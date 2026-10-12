@@ -89,6 +89,21 @@ await build({
   plugins: [yamlEsmPlugin],
 });
 
+// Knex's CommonJS internals require Node built-ins dynamically. Give this
+// standalone ESM entry a require function; the regular server has no Knex.
+await build({
+  entryPoints: [join(server, "postgres-migrate.ts")],
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "esm",
+  outfile: join(root, "dist-server", "postgres-migrate.js"),
+  banner: { js: "import { createRequire as __ombCreateRequire } from 'node:module'; const require = __ombCreateRequire(import.meta.url);" },
+  // Knex discovers every dialect, but only pg is selected by this command.
+  external: ["better-sqlite3", "sqlite3", "mysql", "mysql2", "mariadb/callback", "oracledb", "tedious"],
+  logLevel: "info",
+});
+
 // External MCP clients launch this as an independent stdio process. Keep its
 // source under scripts for a pleasant checkout command (`pnpm mcp`), but ship
 // the bundled output beside the packaged harness so release users do not need

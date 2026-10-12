@@ -4,6 +4,7 @@
 // First, before any module that could start a process: a Cloud home's
 // secrets off the launcher's pipe (cloud-secrets-boot.ts).
 import { BOOT_CLOUD_SECRETS } from "./cloud-secrets-boot.ts";
+import { postgresConnectionUrl } from "./postgres-config.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, rmSync, mkdirSync } from "node:fs";
@@ -683,6 +684,11 @@ const MIME: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
+// Until every structured store has an async PostgreSQL implementation, a
+// successful boot here would persist sessions, bots and chats on ephemeral disk.
+if (postgresConnectionUrl(process.env)) {
+  throw new Error("PostgreSQL storage is not ready for server startup; keep OMB_POSTGRES_ENABLED=false until all structured stores are migrated");
+}
 ensureDirs();
 // The desktop parent owns the primary lease and delegates one private child
 // claim; a standalone/headless server owns the primary lease itself. Acquire
