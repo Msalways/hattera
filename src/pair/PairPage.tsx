@@ -85,6 +85,7 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
   const connected = isConnected(session);
   const emailOffered = environment?.capabilities.emailSignIn === true;
   const cloudHome = environment?.capabilities.cloudHome === true;
+  const githubFailure = new URLSearchParams(location.search).has("github");
 
   async function submitCode(e: React.FormEvent) {
     e.preventDefault();
@@ -116,6 +117,24 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
     setSent(true);
   }
 
+  async function submitGithub() {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/identity/sign-in/social", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider: "github", callbackURL: `${location.origin}/identity/finish`, errorCallbackURL: `${location.origin}/pair?github=1`, disableRedirect: true }),
+      });
+      const answer = await response.json() as { url?: string };
+      if (!response.ok || !answer.url) throw new Error("GitHub sign-in could not start. Try again.");
+      location.assign(answer.url);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "GitHub sign-in could not start. Try again.");
+      setBusy(false);
+    }
+  }
+
   function switchMode(next: "email" | "code") {
     setMode(next);
     setError(null);
@@ -134,6 +153,7 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
           {pairIntro({ mode, sent, email, cloudHome })}
         </p>
         {reasonWorthShowing(reason) && !connected ? <p className="mt-3 text-[13px] text-ink-secondary">{reasonWorthShowing(reason)}</p> : null}
+        {githubFailure && !connected ? <p role="alert" className="mt-3 text-[13px] text-danger">GitHub sign-in was refused. Use the configured owner account and try again.</p> : null}
         {/* An expired or used code on a Cloud: the app starts a fresh one. */}
         {error && cloudHome && initialCode ? <p className="mt-3 text-[13px] text-ink-secondary">This link has expired or was already used. In the OpenMausBot app on your computer, open Settings → MausBot Cloud and choose Open My Cloud.</p> : null}
         </>}
@@ -230,6 +250,11 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
             ) : null}
           </form>
         )}
+        {!opening && !connected && environment?.capabilities.githubSignIn ? (
+          <button type="button" onClick={() => void submitGithub()} disabled={busy} className="mt-3 w-full rounded-md border border-hairline/40 px-4 py-2 text-[14px] font-medium">
+            Sign in with GitHub
+          </button>
+        ) : null}
       </div>
     </main>
   );

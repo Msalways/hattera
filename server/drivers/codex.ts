@@ -48,7 +48,7 @@ import { commandSummary, toolDetailPreview } from "../tool-summary.ts";
 import { codexDeveloperInstructions, syncCodexInstructions } from "./codex-instructions.ts";
 import { volatileContextNote, withContextNote } from "./prompt-split.ts";
 import type { ApprovalMode } from "../../shared/approval-mode.ts";
-import { CodexDeviceAuthController } from "./codex-device-auth.ts";
+import { CodexBrowserAuthController, CodexDeviceAuthController } from "./codex-device-auth.ts";
 import { codexAccountEmail, codexHome } from "./codex-identity.ts";
 import { keyRejected, noteKeyAccepted, noteKeyRejected } from "../key-rejections.ts";
 import { classifyResumeFailure, mayReplay, recoveryPromptFor } from "../resume-recovery.ts";
@@ -150,19 +150,19 @@ async function codexReleaseUpdate(version: string, cli: string): Promise<Provide
 export interface CodexConfig {
   cli: string;
   fullAuto: boolean;
-  authMode?: "chatgpt-plan";
+  authMode?: "chatgpt-plan" | "browser-cli";
   /** Ephemeral Company routing, supplied by the trusted desktop parent. */
   managed?: { url: string; models: string[] };
 }
 
 function decodeConfig(raw: unknown): CodexConfig {
   const o = (raw ?? {}) as Record<string, unknown>;
-  if (o.authMode !== undefined && o.authMode !== "chatgpt-plan") throw new Error("Unknown Codex sign-in mode.");
-  if (o.authMode && o.managed) throw new Error("ChatGPT plan and Company billing cannot be combined.");
+  if (o.authMode !== undefined && o.authMode !== "chatgpt-plan" && o.authMode !== "browser-cli") throw new Error("Unknown Codex sign-in mode.");
+  if (o.authMode && o.managed) throw new Error("ChatGPT sign-in and Company billing cannot be combined.");
   return {
     cli: typeof o.cli === "string" ? o.cli : "codex",
     fullAuto: o.fullAuto === true,
-    ...(o.authMode === "chatgpt-plan" ? { authMode: "chatgpt-plan" as const } : {}),
+    ...(o.authMode === "chatgpt-plan" || o.authMode === "browser-cli" ? { authMode: o.authMode } : {}),
     ...(o.managed && typeof o.managed === "object" ? { managed: decodeManagedCodex(o.managed) } : {}),
   };
 }
@@ -441,6 +441,9 @@ function withResolvedSandbox(params: CodexApprovalParams, session: unknown): Cod
     throw new Error("Codex did not return its resolved sandbox policy. Update Codex, then retry; the turn was not started because its permissions could not be verified.");
   }
   if (sandbox.type !== requested.type) {
+    if (process.platform === "win32" && requested.type === "workspaceWrite" && sandbox.type === "readOnly") {
+      throw new Error("Codex resolved workspace-write to read-only on Windows. Set [windows] sandbox = \"elevated\" in this connection's CODEX_HOME/config.toml, then retry.");
+    }
     throw new Error("Codex did not apply the requested sandbox mode; cannot safely start the turn.");
   }
   return { ...params, turn: { ...params.turn, sandboxPolicy: sandbox } };
@@ -760,7 +763,8 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
     const loginRefused = () => { const mark = loginMark(); if (mark) noteKeyRejected(...mark); };
     const loginAccepted = (mark = loginMark()) => { if (mark) noteKeyAccepted(...mark); };
     const loginRejected = () => { const mark = loginMark(); return mark !== null && keyRejected(...mark); };
-    const authentication = new CodexDeviceAuthController({
+    const AuthController = config.authMode === "browser-cli" ? CodexBrowserAuthController : CodexDeviceAuthController;
+    const authentication = new AuthController({
       cli: config.cli,
       environment: childEnv,
       signInRejected: loginRejected,
@@ -2112,7 +2116,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
     },
     refreshModels,
     ...(startupModelRefresh ? { startupModelRefresh } : {}),
-    ...(plan ? { authenticationMethod: "browser-pkce" as const } : {}),
+    ...(plan || config.authMode === "browser-cli" ? { authenticationMethod: "browser-pkce" as const } : {}),
     startAuthentication: async () => {
       if (planUnavailable) throw new Error(planUnavailable);
       if (planSigningOut || disposed) throw new Error("This account is being disconnected. Wait before signing in again.");

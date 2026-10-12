@@ -3,7 +3,7 @@
 // keep a working login and to confirm the new one, and `codex logout` for
 // Settings' sign-out.
 import { stripVTControlCharacters } from "node:util";
-import { deviceSignInPrompt } from "../../shared/device-sign-in.ts";
+import { codexBrowserSignInPrompt, deviceSignInPrompt } from "../../shared/device-sign-in.ts";
 import { DeviceAuthController, type DeviceAuthOptions, type DeviceSignIn } from "./device-auth.ts";
 
 export function codexDevicePrompt(output: string): { authorizationUrl: string; userCode: string } | null {
@@ -45,4 +45,17 @@ export const CODEX_DEVICE_SIGN_IN: DeviceSignIn = {
 
 export class CodexDeviceAuthController extends DeviceAuthController {
   constructor(options: DeviceAuthOptions) { super(CODEX_DEVICE_SIGN_IN, options); }
+}
+
+export const CODEX_BROWSER_SIGN_IN: DeviceSignIn = {
+  ...CODEX_DEVICE_SIGN_IN,
+  loginArgs: ["login"],
+  prompt: codexBrowserSignInPrompt,
+  failure: (output) => /expired|expiration|timed out/i.test(output)
+    ? "The ChatGPT browser sign-in expired. Start sign-in again."
+    : "ChatGPT browser sign-in did not finish. Check the server's connection and try again.",
+};
+
+export class CodexBrowserAuthController extends DeviceAuthController {
+  constructor(options: DeviceAuthOptions) { super(CODEX_BROWSER_SIGN_IN, options); }
 }

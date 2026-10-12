@@ -9,6 +9,36 @@ export type DeviceSignInProvider = "codex" | "grok";
 
 const CODEX_PAGE = "https://auth.openai.com/codex/device";
 
+/** Codex CLI's local browser callback. Only the official authorization
+ * endpoint and the CLI's loopback callback may be opened by the app. */
+export function codexBrowserSignInLink(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const callback = new URL(url.searchParams.get("redirect_uri") ?? "");
+    const required = ["response_type", "client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state"];
+    return url.origin === "https://auth.openai.com" && url.pathname === "/oauth/authorize" &&
+      !url.username && !url.password && !url.hash &&
+      required.every((key) => url.searchParams.getAll(key).length === 1) &&
+      url.searchParams.get("response_type") === "code" &&
+      url.searchParams.get("code_challenge_method") === "S256" &&
+      /^[A-Za-z0-9_-]+$/.test(url.searchParams.get("client_id") ?? "") &&
+      /^[A-Za-z0-9_-]+$/.test(url.searchParams.get("code_challenge") ?? "") &&
+      /^[A-Za-z0-9_-]+$/.test(url.searchParams.get("state") ?? "") &&
+      callback.origin === "http://127.0.0.1:1455" && callback.pathname === "/auth/callback" &&
+      !callback.username && !callback.password && !callback.search && !callback.hash ? url.href : null;
+  } catch { return null; }
+}
+
+/** Read only a complete CLI output line; chunks can end midway through a URL. */
+export function codexBrowserSignInPrompt(text: string): { authorizationUrl: string } | null {
+  for (const line of text.split(/\r?\n/).slice(0, -1)) {
+    const authorizationUrl = codexBrowserSignInLink(line.trim());
+    if (authorizationUrl) return { authorizationUrl };
+  }
+  return null;
+}
+
 const RULES: Record<DeviceSignInProvider, { page(value: string): string | null; code: RegExp }> = {
   codex: {
     page: (value) => (/^https:\/\/auth\.openai\.com\/codex\/device\/?$/.test(value) ? CODEX_PAGE : null),

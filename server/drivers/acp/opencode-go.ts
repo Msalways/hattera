@@ -82,9 +82,12 @@ export function isFreeOpenCodeModel(id: string): boolean {
  * all-paid catalog (the person's own providers) falls back to OpenCode's
  * pick. */
 export function preferredOpenCodeModel(offered: readonly string[], current?: string | null): string {
-  if (current && offered.includes(current) && isFreeOpenCodeModel(current)) return current;
-  const free = offered.filter(isFreeOpenCodeModel);
-  return free.find((id) => id.startsWith("opencode/"))
+  // OpenCode 2 still advertises exo-free, but its prompt endpoint rejects it
+  // as deprecated. Prefer the free model verified through the current ACP route.
+  if (current && current !== "opencode/exo-free" && offered.includes(current) && isFreeOpenCodeModel(current)) return current;
+  const free = offered.filter((id) => id !== "opencode/exo-free" && isFreeOpenCodeModel(id));
+  return free.find((id) => id === "opencode/space-bunny-free")
+    ?? free.find((id) => id.startsWith("opencode/"))
     ?? free[0]
     ?? (current && offered.includes(current) ? current : offered[0] ?? "");
 }

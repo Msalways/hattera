@@ -87,6 +87,15 @@ describe("ChatGPT plan browser sign-in", () => {
     expect(html).not.toContain("codex login");
   });
 
+  it("opens a validated Codex CLI browser login", () => {
+    const cliUrl = "https://auth.openai.com/oauth/authorize?response_type=code&client_id=app_fixture&redirect_uri=http%3A%2F%2F127.0.0.1%3A1455%2Fauth%2Fcallback&code_challenge=fixture_abc&code_challenge_method=S256&state=fixture_123";
+    expect(chatgptPlanLink(cliUrl)).toBe(cliUrl);
+    const html = renderBrowser({ ...waiting, authorizationUrl: cliUrl, userCode: undefined });
+    expect(html).toContain("Continue with ChatGPT");
+    expect(html).toContain("href=");
+    expect(html).not.toContain("Copy sign-in code");
+  });
+
   it.each([
     "http://auth.openai.com/api/accounts/authorize",
     "https://auth.openai.com.evil.test/api/accounts/authorize",

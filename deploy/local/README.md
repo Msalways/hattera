@@ -10,10 +10,9 @@ To customize, copy `.env.example` to `.env` in the repository root.
 The `.env` file is ignored by Git. Shell environment variables take precedence.
 `OMB_HTTP_PORT` changes the host port and the default public URL.
 Internal service ports remain fixed inside the shared network namespace.
-`ENGINES` selects space-separated npm packages; an empty value skips installation.
-The image also carries Grok Build, pinned by `GROK_VERSION` in
-`deploy/local/Dockerfile`; Grok and Codex sign in from the app's engine setup
-with a one-time code, no terminal needed.
+Compose builds this checkout's `Dockerfile` server target. `ENGINES` selects
+space-separated npm packages; the default includes OpenCode, Claude Code, and
+Codex. An empty value skips CLI installation.
 
 For Tailscale Serve, set `OMB_PUBLIC_URL` to your HTTPS URL and
 `OMB_HTTPS_HOST` to its hostname without scheme or path. Configure Tailscale
@@ -26,6 +25,18 @@ semantics for that host while localhost access continues to use HTTP.
 Private tailnet webhook URLs are only reachable by callers on that tailnet.
 Without `OMB_HTTPS_HOST`, the bind address can be changed for HTTP access.
 Only use HTTPS hostname mapping with a trusted local TLS-terminating proxy.
+
+For GitHub sign-in, set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
+`BETTER_AUTH_SECRET`, and your stable numeric `GITHUB_OWNER_ID` in `.env`.
+Set `GITHUB_REDIRECT_URI` to
+`https://<tailnet-host>/identity/callback/github` and register that exact
+callback in the GitHub OAuth app. `OMB_PUBLIC_URL` must use the same HTTPS
+origin. For testing only on this computer, use `OMB_PUBLIC_URL=http://127.0.0.1:8080`
+and `GITHUB_REDIRECT_URI=http://127.0.0.1:8080/identity/callback/github`.
+Open the app at `http://127.0.0.1:8080`; keep `OMB_BIND_ADDRESS=127.0.0.1`
+and `OMB_HTTPS_HOST` empty. GitHub's OAuth app Homepage URL can be
+`http://127.0.0.1:8080`. These values are passed to the server; its identity
+database lives on the persistent `/data` volume.
 
 Sign in and pair a browser:
 

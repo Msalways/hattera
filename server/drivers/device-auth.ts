@@ -48,6 +48,8 @@ export interface DeviceSignIn {
   homeEnv: string;
   homeDir: string;
   loginArgs: readonly string[];
+  /** CLI-specific safe challenge parser. Device code is the default. */
+  prompt?(output: string): { authorizationUrl: string; userCode?: string } | null;
   /** How to install the CLI, said after "<product> is not installed on this server." */
   install: string;
   /** One safe, actionable sentence for a login command that failed; never
@@ -311,7 +313,8 @@ export class DeviceAuthController {
         return;
       }
       output += chunk.toString("utf8");
-      const prompt = parsePrompt && !flow.ready ? deviceSignInPrompt(provider, stripVTControlCharacters(output)) : null;
+      const prompt = parsePrompt && !flow.ready
+        ? (this.spec.prompt ?? ((text) => deviceSignInPrompt(provider, text)))(stripVTControlCharacters(output)) : null;
       if (prompt) {
         flow.status = { ...flow.status, ...prompt };
         flow.ready = true;

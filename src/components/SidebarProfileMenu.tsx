@@ -9,17 +9,14 @@
 // The update entry is the one item that reports progress in place, so it
 // keeps the menu open and re-labels itself as it works.
 //
-// The phone has two entries: Connect your phone, which opens the pairing
-// this window can do and says where the phone will connect (this computer,
-// your Cloud, this server), and Get the phone app (iPhone and Android). On
-// this computer, a paid Cloud that is Ready adds a Connect your phone line
-// of its own, first: to your Cloud, always on.
+// Connect your phone opens this window's pairing and says where the phone
+// will connect (this computer, your Cloud, this server). On this computer,
+// a paid Cloud that is Ready adds a line of its own, first: to your Cloud.
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   Check,
   CircleUserRound,
-  Download,
   Gauge,
   Info,
   HelpCircle,
@@ -34,7 +31,6 @@ import {
 import { InitialsAvatar } from "./Avatar";
 import { DiscordIcon } from "./DiscordIcon";
 import { AboutDialog } from "./AboutDialog";
-import { PhoneAppDialog } from "./PhoneAppDialog";
 import { SidebarPopoverMenu, type SidebarMenuItem } from "./SidebarPopoverMenu";
 import { ShortcutHint } from "./ShortcutHint";
 import { useSidebarPhoneStatus } from "./SidebarPhoneButton";
@@ -261,41 +257,31 @@ export function selectPhoneDestination(destination: PhoneDestination, { bridge, 
 }
 
 /** The phone entries at the top of the menu: a Connect your phone line per
- * destination, then Get the phone app. Connect your phone is absent where
+ * destination. Connect your phone is absent where
  * this window cannot pair one (a chat-only session, a server whose people
  * sign in through their organization). */
 export function phoneMenuItems({
   destinations,
   connected,
   onConnect,
-  onGetApp,
 }: {
   destinations: PhoneDestination[];
   /** a phone is connected to this computer right now */
   connected: boolean;
   onConnect: (destination: PhoneDestination) => void;
-  onGetApp: () => void;
 }): SidebarMenuItem[] {
-  return [
-    ...destinations.map((destination) => ({
-      key: destination.id === "cloud" ? "connect-phone-cloud" : "connect-phone",
-      label: t("sidebar.menu.connectPhone"),
-      subtitle: t(destination.subtitleKey),
-      ...(destination.noteKey ? { note: t(destination.noteKey) } : {}),
-      icon: <Smartphone size={18} />,
-      trailing:
-        destination.id === "here" && destination.target === "computer" && connected ? (
-          <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-success" />
-        ) : undefined,
-      onSelect: () => onConnect(destination),
-    } satisfies SidebarMenuItem)),
-    {
-      key: "phone-app",
-      label: t("sidebar.menu.getPhoneApp"),
-      icon: <Download size={18} />,
-      onSelect: onGetApp,
-    },
-  ];
+  return destinations.map((destination) => ({
+    key: destination.id === "cloud" ? "connect-phone-cloud" : "connect-phone",
+    label: t("sidebar.menu.connectPhone"),
+    subtitle: t(destination.subtitleKey),
+    ...(destination.noteKey ? { note: t(destination.noteKey) } : {}),
+    icon: <Smartphone size={18} />,
+    trailing:
+      destination.id === "here" && destination.target === "computer" && connected ? (
+        <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-success" />
+      ) : undefined,
+    onSelect: () => onConnect(destination),
+  } satisfies SidebarMenuItem));
 }
 
 /** The profile menu's rows, in its three groups: where you stand (usage,
@@ -360,7 +346,6 @@ export function SidebarProfileMenu({ iconOnly = false }: { iconOnly?: boolean } 
   const destinations = phoneDestinations(connectPhone, cloudPhone.cloud);
   const update = useUpdateItem();
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [phoneAppOpen, setPhoneAppOpen] = useState(false);
   const triggerRef = useRef<HTMLSpanElement>(null);
 
   const profile = state.config?.profile;
@@ -375,7 +360,6 @@ export function SidebarProfileMenu({ iconOnly = false }: { iconOnly?: boolean } 
       destinations,
       connected: phone.kind === "connected",
       onConnect: connectTo,
-      onGetApp: () => setPhoneAppOpen(true),
     }),
     usage: !remote,
     update: update?.item ?? null,
@@ -448,15 +432,6 @@ export function SidebarProfileMenu({ iconOnly = false }: { iconOnly?: boolean } 
         )}
       />
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
-      <PhoneAppDialog
-        open={phoneAppOpen}
-        onClose={() => setPhoneAppOpen(false)}
-        connect={destinations.map((destination) => ({
-          key: destination.id,
-          subtitle: t(destination.subtitleKey),
-          onSelect: () => connectTo(destination),
-        }))}
-      />
     </>
   );
 }
