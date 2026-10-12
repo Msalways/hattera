@@ -687,7 +687,7 @@ const MIME: Record<string, string> = {
 // Until every structured store has an async PostgreSQL implementation, a
 // successful boot here would persist sessions, bots and chats on ephemeral disk.
 if (postgresConnectionUrl(process.env)) {
-  throw new Error("PostgreSQL storage is not ready for server startup; keep OMB_POSTGRES_ENABLED=false until all structured stores are migrated");
+  throw new Error("PostgreSQL storage is not ready for server startup; keep OMB_POSTGRES_ENABLED=false until all structured stores have PostgreSQL implementations");
 }
 ensureDirs();
 // The desktop parent owns the primary lease and delegates one private child
