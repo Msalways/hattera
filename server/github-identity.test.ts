@@ -27,7 +27,7 @@ let identity: ReturnType<typeof createGithubIdentity> | undefined;
 afterEach(async () => {
   if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
   server = undefined;
-  identity?.close(); identity = undefined;
+  if (identity) await identity.close(); identity = undefined;
   sessions?.close(); sessions = undefined;
   if (dir) rmSync(dir, { recursive: true, force: true });
   dir = undefined;

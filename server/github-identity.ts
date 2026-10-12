@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import type { Pool } from "pg";
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
@@ -40,16 +41,16 @@ export function isGithubOwner(account: { providerId: string; accountId: string }
   return account.providerId === "github" && account.accountId === ownerId;
 }
 
-export function createGithubIdentity(input: { config: GithubIdentityConfig; dataDir: string; sessions: SessionRegistry; cookieName: string }) {
+export function createGithubIdentity(input: { config: GithubIdentityConfig; dataDir: string; sessions: SessionRegistry; cookieName: string; postgresPool?: Pool }) {
   const { config, sessions, cookieName } = input;
-  mkdirSync(input.dataDir, { recursive: true, mode: 0o700 });
-  const db = new DatabaseSync(join(input.dataDir, "github-identity.sqlite"));
+  if (!input.postgresPool) mkdirSync(input.dataDir, { recursive: true, mode: 0o700 });
+  const sqliteDb = input.postgresPool ? null : new DatabaseSync(join(input.dataDir, "github-identity.sqlite"));
   const auth = betterAuth({
     appName: "OpenMausBot",
     baseURL: config.publicUrl,
     basePath: "/identity",
     secret: config.secret,
-    database: db,
+    database: input.postgresPool ?? sqliteDb!,
     trustedOrigins: [config.publicUrl],
     socialProviders: {
       github: {
@@ -107,5 +108,8 @@ export function createGithubIdentity(input: { config: GithubIdentityConfig; data
     return true;
   }
 
-  return { ready, handle, clearOAuthSession, close: () => db.close() };
+  return { ready, handle, clearOAuthSession, close: async () => {
+    if (sqliteDb) sqliteDb.close();
+    else await input.postgresPool!.end();
+  } };
 }

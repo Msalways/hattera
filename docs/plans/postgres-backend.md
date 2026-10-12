@@ -7,13 +7,16 @@ environment is validated, and `pnpm storage:pg:migrate` applies a versioned
 initial PostgreSQL schema. The command requires both
 `OMB_POSTGRES_ENABLED=true` and `DATABASE_URL`. The migration command is
 idempotent and is included in the packaged server bundle as
-`dist-server/postgres-migrate.js`.
+`dist-server/postgres-migrate.js`. Better Auth can now initialize and reopen
+against a PostgreSQL pool; the existing SQLite identity path remains the
+default. The PostgreSQL identity adapter has passed a disposable database
+test, but the server does not select it yet.
 
 **Do not enable the flag on a running server or Render yet.** The server
 deliberately rejects it before creating its data directory. The active chat,
 bot, settings, session, and Data-table stores still use synchronous SQLite,
-DuckDB, and JSON files. The new PostgreSQL tables are not yet active stores,
-and existing data is not imported. Startup migration on deployment belongs
+DuckDB, and JSON files. The new PostgreSQL tables are not yet active stores.
+Startup migration on deployment belongs
 with the completed backend switch; running schema migrations alone would not
 make an ephemeral deployment durable.
 
@@ -74,33 +77,21 @@ boundary and update callers through that boundary. Avoid blocking the Node
 event loop with a synchronous worker or hidden whole-directory snapshots.
 Keep API URLs and response shapes unchanged in both modes.
 
-## Initialization and migration
+## Initialization
 
-1. Add versioned, transactional PostgreSQL schema migrations. At startup,
-   acquire a PostgreSQL advisory lock, apply pending schema versions, then
-   accept requests. Concurrent instances must not race the migrations.
-2. Add an explicit `storage:migrate` command for **SQLite/JSON to PostgreSQL**.
-   It reads an offline or locked source data directory. It first reports the
-   source inventory and target status in a dry run, without changing either.
-3. Require a consistent SQLite backup and stop application writes for the
-   import. Import structured records in dependency order with stable IDs and
-   timestamps. Record the source fingerprint and migration ID in PostgreSQL.
-   Each batch is transactional and safely resumable after interruption.
-4. Verify row counts, representative checksums, referential links, search
-   results, Data tables, and authentication ownership before cutover. Keep the original
-   SQLite and JSON files intact as the rollback source; never delete them as
-   part of import.
-5. Start with `OMB_POSTGRES_ENABLED=true` only after verification. A repeated
-   migration must refuse a different source or an already active target rather
-   than duplicate records. Rollback to the untouched source is safe only before
-   PostgreSQL accepts new writes. After that, recovery uses PostgreSQL backups
-   or an explicit reverse export; it is not an automatic dual-write mode.
+For a fresh installation, `OMB_POSTGRES_ENABLED=true` selects PostgreSQL and
+`DATABASE_URL` identifies its database. Apply pending, versioned schema
+migrations before serving requests. Knex's migration lock and version table
+make repeated deploys safe. Better Auth's PostgreSQL tables initialize on the
+same startup path. A failed connection or migration stops startup; it cannot
+fall back to a local database.
 
-Better Auth's schema migration is distinct from importing its existing users
-and accounts. Auth records and app sessions must be handled explicitly; if a
-session cannot be transferred safely, require a fresh GitHub sign-in and say
-so in the cutover report. The configured GitHub owner ID remains the
-authorization check in either backend.
+There is **no SQLite-to-PostgreSQL data import** in this work. Each backend
+owns a separate installation's records. Setting the PostgreSQL flag on an
+installation that already has SQLite data would open an empty PostgreSQL
+workspace; turning the flag off would show the original SQLite workspace.
+That is a backend choice for new deployments, not a live migration feature.
+The configured GitHub owner ID remains the authorization check in both modes.
 
 ## Cleanup and retention
 
@@ -123,10 +114,9 @@ authorization check in either backend.
   require a PostgreSQL driver or connection at runtime.
 - PostgreSQL mode initializes an empty database, persists all structured
   records across a server restart, and fails closed when its connection drops.
-- An isolated fixture with messages, branches, bots, settings, routines,
-  sessions, GitHub identity, and per-bot Data tables migrates without missing
-  or duplicated data.
-  A second run is safe; a partially failed run resumes or refuses cleanly.
+- A fresh PostgreSQL fixture persists messages, branches, bots, settings,
+  routines, sessions, GitHub identity, and per-bot Data tables through a
+  restart. A second schema migration run applies zero migrations.
 - Legacy `/api/auth/*` routes, pairing, logout, GitHub owner rejection, search,
   command receipts, and live turns behave the same in both modes.
 - The file store and backup/restore gate are completed before calling a
@@ -140,7 +130,6 @@ authorization check in either backend.
    contracts while keeping SQLite behavior and tests intact.
 2. Add PostgreSQL schema, migrations, and implementations for messages,
    search, documents, sessions, and Better Auth.
-3. Add the one-time importer and cutover verification.
-4. Add file storage, cleanup, and backup/restore for the chosen host.
-5. Enable the environment flag after both backend test suites and an isolated
-   end-to-end migration pass.
+3. Add file storage, cleanup, and backup/restore for the chosen host.
+4. Enable the environment flag and startup migrations after both backend test
+   suites and an isolated end-to-end persistence pass.
