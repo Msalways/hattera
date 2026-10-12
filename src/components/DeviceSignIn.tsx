@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { openExternalLink } from "@/lib/app-links";
 import { useCopyFeedback } from "@/lib/copy-text";
 import type { LocaleKey } from "@/locales";
-import { deviceSignInLink, isDeviceSignInCode, type DeviceSignInProvider } from "../../shared/device-sign-in";
+import { codexBrowserSignInLink, deviceSignInLink, isDeviceSignInCode, type DeviceSignInProvider } from "../../shared/device-sign-in";
 import { CodexMark } from "./ProviderIcons";
 
 export interface DeviceSignInStatus {
@@ -68,6 +68,8 @@ export function codexDeviceLink(value: string | null): string | null {
 }
 
 export function chatgptPlanLink(value: string | null): string | null {
+  const cli = codexBrowserSignInLink(value);
+  if (cli) return cli;
   if (!value) return null;
   try {
     const url = new URL(value);

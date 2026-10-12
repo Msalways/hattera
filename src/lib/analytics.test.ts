@@ -1,5 +1,5 @@
-// The opt-out has one job that matters: an install that turned analytics off
-// must not talk to PostHog at all. optAction pins the decision, the storage
+// A fresh install and an install that turned analytics off must not talk to
+// PostHog. optAction pins the decision, the storage
 // round-trip pins that the choice survives a restart, and the loading tests
 // pin that posthog-js is only evaluated once analytics are on.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -61,6 +61,7 @@ vi.stubGlobal("localStorage", baseStorage);
 
 beforeEach(() => {
   store.clear();
+  store.set("omb-analytics-opt-out", "0"); // most tests exercise an explicit opt-in
   ph.loads = 0;
   ph.fail = false;
   ph.initThrows = false;
@@ -105,8 +106,13 @@ describe("optAction", () => {
 });
 
 describe("the stored choice", () => {
-  it("is on for a fresh install", () => {
-    expect(analyticsEnabled()).toBe(true);
+  it("is off for a fresh install and never loads PostHog", async () => {
+    store.clear();
+    const fresh = await freshAnalytics();
+    expect(fresh.analyticsEnabled()).toBe(false);
+    await fresh.initAnalytics();
+    expect(ph.loads).toBe(0);
+    expect(ph.calls).toEqual([]);
   });
 
   it("survives a restart once opted out", () => {
@@ -142,7 +148,8 @@ describe("the stored choice", () => {
     expect(store.get("omb-installed")).toBeUndefined();
   });
 
-  it("treats unusable storage as a fresh install rather than failing", () => {
+  it("treats unusable storage as a fresh install rather than failing", async () => {
+    const fresh = await freshAnalytics();
     vi.stubGlobal("localStorage", {
       getItem: () => {
         throw new Error("denied");
@@ -151,8 +158,10 @@ describe("the stored choice", () => {
         throw new Error("denied");
       },
     });
-    expect(analyticsEnabled()).toBe(true);
-    expect(() => setAnalyticsEnabled(false)).not.toThrow();
+    expect(fresh.analyticsEnabled()).toBe(false);
+    expect(() => fresh.setAnalyticsEnabled(false)).not.toThrow();
+    await fresh.initAnalytics();
+    expect(ph.loads).toBe(0);
   });
 });
 

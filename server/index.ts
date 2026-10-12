@@ -596,6 +596,7 @@ import {
   sessionCookieName,
 } from "./request-auth.ts";
 import { cookieMaxAgeSeconds, formatPairingCode, SessionRegistry, type Scope, type SessionRecord } from "./sessions.ts";
+import { createGithubIdentity, githubIdentityConfig } from "./github-identity.ts";
 import { ThreadStarters } from "./thread-starters.ts";
 import {
   activityCsv,
@@ -799,6 +800,15 @@ if (CLOUD_HOME && Object.keys(CLOUD_SECRETS).length === 0) {
 const threadStarters = new ThreadStarters(join(DATA_DIR, "thread-starters.json"));
 const commandAllowlist = new CommandAllowlistStore(join(DATA_DIR, "command-allowlist.json"));
 const SESSION_COOKIE = sessionCookieName(PORT, ENVIRONMENT_ID);
+const GITHUB_IDENTITY = githubIdentityConfig(process.env);
+sessions.revokeOtherGithubOwners(GITHUB_IDENTITY?.ownerId ?? null);
+// Agent CLIs inherit this process's environment; OAuth credentials stay here.
+if (GITHUB_IDENTITY) {
+  delete process.env.GITHUB_CLIENT_SECRET;
+  delete process.env.BETTER_AUTH_SECRET;
+}
+const githubIdentity = GITHUB_IDENTITY ? createGithubIdentity({ config: GITHUB_IDENTITY, dataDir: DATA_DIR, sessions, cookieName: SESSION_COOKIE }) : null;
+if (githubIdentity) await githubIdentity.ready;
 const HOSTED_WORKSPACE = hostedWorkspaceConfigured();
 let workspaceAccess: WorkspaceAccess | null = null;
 const DESKTOP_MANAGED = process.env.OMB_DESKTOP_PARENT === "1";
@@ -16960,6 +16970,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
   let m: RegExpMatchArray | null = null;
   let releaseWorkspaceRequest: (() => void) | undefined;
   try {
+    if (githubIdentity && await githubIdentity.handle(req, res, path)) return;
     // Unlike the legacy reachability probe, this attests the running
     // server's portal-membership capability, including live entitlement.
     if (method === "GET" && path === "/api/health/hosted") {
@@ -17007,7 +17018,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     // paired session with the right scope.
     if (method === "GET" && !path.startsWith("/api/") && !path.startsWith("/.well-known/") && serveStatic(res, path)) return;
     if (method === "GET" && path === "/.well-known/openmausbot/environment") {
-      return json(res, 200, environmentDescriptor({ environmentId: ENVIRONMENT_ID, desktopManaged: DESKTOP_MANAGED, emailSignIn: !HOSTED_WORKSPACE && !CLOUD_HOME && emailSignIn.enabled(), sharedComputers: lendingEnabled(), cloudHome: Boolean(CLOUD_HOME) }));
+      return json(res, 200, environmentDescriptor({ environmentId: ENVIRONMENT_ID, desktopManaged: DESKTOP_MANAGED, emailSignIn: !HOSTED_WORKSPACE && !CLOUD_HOME && emailSignIn.enabled(), githubSignIn: Boolean(githubIdentity), sharedComputers: lendingEnabled(), cloudHome: Boolean(CLOUD_HOME) }));
     }
     const domainCheck = /^\/\.well-known\/openmausbot\/domain-check\/([a-f0-9]{64})$/.exec(path);
     if (method === "GET" && domainCheck) {
@@ -17257,8 +17268,9 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       return json(res, 200, sessions.issueStreamTicket(auth.session.id));
     }
     if (method === "POST" && path === "/api/auth/logout") {
+      const oauthCookies = githubIdentity ? await githubIdentity.clearOAuthSession(req) : [];
       if (auth.kind === "session") sessions.revoke(auth.session.id);
-      res.setHeader("set-cookie", clearSessionCookie(SESSION_COOKIE));
+      res.setHeader("set-cookie", githubIdentity ? [...oauthCookies, clearSessionCookie(SESSION_COOKIE)] : clearSessionCookie(SESSION_COOKIE));
       return json(res, 200, { ok: true });
     }
     if (method === "POST" && path === "/api/auth/pairing") {

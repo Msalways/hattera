@@ -615,6 +615,16 @@ export class SessionRegistry {
     return true;
   }
 
+  /** A changed or removed GitHub owner must not keep a previous owner's grant. */
+  revokeOtherGithubOwners(ownerId: string | null): void {
+    const revoked = this.sessions.filter((session) => session.userId?.startsWith("github:") && session.userId !== (ownerId === null ? null : `github:${ownerId}`));
+    if (!revoked.length) return;
+    const ids = new Set(revoked.map((session) => session.id));
+    this.sessions = this.sessions.filter((session) => !ids.has(session.id));
+    for (const session of revoked) this.forget(session.id);
+    this.persist();
+  }
+
   // ── stream tickets ─────────────────────────────────────────────────────
 
   issueStreamTicket(sessionId: string): { ticket: string; expiresAt: number } {

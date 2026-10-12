@@ -165,6 +165,11 @@ RUN if [ -n "$ENGINES" ]; then HOME=/tmp/omb-build-home npm install -g $ENGINES 
 COPY --from=build --chown=maus:maus /src/dist-native/duckdb/linux-x64 ./duckdb
 COPY --from=build --chown=maus:maus /src/dist-server ./dist-server
 COPY --from=build --chown=maus:maus /src/dist ./dist
+# Render runs this image with deploy/render/start.mjs; local Compose keeps the
+# default command below and its separate Caddy service.
+COPY --from=edge /caddy /usr/local/bin/caddy
+COPY deploy/render/Caddyfile ./render/Caddyfile
+COPY deploy/render/start.mjs ./render/start.mjs
 ENV HOME=/data
 VOLUME ["/data"]
 USER maus

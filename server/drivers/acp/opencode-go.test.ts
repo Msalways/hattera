@@ -546,6 +546,8 @@ describe("OpenCode catalog discovery from the ACP session", () => {
     const offered = ["opencode/claude-sonnet-5-5", "opencode/big-pickle", "opencode/longcat-2.5-preview-free"];
     expect(preferredOpenCodeModel(offered, "opencode/longcat-2.5-preview-free")).toBe("opencode/longcat-2.5-preview-free");
     expect(preferredOpenCodeModel(offered, "opencode/claude-sonnet-5-5")).toBe("opencode/longcat-2.5-preview-free");
+    expect(preferredOpenCodeModel(["opencode/exo-free", "opencode/space-bunny-free"], "opencode/exo-free"))
+      .toBe("opencode/space-bunny-free");
     // Zen's price (models --verbose) outranks the name.
     parseOpenCodeModelsOutput(["opencode/big-pickle", JSON.stringify({ cost: { input: 0, output: 0 } })].join("\n"));
     expect(preferredOpenCodeModel(offered, "opencode/big-pickle")).toBe("opencode/big-pickle");
