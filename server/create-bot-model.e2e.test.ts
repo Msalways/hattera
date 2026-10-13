@@ -93,3 +93,49 @@ it("Chief creation uses the workspace default or a validated explicit model with
     await removeTempDir(temp);
   }
 }, 60_000);
+
+it("rejects a signed-out engine in Chief bot creation and team setup", async () => {
+  const temp = mkdtempSync(join(tmpdir(), "omb-create-signed-out-"));
+  const gate = join(temp, "finish");
+  const fixture = await launchVerificationServer({ FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_SLOW_FINISH_GATE: gate,
+    FAKE_CODEX_MODE: "logged-out" }, undefined, undefined, undefined, undefined, undefined, ["codex"]);
+  const api = async (method: string, path: string, body?: unknown, token?: string) => {
+    const response = await fetch(fixture.info.url + path, { method,
+      headers: { "content-type": "application/json", origin: fixture.info.url,
+        ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    return { status: response.status, body: await response.json() as any };
+  };
+  try {
+    const instances = (await api("GET", "/api/instances")).body.instances;
+    const codex = instances.find((item: any) => item.instanceId === "codex");
+    expect(codex.snapshot.authenticated).toBe(false);
+    const claude = instances.find((item: any) => item.instanceId === "claude");
+    const chief = (await api("POST", "/api/bots", { name: "Chief", section: "Design",
+      modelSelection: { instanceId: "claude", model: claude.models.default } })).body.bot;
+    await api("PATCH", `/api/bots/${chief.id}`, { chiefOfStaff: true });
+    await api("POST", `/api/bots/${chief.id}/messages`, { text: "Prepare a specialist." });
+    await expect.poll(() => existsSync(fixture.fixtureDumpPath), { timeout: 15_000 }).toBe(true);
+    const token = JSON.parse(readFileSync(fixture.fixtureDumpPath, "utf8")).mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN;
+    const selection = { instanceId: "codex", model: codex.models.default };
+    const catalog = await api("GET", "/api/internal/team-setup-catalog", undefined, token);
+    expect(catalog.body.instances.find((item: any) => item.instanceId === "codex")).toMatchObject({ ready: false });
+    const created = await api("POST", "/api/internal/create-bot", {
+      name: "Review", role: "Reviewer", instructions: "Review the work.", modelSelection: selection,
+    }, token);
+    expect(created.status).toBe(400);
+    expect(created.body.error).toContain("not ready to run");
+    const setup = await api("POST", "/api/internal/team-setup-requests", { plan: {
+      reason: "Add a reviewer", operations: [{ action: "create", key: "review", fields: {
+        name: "Review", title: "Reviewer", soul: "Review the work.", modelSelection: selection,
+      } }],
+    } }, token);
+    expect(setup.status).toBe(400);
+    expect(setup.body.error).toContain("not ready to run");
+    expect((await api("GET", "/api/bots")).body.bots.some((bot: any) => bot.name === "Review")).toBe(false);
+  } finally {
+    writeFileSync(gate, "finish");
+    await fixture.close();
+    await removeTempDir(temp);
+  }
+}, 90_000);

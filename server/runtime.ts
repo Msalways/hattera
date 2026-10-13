@@ -12645,6 +12645,10 @@ const chiefPeerTargetRule = (noun: string) => (proposerBotId: string, targetBotI
 const validateModelProposal = (selection: ModelSelection, current?: BotRecord): string | null => {
   const checked = checkedModelSelection(selection, undefined, true);
   if (!checked.ok) return checked.error;
+  const engine = threadEngine(selection.instanceId);
+  if (!registry.lastSnapshot(selection.instanceId) || !engine || !readyToRun(selectableInstances([engine])[0]!, selectionContext)) {
+    return `model instance "${selection.instanceId}" is not ready to run; sign in or choose a ready engine`;
+  }
   if (current?.approvalGrant) return "Wait for the approval-level confirmation before changing this bot's model";
   if (current) {
     const mode = approvalModeFor(current);
@@ -12828,6 +12832,7 @@ async function resolveAndSendTeamSetup(res: ServerResponse, args: { botId: strin
   const card = store.messagesFor(args.threadId).find((item) => item.card?.requestId === args.requestId && item.card.teamSetupRequest)?.card;
   if (!card) return false;
   if (args.behavior === "allow" && !ownerReview) { json(res, 403, { error: "Approve team setup or deletion from the desktop app or a paired Full-access device. In a local browser, wait until every bot is idle." }); return true; }
+  if (args.behavior === "allow") await registry.describe();
   if (args.behavior === "allow" && !card.answered && !card.dismissed && !card.expired) {
     // Confirmed Chief setup can move bots without the ordinary PATCH route.
     // Keep that atomic Store operation behind the same shared-machine fence.
@@ -13012,14 +13017,15 @@ function resolveAndSendProfile(
   return true;
 }
 
-function resolveAndSendModel(
+async function resolveAndSendModel(
   res: ServerResponse,
   args: { botId: string; botName?: string; threadId: string; requestId: string; behavior: string },
-): boolean {
+): Promise<boolean> {
   const card = store.messagesFor(args.threadId).find(
     (message) => message.card?.requestId === args.requestId && message.card.modelRequest,
   )?.card;
   if (!card) return false;
+  if (args.behavior === "allow") await registry.describe();
   const result = modelRequests.resolve(args);
   if (!result.claimed) return false;
   if (result.state === "applied" || result.state === "denied") {
@@ -18248,6 +18254,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if (!from) return json(res, 403, { error: "unknown sender" });
         const owner = connectorThread(from.id, body.fromThreadId);
         if (!owner) return json(res, 403, { error: "source conversation does not belong to sender" });
+        await registry.describe();
         const proposed = modelRequests.submit({
           botId: from.id,
           threadId: body.fromThreadId,
@@ -18266,7 +18273,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       if (method === "GET" && path === "/api/internal/team-setup-catalog") {
         let chief = store.bot(internalCapability.botId)!;
         if (!chief.chiefOfStaff || chief.hidden) return json(res, 403, { error: "Only an active Chief may plan team setup" });
-        const instances = await registry.describe();
+        const instances = selectableInstances(await registry.describe());
         requireActiveInternalCapability();
         chief = store.bot(internalCapability.botId)!;
         if (!chief.chiefOfStaff || chief.hidden) return json(res, 403, { error: "Only an active Chief may plan team setup" });
@@ -18275,8 +18282,8 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           bots: store.bots.filter((bot) => !bot.hidden && canAccessTeam(chief, bot.section) && (bot.id === chief.id || peerAllowed(chief, bot)))
             .map((bot) => ({ id: bot.id, name: bot.name, title: bot.title, section: bot.section ?? "", modelSelection: bot.modelSelection, chiefOfStaff: Boolean(bot.chiefOfStaff) })),
           instances: instances.map((instance) => ({ instanceId: instance.instanceId, driverKind: instance.driverKind, displayName: instance.displayName,
-            state: instance.snapshot.state, models: instance.models, effortLevels: instance.capabilities?.effortLevels ?? [] })),
-          scope: "Bot model defaults apply to groups and new threads; existing threads retain their models. Full Access applies requested team setup immediately; other modes return a review card. Existing unauthorized teams remain outside this Chief's scope.",
+            state: instance.snapshot.state, ready: readyToRun(instance, selectionContext), models: instance.models, effortLevels: instance.capabilities?.effortLevels ?? [] })),
+          scope: "Choose engines with ready=true for new bots. Bot model defaults apply to groups and new threads; existing threads retain their models. Full Access applies requested team setup immediately; other modes return a review card. Existing unauthorized teams remain outside this Chief's scope.",
         });
       }
       if (method === "POST" && path === "/api/internal/team-setup-requests") {
@@ -18285,6 +18292,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const chief = store.bot(internalCapability.botId)!;
         const owner = connectorThread(chief.id, internalCapability.threadId);
         if (!owner) return json(res, 403, { error: "Source conversation no longer belongs to the Chief" });
+        await registry.describe();
         const proposed = await teamSetupRequests.submit({ botId: chief.id, threadId: internalCapability.threadId, plan: parsed.data.plan,
           canCommit: () => internalCapabilityIsActive(internalCapability),
           ...(owner.group ? { from: { botId: chief.id, name: chief.name, color: chief.color } } : {}) });
@@ -19545,6 +19553,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if (instructions.length > 1_000) {
           return json(res, 400, { error: "instructions must be at most 1000 characters" });
         }
+        await registry.describe();
         let selection: ModelSelection;
         if (body.modelSelection === undefined) {
           selection = await defaultSelection();
@@ -19553,6 +19562,8 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           if (!checked.ok) return json(res, checked.status, { error: checked.error });
           selection = checked.selection;
         }
+        const modelError = validateModelProposal(selection);
+        if (modelError) return json(res, 400, { error: modelError });
         if (hostedModels && !hostedModels.allows(selection)) return json(res, 400, { error: hostedModels.error() });
         // The same check the profile path runs: absolute, exists, is a
         // folder. Creation names where the specialist works; nothing looser.
@@ -23780,7 +23791,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           requestId: String(body.requestId),
           behavior,
         })) return;
-        if (resolveAndSendModel(res, {
+        if (await resolveAndSendModel(res, {
           botId: bot.id,
           botName: bot.name,
           threadId: bot.threadId,
@@ -23909,7 +23920,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           const modelBotId = modelCard.from?.botId ?? store.botByThread(threadId)?.id;
           if (!modelBotId) return json(res, 400, { error: "this model request has no valid owner" });
           const modelOwner = store.bot(modelBotId);
-          if (resolveAndSendModel(res, {
+          if (await resolveAndSendModel(res, {
             botId: modelBotId,
             botName: modelOwner?.name,
             threadId,

@@ -96,6 +96,7 @@ it("Clive reviews multi-provider teams once, continues after each decision, and 
     token = await start("Clive, set up Research, Engineering and Growth specialists with suitable engines and models.");
     const tools = await api("GET", "/api/internal/team-setup-catalog", undefined, 200, token);
     expect(tools.instances.map((item: any) => item.instanceId)).toEqual(expect.arrayContaining(["claude", "codex"]));
+    expect(tools.instances.filter((item: any) => ["claude", "codex"].includes(item.instanceId)).every((item: any) => item.ready)).toBe(true);
     await api("POST", "/api/internal/team-setup-requests", { plan: { ...plan, operations: [build("Bad", "Research", { instanceId: "codex", model: "invented-model" })] } }, 400, token);
     await api("POST", "/api/internal/team-setup-requests", { fromBotId: "foreign", plan }, 403, token);
     const denied = await api("POST", "/api/internal/team-setup-requests", { plan }, 201, token);

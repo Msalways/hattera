@@ -378,6 +378,7 @@ export function verificationServerEnvironment(parentEnv: NodeJS.ProcessEnv, data
     // FAKE_CLAUDE_DUMP stays the launcher's: assertions read fixtureDumpPath.
     if (key.startsWith("FAKE_CLAUDE_") && key !== "FAKE_CLAUDE_DUMP" && value) childEnv[key] = value;
   }
+  if (parentEnv.FAKE_CODEX_MODE === "logged-out") childEnv.FAKE_CODEX_MODE = "logged-out";
   // A test's key for relaying an organization library into the fixture
   // (POST /api/testing/org-library); the route does not exist without it.
   if (parentEnv.OMB_TEST_ORG_LIBRARY_KEY) childEnv.OMB_TEST_ORG_LIBRARY_KEY = parentEnv.OMB_TEST_ORG_LIBRARY_KEY;
@@ -508,7 +509,7 @@ export async function launchVerificationServer(
   });
   closeSync(log);
 
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + (process.platform === "win32" ? 60_000 : 20_000);
   try {
     for (;;) {
       if (signal?.aborted) throw new ControlOmbError("verification launch cancelled");
