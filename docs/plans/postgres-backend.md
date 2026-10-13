@@ -12,13 +12,18 @@ against a PostgreSQL pool; the existing SQLite identity path remains the
 default. The PostgreSQL identity adapter has passed a disposable database
 test, but the server does not select it yet.
 
+Async Knex stores now read and replace named JSON records and persist
+transcripts plus branch heads in PostgreSQL. A versioned sequence column keeps
+message insertion order when timestamps match. Disposable database tests cover
+both stores across connections and a failed append rollback. The server does
+not call these stores yet.
+
 **Do not enable the flag on a running server or Render yet.** The server
 deliberately rejects it before creating its data directory. The active chat,
 bot, settings, session, and Data-table stores still use synchronous SQLite,
 DuckDB, and JSON files. The new PostgreSQL tables are not yet active stores.
-Startup migration on deployment belongs
-with the completed backend switch; running schema migrations alone would not
-make an ephemeral deployment durable.
+Startup migration on deployment belongs with the completed backend switch;
+running schema migrations alone would not make an ephemeral deployment durable.
 
 ## Decision
 

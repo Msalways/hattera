@@ -59,7 +59,23 @@ const initial: Knex.Migration = {
   },
 };
 
-const migrations = new Map([["001_initial_postgres_storage", initial]]);
+const messageOrder: Knex.Migration = {
+  async up(db) {
+    // SQLite reads transcripts in insertion order (rowid), including lines
+    // sharing one timestamp. Keep that order across PostgreSQL restarts.
+    await db.raw("ALTER TABLE omb_messages ADD COLUMN seq BIGSERIAL");
+    await db.raw("CREATE INDEX omb_messages_thread_seq ON omb_messages (thread_id, seq)");
+  },
+  async down(db) {
+    await db.raw("DROP INDEX omb_messages_thread_seq");
+    await db.schema.alterTable("omb_messages", (table) => table.dropColumn("seq"));
+  },
+};
+
+const migrations = new Map([
+  ["001_initial_postgres_storage", initial],
+  ["002_message_order", messageOrder],
+]);
 
 /** Knex owns its migration lock and version table; repeated deploys are safe. */
 export const postgresMigrationSource: Knex.MigrationSource<string> = {
