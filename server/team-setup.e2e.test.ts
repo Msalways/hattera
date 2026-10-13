@@ -32,6 +32,8 @@ it("Clive reviews multi-provider teams once, continues after each decision, and 
     const selection = (instance: any) => ({ instanceId: instance.instanceId, model: instance.models.default });
     const chief = (await api("POST", "/api/bots", { name: "Clive", title: "Chief of Staff", section: "Operations", modelSelection: selection(claude) }, 201)).bot;
     await api("PATCH", `/api/bots/${chief.id}`, { chiefOfStaff: true });
+    // Choosing Codex on a bot authorizes that exact model for Chief setup.
+    await api("POST", "/api/bots", { name: "Configured Codex", section: "Operations", modelSelection: selection(codex) }, 201);
     const state = async () => (await api("GET", "/api/bots")).bots;
     // The fixture pins its starter's name (control-omb.ts), but identity is
     // still the honest comparison: "Quill" once collided with a randomly

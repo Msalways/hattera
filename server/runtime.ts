@@ -12639,6 +12639,21 @@ const chiefPeerTargetRule = (noun: string) => (proposerBotId: string, targetBotI
   if (!canReachPeer(proposer, target)) return "that bot is not in a team this Chief is allowed to manage";
   return null;
 };
+// An owner configures a model by choosing it as a workspace default, a bot
+// default, or a conversation model. Discovery alone never grants a Chief a
+// new provider/model choice.
+const configuredBotModels = () => {
+  const models = new Map<string, Set<string>>();
+  const selections = [cfg.defaultModelSelection, cfg.newBotDefaults?.profile.modelSelection,
+    ...store.bots.flatMap((bot) => [bot.modelSelection, ...store.tasks(bot.id).map((task) => task.modelSelection)])];
+  for (const selection of selections) {
+    if (!selection?.instanceId || !selection.model) continue;
+    const offered = models.get(selection.instanceId) ?? new Set<string>();
+    offered.add(selection.model);
+    models.set(selection.instanceId, offered);
+  }
+  return models;
+};
 /** Shared model validation for team-setup cards and propose_model: the
  * selection must resolve, and the destination driver must still support the
  * bot's existing approval setup. */
@@ -12648,6 +12663,9 @@ const validateModelProposal = (selection: ModelSelection, current?: BotRecord): 
   const engine = threadEngine(selection.instanceId);
   if (!registry.lastSnapshot(selection.instanceId) || !engine || !readyToRun(selectableInstances([engine])[0]!, selectionContext)) {
     return `model instance "${selection.instanceId}" is not ready to run; sign in or choose a ready engine`;
+  }
+  if (!configuredBotModels().get(selection.instanceId)?.has(selection.model)) {
+    return `model "${selection.model}" on instance "${selection.instanceId}" has not been configured in app settings or on a bot`;
   }
   if (current?.approvalGrant) return "Wait for the approval-level confirmation before changing this bot's model";
   if (current) {
@@ -18273,7 +18291,15 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       if (method === "GET" && path === "/api/internal/team-setup-catalog") {
         let chief = store.bot(internalCapability.botId)!;
         if (!chief.chiefOfStaff || chief.hidden) return json(res, 403, { error: "Only an active Chief may plan team setup" });
-        const instances = selectableInstances(await registry.describe()).filter((instance) => readyToRun(instance, selectionContext));
+        const configured = configuredBotModels();
+        const instances = selectableInstances(await registry.describe()).flatMap((instance) => {
+          if (!readyToRun(instance, selectionContext)) return [];
+          const selected = configured.get(instance.instanceId);
+          if (!selected) return [];
+          const options = instance.models.options.filter((model) => selected.has(model.id));
+          const defaultModel = selected.has(instance.models.default) ? instance.models.default : options[0]?.id;
+          return defaultModel ? [{ ...instance, models: { ...instance.models, default: defaultModel, options } }] : [];
+        });
         requireActiveInternalCapability();
         chief = store.bot(internalCapability.botId)!;
         if (!chief.chiefOfStaff || chief.hidden) return json(res, 403, { error: "Only an active Chief may plan team setup" });
@@ -18283,7 +18309,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             .map((bot) => ({ id: bot.id, name: bot.name, title: bot.title, section: bot.section ?? "", modelSelection: bot.modelSelection, chiefOfStaff: Boolean(bot.chiefOfStaff) })),
           instances: instances.map((instance) => ({ instanceId: instance.instanceId, driverKind: instance.driverKind, displayName: instance.displayName,
             state: instance.snapshot.state, ready: readyToRun(instance, selectionContext), models: instance.models, effortLevels: instance.capabilities?.effortLevels ?? [] })),
-          scope: "Only configured engines that are ready to run are listed. Bot model defaults apply to groups and new threads; existing threads retain their models. Full Access applies requested team setup immediately; other modes return a review card. Existing unauthorized teams remain outside this Chief's scope.",
+          scope: "Only models chosen in app settings or on a bot, and ready to run, are listed. Bot model defaults apply to groups and new threads; existing threads retain their models. Full Access applies requested team setup immediately; other modes return a review card. Existing unauthorized teams remain outside this Chief's scope.",
         });
       }
       if (method === "POST" && path === "/api/internal/team-setup-requests") {
@@ -19556,7 +19582,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         await registry.describe();
         let selection: ModelSelection;
         if (body.modelSelection === undefined) {
-          selection = await defaultSelection();
+          selection = cfg.newBotDefaults?.profile.modelSelection ?? cfg.defaultModelSelection ?? chief.modelSelection;
         } else {
           const checked = checkedModelSelection(body.modelSelection, undefined, true);
           if (!checked.ok) return json(res, checked.status, { error: checked.error });

@@ -26,6 +26,8 @@ it("Chief creation uses the workspace default or a validated explicit model with
     await api("PATCH", "/api/config", { defaultModelSelection: defaultModel });
     const chiefModel = { instanceId: "claude", model: claude.models.default };
     const chief = (await api("POST", "/api/bots", { name: "Chief", section: "Design", modelSelection: chiefModel }, 201)).bot;
+    const explicit = { instanceId: "claude", model: claude.models.options.find((item: any) => item.id !== claude.models.default).id, effort: "low" };
+    await api("POST", "/api/bots", { name: "Configured Claude", section: "Design", modelSelection: explicit }, 201);
     await api("PATCH", `/api/bots/${chief.id}`, { chiefOfStaff: true });
     await api("POST", `/api/bots/${chief.id}/messages`, { text: "Prepare a specialist." }, 202);
     await expect.poll(() => existsSync(fixture.fixtureDumpPath), { timeout: 15_000 }).toBe(true);
@@ -47,9 +49,10 @@ it("Chief creation uses the workspace default or a validated explicit model with
     };
     const before = (await api("GET", "/api/bots")).bots.length;
     const firstCard = await create("Default specialist");
-    const explicit = { instanceId: "claude", model: claude.models.options.find((item: any) => item.id !== claude.models.default).id, effort: "low" };
     const secondCard = await create("Chosen specialist", explicit);
     expect((await api("GET", "/api/bots")).bots.length).toBe(before);
+    const unconfigured = await create("Unconfigured specialist", { instanceId: "codex", model: "gpt-page-two" }, 400);
+    expect(unconfigured.error).toContain("has not been configured");
     for (const invalid of [null, {}, { instanceId: "missing", model: "missing" },
       { ...explicit, model: "not-in-catalog" }, { ...explicit, effort: "invalid" },
       { ...explicit, variant: "a-variant" }]) {
