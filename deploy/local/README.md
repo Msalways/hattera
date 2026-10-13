@@ -50,7 +50,20 @@ directory. It respects Docker's selected context and `DOCKER_CONTEXT`.
 
 Data and engine credentials persist in the named data volume. For an existing
 volume, set `OMB_DATA_VOLUME` to its name and `OMB_DATA_EXTERNAL=true`.
-Fresh installs create their volume automatically.
+Fresh installs create their volume automatically. The external volume may use
+any Docker volume driver that presents a durable POSIX filesystem at `/data`;
+the app does not depend on a particular storage vendor. See the
+[storage and recovery guide](../../docs/storage-and-recovery.md) before moving
+to another host.
+
+For a fresh PostgreSQL installation, set `OMB_POSTGRES_ENABLED=true` and
+`DATABASE_URL` in the local `.env`. The server runs Knex migrations at startup.
+Compose passes `OMB_POSTGRES_FILES_DIR=/data/.openmausbot-postgres`, so uploads,
+bot workspaces, and engine credentials remain on the named `/data` volume.
+Keep that volume even though PostgreSQL stores chats and other structured
+records. The server checks the file directory's database marker and refuses
+to mix it with a different database. Switching an existing SQLite install to
+PostgreSQL does not import its data.
 
 Update with `docker compose build --pull` followed by `docker compose up -d`.
 Stop with `docker compose stop`. `docker compose down -v` deletes managed volumes.

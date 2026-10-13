@@ -41,9 +41,12 @@ limit until those APIs are made asynchronous. The bridge fails closed after a
 the database account used to initialize them needs permission to create roles
 and schemas. Check those privileges on a managed provider before deployment.
 
-The temporary cache is disposable. It may contain copies of sensitive JSON and
-logs, so place the host's temporary directory on appropriately protected
-storage. `OMB_DATA_DIR` is replaced with that cache in PostgreSQL mode.
+Without `OMB_POSTGRES_FILES_DIR`, the temporary cache is disposable. Compose
+sets that variable to a stable path on its `/data` volume, where uploads,
+workspaces, and other files persist. In either case the cache may contain
+copies of sensitive JSON and logs; protect its storage. `OMB_DATA_DIR` is
+replaced with that path in PostgreSQL mode. A marker prevents reuse with a
+different database.
 Workspace backup and cloud move endpoints return 501 in this mode because
 their current implementations copy local files only.
 

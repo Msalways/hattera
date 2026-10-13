@@ -6,9 +6,16 @@ import { join } from "node:path";
 import knex from "knex";
 import { expect, it } from "vitest";
 import { migratePostgres } from "../postgres-schema.ts";
-import { createDataEngine } from "./engine.ts";
+import { createDataEngine, dataRoleConnectionUrl } from "./engine.ts";
 
 const url = process.env.OMB_TEST_DATABASE_URL;
+
+it("routes a restricted Data role through Supabase's shared session pooler", () => {
+  expect(dataRoleConnectionUrl("postgresql://postgres.project123:old@aws-0.pooler.supabase.com:5432/postgres", "omb_role_abc", "new"))
+    .toBe("postgresql://omb_role_abc.project123:new@aws-0.pooler.supabase.com:5432/postgres");
+  expect(dataRoleConnectionUrl("postgresql://postgres:old@localhost:5432/app", "omb_role_abc", "new"))
+    .toBe("postgresql://omb_role_abc:new@localhost:5432/app");
+});
 
 it.skipIf(!url)("keeps bot Data tables and results in PostgreSQL across engine restarts", async () => {
   const parsed = new URL(url!);

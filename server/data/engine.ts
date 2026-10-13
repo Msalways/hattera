@@ -79,6 +79,17 @@ function postgresBotRole(botId: string): string {
   return `omb_role_${createHash("sha256").update(botId).digest("hex").slice(0, 32)}`;
 }
 
+/** Supabase's shared session pooler routes custom roles with a project suffix. */
+export function dataRoleConnectionUrl(connection: string, role: string, password: string): string {
+  const url = new URL(connection);
+  const originalUser = decodeURIComponent(url.username);
+  const projectSuffix = url.hostname.endsWith(".pooler.supabase.com") && originalUser.includes(".")
+    ? originalUser.slice(originalUser.indexOf(".")) : "";
+  url.username = `${role}${projectSuffix}`;
+  url.password = password;
+  return url.toString();
+}
+
 /** The directory whose node_modules/@duckdb holds the binding: a packaged
  * resource tree or an explicit override. Null means the server's own
  * node_modules (a checkout, the npm package). */
@@ -838,10 +849,7 @@ class Engine implements DataEngine {
         await transaction.raw("GRANT USAGE, CREATE ON SCHEMA ?? TO ??", [schema, role]);
       }
     });
-    const url = new URL(this.postgresUrl);
-    url.username = role;
-    url.password = password;
-    return url.toString();
+    return dataRoleConnectionUrl(this.postgresUrl, role, password);
   }
 
   private load(): { binding: Binding } | { reason: string } {

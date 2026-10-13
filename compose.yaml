@@ -24,6 +24,9 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
       GITHUB_OWNER_ID: ${GITHUB_OWNER_ID:-}
       GITHUB_REDIRECT_URI: ${GITHUB_REDIRECT_URI:-}
+      OMB_POSTGRES_ENABLED: ${OMB_POSTGRES_ENABLED:-false}
+      DATABASE_URL: ${DATABASE_URL:-}
+      OMB_POSTGRES_FILES_DIR: ${OMB_POSTGRES_FILES_DIR:-/data/.openmausbot-postgres}
     healthcheck:
       test:
         - CMD
