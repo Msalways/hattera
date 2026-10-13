@@ -31,10 +31,16 @@ volume or `.env` is included in the image.
    running; it does not keep an idle Free service awake. A continuously warm
    service also consumes the workspace's Free instance hours.
 
-Render Free has an ephemeral filesystem. Its SQLite databases, session keys,
-chats, workspaces, uploads, and engine logins disappear on restart, redeploy,
-or idle spin-down. Use this service only for throwaway testing. The image
-includes OpenCode; sign in to an engine again if the service restarts. Tailscale
-is not required for this public HTTPS endpoint. See the
+Render Free has an ephemeral filesystem. By default, its SQLite databases,
+chats, sessions, workspaces, uploads, and engine logins disappear on restart,
+redeploy, or idle spin-down. For a fresh PostgreSQL installation, set
+`OMB_POSTGRES_ENABLED=true` and a secret `DATABASE_URL` in Render's
+environment. The server then migrates the database at startup and keeps
+structured records there. This does not retain uploads, workspaces, browser
+profiles, or engine logins, so the deployment is still unsuitable for
+irreplaceable work. Check that the provider permits role and schema creation
+before enabling the Data feature. The image includes OpenCode; its login may
+need to be repeated after a restart. Tailscale is not required for this public
+HTTPS endpoint. See the
 [hosting checklist](../../docs/hattera-hosting.md) for the durable path and
 remaining gaps.

@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { DATA_LIMITS, type DataBroadcast, type DataCard, type DataSheet, type DataSource } from "../../shared/data-surface.ts";
-import { writeFileAtomic } from "../atomic.ts";
+import { removeStructuredDocument, writeFileAtomic } from "../atomic.ts";
 import { botFolder } from "../bot-folder.ts";
 
 export const SHEET_FILE = "sheet.json";
@@ -228,6 +228,7 @@ export class DataSheetRegistry {
   delete(botId: string): void {
     const dir = this.deps.dir?.(botId) ?? botFolder(botId);
     this.stores.delete(botId);
+    removeStructuredDocument(join(dir, SHEET_FILE));
     rmSync(join(dir, SHEET_FILE), { force: true });
   }
 }

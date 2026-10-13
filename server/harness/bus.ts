@@ -11,8 +11,8 @@
 // bus holds a thread's text for at most DELTA_MERGE_MS and publishes it as
 // one delta, sooner when anything else happens on that thread, so the order
 // of events never changes.
-import { appendFile } from "node:fs/promises";
 import { join } from "node:path";
+import { appendStructuredFile } from "../atomic.ts";
 
 import { EVENTS_DIR } from "../config.ts";
 import { redactSecrets } from "../redact.ts";
@@ -42,7 +42,7 @@ export type EventLogAppend = (
   options?: { mode?: number },
 ) => void | Promise<void>;
 
-const defaultAppend: EventLogAppend = (path, data, options) => appendFile(path, data, options);
+const defaultAppend: EventLogAppend = (path, data, options) => appendStructuredFile(path, data, options);
 
 type QueuedLog = { event: RuntimeEvent; bytes: number };
 

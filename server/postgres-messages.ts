@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
 import type { Message } from "./store.ts";
-import type { ChatFollowup, FollowupStatus, StoredCommandReceipt, MemoryFileStat, RecallRange, ThreadLatest } from "./message-db.ts";
+import type { ChatFollowup, FollowupStatus, StoredCommandReceipt, MemoryFileStat, RecallRange, ThreadLatest, RecallHit, MemoryHit, SearchMode } from "./message-db.ts";
 import type { SearchHit } from "./message-search-query.ts";
 import { peerProvenanceAuthor } from "./peer-provenance.ts";
 
@@ -50,7 +50,12 @@ export class PostgresMessages {
       .onConflict(["thread_id", "id"]).merge(["at", "role", "kind", "text", "json"]);
   }
 
-  async appendMessage(threadId: string, message: Message): Promise<void> {
+  async appendMessage(threadId: string, message: Message, db?: Knex.Transaction): Promise<void> {
+    if (db) {
+      await this.insertMessage(threadId, message, db);
+      await this.setActiveLeaf(threadId, message.id, db);
+      return;
+    }
     await this.db.transaction(async (transaction) => {
       await this.insertMessage(threadId, message, transaction);
       await this.setActiveLeaf(threadId, message.id, transaction);
@@ -70,9 +75,9 @@ export class PostgresMessages {
     });
   }
 
-  async updateMessage(threadId: string, message: Message): Promise<void> {
+  async updateMessage(threadId: string, message: Message, db: Knex | Knex.Transaction = this.db): Promise<void> {
     const { thread_id: _threadId, id: _id, ...fields } = this.messageRow(threadId, message);
-    await this.db("omb_messages").where({ thread_id: threadId, id: message.id }).update(fields);
+    await db("omb_messages").where({ thread_id: threadId, id: message.id }).update(fields);
   }
 
   async setActiveLeaf(threadId: string, leafId: string | null, db?: Knex.Transaction): Promise<void> {
@@ -172,6 +177,43 @@ export class PostgresMessages {
       snippet: row.text.slice(0, 240).replace(/\s+/g, " ").trim(),
       ...(row.json.from?.name ? { from: row.json.from.name } : {}),
       ...(row.json.peerAsk?.name ? { peer: row.json.peerAsk.name } : {}) }));
+  }
+
+  async recallMessages(query: string, threadIds: readonly string[], limit = 12, range?: RecallRange, mode: SearchMode = "all"): Promise<RecallHit[]> {
+    if (!query.trim() || !threadIds.length) return [];
+    const search = mode === "any" ? query.trim().split(/\s+/).join(" OR ") : query;
+    const expression = mode === "any" ? "websearch_to_tsquery('simple', ?)" : "plainto_tsquery('simple', ?)";
+    const rowsQuery = this.db("omb_messages")
+      .whereIn("thread_id", [...new Set(threadIds)]).whereIn("kind", ["text", "digest"]).whereNotNull("text")
+      .whereRaw(`to_tsvector('simple', coalesce(text, '')) @@ ${expression}`, [search])
+      .orderByRaw("(kind = 'digest') ASC")
+      .orderByRaw(`ts_rank(to_tsvector('simple', coalesce(text, '')), ${expression}) DESC`, [search])
+      .orderBy("at", "desc").limit(limit)
+      .select("thread_id", "id", "at", "role", "kind", "text", "json")
+      .select(this.db.raw(`ts_headline('simple', text, ${expression}, ?) as snippet`, [search, "StartSel=[, StopSel=], MaxWords=48"]));
+    if (range?.since !== undefined) rowsQuery.where("at", ">=", range.since);
+    if (range?.until !== undefined) rowsQuery.where("at", "<=", range.until);
+    const rows = await rowsQuery as Array<{ thread_id: string; id: string; at: string; role: string; kind: string; text: string; snippet: string; json: Message }>;
+    return rows.map((row) => ({ threadId: row.thread_id, messageId: row.id, at: Number(row.at), role: row.role,
+      ...(row.kind === "digest" ? { kind: "digest" as const } : {}),
+      snippet: row.snippet.replace(/\s+/g, " ").trim(),
+      ...(row.json.from?.name ? { from: row.json.from.name } : {}),
+      ...(row.json.peerAsk?.name ? { peer: row.json.peerAsk.name } : {}),
+    }));
+  }
+
+  async recallMemory(query: string, botId: string, limit = 12, mode: SearchMode = "all"): Promise<MemoryHit[]> {
+    if (!query.trim()) return [];
+    const search = mode === "any" ? query.trim().split(/\s+/).join(" OR ") : query;
+    const expression = mode === "any" ? "websearch_to_tsquery('simple', ?)" : "plainto_tsquery('simple', ?)";
+    const rowsQuery = this.db("omb_memory_files").where("bot_id", botId)
+      .whereRaw(`to_tsvector('simple', text) @@ ${expression}`, [search])
+      .orderByRaw(`ts_rank(to_tsvector('simple', text), ${expression}) DESC`, [search])
+      .orderBy("mtime_ms", "desc").limit(limit).select("path", "mtime_ms", "text")
+      .select(this.db.raw(`ts_headline('simple', text, ${expression}, ?) as snippet`, [search, "StartSel=[, StopSel=], MaxWords=48"]));
+    if (mode === "any") rowsQuery.whereNotIn("path", ["MEMORY.md", "memory/archive.md"]).where("path", "not like", "memory/log/%");
+    const rows = await rowsQuery as Array<{ path: string; mtime_ms: string; snippet: string }>;
+    return rows.map((row) => ({ file: row.path, at: Number(row.mtime_ms), snippet: row.snippet.replace(/\s+/g, " ").trim() }));
   }
 
   async latestSaidByBot(threadIds: readonly string[], botId: string, since: number, limit = 20): Promise<ThreadLatest[]> {

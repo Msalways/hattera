@@ -11,6 +11,7 @@
 import { unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { EVENTS_DIR, NATIVE_DIR } from "./config.ts";
+import { removeStructuredFileLog } from "./atomic.ts";
 
 export interface ThreadLogRetentionCandidate {
   threadId: string;
@@ -50,6 +51,7 @@ export function sweepThreadEventLogs(
     for (const dir of [EVENTS_DIR, NATIVE_DIR]) {
       const path = join(dir, `${candidate.threadId}.ndjson`);
       try {
+        removeStructuredFileLog(path);
         unlinkSync(path);
         removedAny = true;
       } catch (error) {

@@ -13,6 +13,7 @@
 // one name, so rotation can never orphan a fragment. What rotates away is
 // gone; the cap is opt-in and off by default.
 import { closeSync, fstatSync, openSync, readSync, renameSync, rmSync, statSync, writeSync } from "node:fs";
+import { replaceStructuredFileLog } from "./atomic.ts";
 
 let capProvider: () => number | null = () => null;
 
@@ -48,6 +49,7 @@ export function capThreadLog(file: string, maxBytes: number | null): void {
 
 function trimToTail(file: string, keepBytes: number): void {
   const staging = `${file}.trim`;
+  let kept = "";
   try {
     const source = openSync(file, "r");
     try {
@@ -70,6 +72,7 @@ function trimToTail(file: string, keepBytes: number): void {
       // alone rather than corrupt the only copy.
       const firstNewline = window.indexOf(0x0a);
       if (firstNewline === -1 || firstNewline + 1 >= window.length) return;
+      kept = window.subarray(firstNewline + 1).toString("utf8");
       const target = openSync(staging, "w", 0o600);
       try {
         // writeSync can also stop short of the requested length; keep
@@ -87,6 +90,7 @@ function trimToTail(file: string, keepBytes: number): void {
     } finally {
       closeSync(source);
     }
+    replaceStructuredFileLog(file, kept);
     renameSync(staging, file);
   } catch {
     try {

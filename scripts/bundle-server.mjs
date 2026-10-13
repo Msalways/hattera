@@ -24,6 +24,8 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const server = join(root, "server");
+const knexOptionalDrivers = ["better-sqlite3", "sqlite3", "mysql", "mysql2", "mariadb/callback", "oracledb", "tedious"];
+const knexRequireBanner = "import { createRequire as __ombCreateRequire } from 'node:module'; const require = __ombCreateRequire(import.meta.url);";
 
 // yaml's Node export is CommonJS and contains dynamic requires that cannot run
 // after it is inlined into our ESM-only packaged server. Its browser export is
@@ -42,6 +44,7 @@ const yamlEsmPlugin = {
 const ENTRY_POINTS = [
   "index.ts",
   "message-search.worker.ts",
+  "postgres-sync.worker.ts",
   // the `openmausbot` command (serve/pair/sessions/status) for the npm
   // package, the container image and checkouts; pair-cli.ts stays as an alias
   "openmausbot.ts",
@@ -87,10 +90,12 @@ await build({
   allowOverwrite: true,
   logLevel: "info",
   plugins: [yamlEsmPlugin],
+  // The Data engine can select PostgreSQL, so Knex is now in the main bundle.
+  banner: { js: knexRequireBanner },
+  external: knexOptionalDrivers,
 });
 
-// Knex's CommonJS internals require Node built-ins dynamically. Give this
-// standalone ESM entry a require function; the regular server has no Knex.
+// Knex's CommonJS internals require Node built-ins dynamically.
 await build({
   entryPoints: [join(server, "postgres-migrate.ts")],
   bundle: true,
@@ -98,9 +103,9 @@ await build({
   target: "node20",
   format: "esm",
   outfile: join(root, "dist-server", "postgres-migrate.js"),
-  banner: { js: "import { createRequire as __ombCreateRequire } from 'node:module'; const require = __ombCreateRequire(import.meta.url);" },
+  banner: { js: knexRequireBanner },
   // Knex discovers every dialect, but only pg is selected by this command.
-  external: ["better-sqlite3", "sqlite3", "mysql", "mysql2", "mariadb/callback", "oracledb", "tedious"],
+  external: knexOptionalDrivers,
   logLevel: "info",
 });
 

@@ -7,8 +7,9 @@
 // but no price (server/model-prices.ts). A turn on an unpriced model counts
 // nothing. Enforced only with the `budgets` entitlement; without it the
 // setting is inert.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { writeFileAtomic } from "./atomic.ts";
 import type { AppConfig } from "./config.ts";
 import { entitled } from "./enterprise.ts";
 import { readUsage, usageRowKey } from "./usage-ledger.ts";
@@ -176,7 +177,7 @@ export function takeSpendAlert(dataDir: string, state: SpendState | null): Spend
   memoryMarks.set(dataDir, next);
   try {
     mkdirSync(join(dataDir, "usage"), { recursive: true, mode: 0o700 });
-    writeFileSync(join(dataDir, "usage", ALERTS_FILE), JSON.stringify(next), { mode: 0o600 });
+    writeFileAtomic(join(dataDir, "usage", ALERTS_FILE), JSON.stringify(next), { mode: 0o600 });
   } catch {
     /* bookkeeping must never take down the turn */
   }

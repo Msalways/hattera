@@ -18,7 +18,7 @@
 // line did.
 import { randomUUID } from "node:crypto";
 import { closeSync, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
-import { appendFile } from "node:fs/promises";
+import { appendStructuredFile } from "./atomic.ts";
 import { join } from "node:path";
 
 import { DATA_DIR } from "./config.ts";
@@ -200,7 +200,7 @@ function enqueue(botId: string, entry: MemoryJournalEntry): void {
   const queued = previous
     .then(async () => {
       mkdirSync(JOURNAL_DIR, { recursive: true, mode: 0o700 });
-      await appendFile(journalFile(botId), `${JSON.stringify(entry)}\n`, { mode: 0o600 });
+      await appendStructuredFile(journalFile(botId), `${JSON.stringify(entry)}\n`, { mode: 0o600 });
     })
     .catch((error: unknown) => {
       // fire-and-forget: the change this row records already happened

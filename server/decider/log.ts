@@ -11,8 +11,9 @@
 // Same discipline as the other logs: 0600, fire-and-forget, serialized per
 // directory, and months older than the shared retention window pruned.
 import { createHash } from "node:crypto";
-import { appendFile, mkdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { appendStructuredFile } from "../atomic.ts";
 
 import { boundRetentionDays, pruneMonthFiles } from "../decision-log.ts";
 import { monthKey } from "../usage-ledger.ts";
@@ -58,7 +59,7 @@ export function deciderLogFileFor(dataDir: string, at: Date): string {
 async function write(dataDir: string, row: DeciderLogRow): Promise<void> {
   const at = new Date(row.at);
   await mkdir(join(dataDir, DECIDER_LOG_DIR), { recursive: true, mode: 0o700 });
-  await appendFile(deciderLogFileFor(dataDir, at), JSON.stringify(row) + "\n", { mode: 0o600 });
+  await appendStructuredFile(deciderLogFileFor(dataDir, at), JSON.stringify(row) + "\n", { mode: 0o600 });
   if (at.getTime() - (lastPrune.get(dataDir) ?? 0) >= PRUNE_EVERY_MS) {
     lastPrune.set(dataDir, at.getTime());
     await pruneMonthFiles(join(dataDir, DECIDER_LOG_DIR), boundRetentionDays(), at);

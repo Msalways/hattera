@@ -14,9 +14,9 @@ This checklist covers this fork's container deployment. The inherited [VPS guide
 
 | State | Current location or form | Consequence on an ephemeral host |
 | --- | --- | --- |
-| Chats and GitHub sign-in | SQLite files under `/data/.openmausbot` | Conversations and GitHub sessions disappear |
-| Pairing sessions, bot definitions, settings, schedules, and other records | JSON and other local files under `/data/.openmausbot` | Devices and bots lose their saved state |
-| Data tables and sheets | Per-bot DuckDB and `sheet.json` | Bot data work disappears |
+| Chats and GitHub sign-in | SQLite by default; PostgreSQL with `OMB_POSTGRES_ENABLED=true` and `DATABASE_URL` | The default loses them; PostgreSQL mode retains structured records |
+| Pairing sessions, bot definitions, settings, schedules, and other records | Local files by default; PostgreSQL documents and session snapshot with the flag | The default loses them; PostgreSQL mode retains structured records |
+| Data tables and sheets | Per-bot DuckDB by default; PostgreSQL schemas and documents with the flag | The default loses them; PostgreSQL mode retains structured Data tables |
 | Uploads, generated files, and agent workspaces | Files below `/data/.openmausbot` | Attachments and working files disappear |
 | Engine sign-ins | CLI home directories below `/data` | OpenCode or other engines need sign-in again |
 
@@ -34,14 +34,14 @@ Use the Render Blueprint with GitHub OAuth and the public Render HTTPS URL. No T
 
 Run the existing Compose stack on an always-on VM with durable host storage behind the `/data` volume. Back up that volume regularly, keep backup copies off the VM, and test a restore into a separate volume before trusting it. Secure the VM and keep the OAuth callback aligned with its stable HTTPS origin. For private access, [Tailscale Serve](https://tailscale.com/docs/reference/tailscale-cli/serve) can expose the local port only inside your tailnet; GitHub OAuth must use that tailnet HTTPS origin. If you want public access instead, use a public HTTPS reverse proxy and its public callback URL.
 
-### Future split storage on an ephemeral container host
+### Split storage on an ephemeral container host
 
-The optional PostgreSQL backend is still being developed on a separate branch. The deployable `main` branch has no production-ready `OMB_POSTGRES_ENABLED` switch. PostgreSQL must cover **all** structured state before it can replace the local records for this use case; Better Auth alone is insufficient. DuckDB files, uploads, workspaces, and engine credentials also need durable storage or a redesign. Do not enable a PostgreSQL flag in the Render Blueprint until the runtime switch and restart tests are complete. [Render Free PostgreSQL expires after 30 days](https://render.com/docs/free), so it is not a durable database choice.
+This branch implements the optional PostgreSQL switch for a **fresh installation's structured records**. Startup runs schema migrations; the existing SQLite dataset is not imported. See the [backend notes](plans/postgres-backend.md) for its exact scope and test evidence. Uploaded bytes, workspaces, browser profiles, and engine credentials still live on the container filesystem. PostgreSQL alone therefore does not make a Render Free deployment durable. Check the chosen provider's role and schema privileges for the Data feature. [Render Free PostgreSQL expires after 30 days](https://render.com/docs/free), so it is not a durable database choice.
 
 ## Release gate for durable hosting
 
-1. Finish and verify the optional SQLite/PostgreSQL switch, including startup schema setup and fresh database initialization. Keep SQLite as the default; an existing SQLite dataset does not automatically migrate to PostgreSQL.
-2. Decide where DuckDB, attachments, workspaces, and engine CLI credentials persist, and define cleanup and retention rules for each. A database URL alone does not solve those files.
+1. Verify the optional SQLite/PostgreSQL switch against the target provider, including startup migrations and a restart of a fresh database. SQLite remains the default; an existing SQLite dataset does not automatically migrate to PostgreSQL.
+2. Decide where attachments, workspaces, browser profiles, and engine CLI credentials persist, and define cleanup and retention rules for each. A database URL alone does not solve those files.
 3. Restore a backup into an isolated deployment. Verify bots, chats, GitHub sign-in, pairing, uploads, agent workspaces, and an OpenCode turn after a restart.
 4. Set a stable HTTPS origin and its matching GitHub callback. Keep `GITHUB_CLIENT_SECRET` and `BETTER_AUTH_SECRET` out of Git and logs. Verify an account other than the owner is rejected.
 5. Monitor health and capacity, and document how to roll back an image and recover state. A passing health probe shows that the process responds; it does not prove the agent engine or storage is healthy.

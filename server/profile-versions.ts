@@ -4,7 +4,7 @@
 // history write must never fail the change it records. Full before/after
 // text is kept only for the soul; redacted versions cannot be restored
 // exactly and are not rollback targets. Other fields keep short one-liners.
-import { appendFile } from "node:fs/promises";
+import { appendStructuredFile } from "./atomic.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
 import { join } from "node:path";
@@ -77,7 +77,7 @@ async function writeRows(botId: string, rows: HistoryRow[]): Promise<void> {
   const file = historyFile(botId);
   mkdirSync(botFolder(botId), { recursive: true, mode: 0o700 });
   const text = rows.map((row) => JSON.stringify(withRestoreEligibility(row))).join("\n") + "\n";
-  await appendFile(file, text, { mode: 0o600 });
+  await appendStructuredFile(file, text, { mode: 0o600 });
 }
 
 function queueHistoryRows(botId: string, rows: HistoryRow[]): void {

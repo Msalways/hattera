@@ -13,15 +13,18 @@
 // `interrupt()` is per connection, so each connection runs one statement at
 // a time: a cancellation always hits the statement it was meant for.
 import { existsSync, mkdirSync } from "node:fs";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { cpus, totalmem } from "node:os";
 import { join } from "node:path";
 import type * as DuckDB from "@duckdb/node-api";
+import knex, { type Knex } from "knex";
 
 import { DATA_LIMITS, DATA_RESULTS_SCHEMA } from "../../shared/data-surface.ts";
 import { botFolder as defaultBotFolder } from "../bot-folder.ts";
 import { DATA_DIR } from "../config.ts";
+import { postgresConnectionUrl } from "../postgres-config.ts";
 import {
   DataFailure,
   type BotDatabase,
@@ -63,6 +66,17 @@ export interface DataEngineOptions {
   idleMs?: number;
   /** The loaded @duckdb/node-api module. Default: loaded from duckdbDirectory() on first use. */
   binding?: Binding;
+  /** PG mode keeps DuckDB compute in memory and its tables in isolated PG schemas. */
+  postgresUrl?: string | null;
+}
+
+function postgresSchemas(botId: string): { data: string; results: string } {
+  const suffix = createHash("sha256").update(botId).digest("hex").slice(0, 32);
+  return { data: `omb_data_${suffix}`, results: `omb_results_${suffix}` };
+}
+
+function postgresBotRole(botId: string): string {
+  return `omb_role_${createHash("sha256").update(botId).digest("hex").slice(0, 32)}`;
 }
 
 /** The directory whose node_modules/@duckdb holds the binding: a packaged
@@ -278,6 +292,8 @@ interface CatalogEntry {
   schema: string;
   name: string;
   type: string;
+  catalog?: string;
+  physicalSchema?: string;
 }
 
 function toCount(cell: Cell): number {
@@ -325,15 +341,32 @@ class BotDb implements BotDatabase {
     const folder = this.engine.folder(this.botId);
     mkdirSync(folder, { recursive: true, mode: 0o700 });
     const settings = instanceSettings(folder, this.engine.dataDir, binding.version(), this.engine.env);
-    const instance = await binding.DuckDBInstance.create(join(folder, DATA_DB_FILE), settings);
+    const botPostgresUrl = this.engine.postgresDb ? await this.engine.ensureBotSchemas(this.botId) : null;
+    const instance = await binding.DuckDBInstance.create(this.engine.postgresDb ? ":memory:" : join(folder, DATA_DB_FILE), settings);
     let bot: DuckDB.DuckDBConnection | undefined;
     let panel: DuckDB.DuckDBConnection | undefined;
     try {
       bot = await instance.connect();
       panel = await instance.connect();
-      // Results live in a real schema: temp tables would be invisible to the
-      // panel's connection (DATA_RESULTS_SCHEMA).
-      await bot.run(`CREATE SCHEMA IF NOT EXISTS ${DATA_RESULTS_SCHEMA}`);
+      if (botPostgresUrl) {
+        const names = postgresSchemas(this.botId);
+        try {
+          await bot.run("INSTALL postgres FROM core");
+          await bot.run("LOAD postgres");
+          // A temporary secret keeps the URL out of ATTACH errors and off disk.
+          await bot.run(`CREATE SECRET omb_postgres (TYPE postgres, URI ${quoteLiteral(botPostgresUrl)})`);
+          await bot.run(`ATTACH '' AS bot_data (TYPE postgres, SECRET omb_postgres, SCHEMA ${quoteLiteral(names.data)})`);
+          await bot.run(`ATTACH '' AS omb_results (TYPE postgres, SECRET omb_postgres, SCHEMA ${quoteLiteral(names.results)})`);
+          await bot.run("USE bot_data");
+          await panel.run("USE bot_data");
+        } catch {
+          throw new DataFailure({ code: "engine_unavailable", message: "PostgreSQL Data storage could not connect. Check DATABASE_URL and the DuckDB postgres extension." });
+        }
+      } else {
+        // Results live in a real schema: temp tables would be invisible to
+        // the panel's connection (DATA_RESULTS_SCHEMA).
+        await bot.run(`CREATE SCHEMA IF NOT EXISTS ${DATA_RESULTS_SCHEMA}`);
+      }
       const keywords = await bot.runAndReadAll("SELECT keyword_name FROM duckdb_keywords() WHERE keyword_category = 'reserved'");
       const reserved = new Set(keywords.getRowsJson().map((row) => String(row[0]).toLowerCase()));
       return { binding, instance, lanes: { bot: new Lane(bot), panel: new Lane(panel) }, reserved };
@@ -448,9 +481,14 @@ class BotDb implements BotDatabase {
   }
 
   private async catalog(connection: DataConnection = "panel"): Promise<CatalogEntry[]> {
-    const sql = "SELECT table_schema, table_name, table_type FROM information_schema.tables WHERE table_catalog = current_database() AND table_schema NOT IN ('information_schema', 'pg_catalog') ORDER BY table_schema, table_name";
+    const sql = this.engine.postgresDb
+      ? "SELECT table_catalog, table_schema, table_name, table_type FROM information_schema.tables WHERE table_catalog IN ('bot_data', 'omb_results') ORDER BY table_catalog, table_schema, table_name"
+      : "SELECT table_schema, table_name, table_type FROM information_schema.tables WHERE table_catalog = current_database() AND table_schema NOT IN ('information_schema', 'pg_catalog') ORDER BY table_schema, table_name";
     const result = await this.statement(connection, sql, {}, (open, conn) => this.read(open, conn, sql));
-    return result.rows.map((row) => ({ schema: String(row[0]), name: String(row[1]), type: String(row[2]) }));
+    return result.rows.map((row) => this.engine.postgresDb
+      ? { schema: row[0] === "bot_data" ? "main" : DATA_RESULTS_SCHEMA, name: String(row[2]), type: String(row[3]),
+        catalog: String(row[0]), physicalSchema: String(row[1]) }
+      : { schema: String(row[0]), name: String(row[1]), type: String(row[2]) });
   }
 
   private displayName(entry: CatalogEntry): string {
@@ -459,6 +497,7 @@ class BotDb implements BotDatabase {
 
   private qualified(entry: CatalogEntry, reserved: Set<string>): string {
     const part = (name: string) => (PLAIN_IDENTIFIER.test(name) && !reserved.has(name) ? name : quoteIdentifier(name));
+    if (entry.catalog && entry.physicalSchema) return `${part(entry.catalog)}.${part(entry.physicalSchema)}.${part(entry.name)}`;
     return `${part(entry.schema)}.${part(entry.name)}`;
   }
 
@@ -682,13 +721,17 @@ FROM ${from}, omb_range WHERE ${id} IS NOT NULL GROUP BY bin ORDER BY bin`;
     const entries = (await this.catalog()).filter((entry) => entry.schema !== DATA_RESULTS_SCHEMA);
     if (!entries.length) return [];
     const open = await this.open();
-    const columnsSql = "SELECT table_schema, table_name, column_name, data_type FROM information_schema.columns WHERE table_catalog = current_database() ORDER BY table_schema, table_name, ordinal_position";
+    const columnsSql = this.engine.postgresDb
+      ? "SELECT table_catalog, table_schema, table_name, column_name, data_type FROM information_schema.columns WHERE table_catalog IN ('bot_data', 'omb_results') ORDER BY table_catalog, table_schema, table_name, ordinal_position"
+      : "SELECT table_schema, table_name, column_name, data_type FROM information_schema.columns WHERE table_catalog = current_database() ORDER BY table_schema, table_name, ordinal_position";
     const columnRows = await this.statement("panel", columnsSql, {}, (o, conn) => this.read(o, conn, columnsSql));
     const columnsByTable = new Map<string, DataColumn[]>();
     for (const row of columnRows.rows) {
-      const key = `${row[0]}\u0000${row[1]}`;
+      const schema = this.engine.postgresDb ? (row[0] === "bot_data" ? "main" : DATA_RESULTS_SCHEMA) : row[0];
+      const offset = this.engine.postgresDb ? 1 : 0;
+      const key = `${schema}\u0000${row[offset + 1]}`;
       const list = columnsByTable.get(key) ?? [];
-      list.push({ name: String(row[2]), type: String(row[3]) });
+      list.push({ name: String(row[offset + 2]), type: String(row[offset + 3]) });
       columnsByTable.set(key, list);
     }
     // One statement for every count: a table's count(*) is metadata, a view's is a scan.
@@ -699,7 +742,9 @@ FROM ${from}, omb_range WHERE ${id} IS NOT NULL GROUP BY bin ORDER BY bin`;
       const qualified = this.qualified(entry, open.reserved);
       return {
         name: this.displayName(entry),
-        sqlName: entry.schema === "main" ? qualified.slice("main.".length) : qualified,
+        sqlName: entry.schema === "main"
+          ? (this.engine.postgresDb ? quoteIdentifier(entry.name) : qualified.slice("main.".length))
+          : (this.engine.postgresDb ? `${DATA_RESULTS_SCHEMA}.${quoteIdentifier(entry.name)}` : qualified),
         rowCount: toCount(countRow[i] ?? 0),
         columns: columnsByTable.get(`${entry.schema}\u0000${entry.name}`) ?? [],
       };
@@ -750,13 +795,53 @@ class Engine implements DataEngine {
   readonly dataDir: string;
   readonly idleMs: number;
   readonly folder: (botId: string) => string;
+  readonly postgresUrl: string | null;
+  readonly postgresDb: Knex | null;
+  private dataRoleSecret: Promise<string> | null = null;
 
   constructor(options: DataEngineOptions) {
     this.env = options.env ?? process.env;
     this.dataDir = options.dataDir ?? DATA_DIR;
     this.idleMs = options.idleMs ?? IDLE_CLOSE_MS;
     this.folder = options.botFolder ?? defaultBotFolder;
+    this.postgresUrl = options.postgresUrl ?? null;
+    this.postgresDb = this.postgresUrl
+      ? knex({ client: "pg", connection: this.postgresUrl, pool: { min: 0, max: 4 }, acquireConnectionTimeout: 15_000 }) : null;
     if (options.binding) this.loaded = { binding: options.binding };
+  }
+
+  private async roleSecret(): Promise<string> {
+    if (!this.postgresDb) throw new Error("PostgreSQL is not configured");
+    this.dataRoleSecret ??= (async () => {
+      await this.postgresDb!("omb_data_role_secret").insert({ id: 1, secret: randomBytes(32).toString("hex") }).onConflict("id").ignore();
+      const row = await this.postgresDb!<{ secret: string }>("omb_data_role_secret").where("id", 1).first("secret");
+      if (!row) throw new Error("PostgreSQL Data role secret is missing");
+      return row.secret;
+    })();
+    try { return await this.dataRoleSecret; }
+    catch (error) { this.dataRoleSecret = null; throw error; }
+  }
+
+  async ensureBotSchemas(botId: string): Promise<string> {
+    if (!this.postgresDb || !this.postgresUrl) throw new Error("PostgreSQL is not configured");
+    const names = postgresSchemas(botId);
+    const role = postgresBotRole(botId);
+    const password = createHmac("sha256", await this.roleSecret()).update(botId).digest("hex");
+    await this.postgresDb.transaction(async (transaction) => {
+      await transaction.raw("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", [`data-role:${role}`]);
+      const existing = await transaction("pg_roles").where("rolname", role).first("rolname");
+      if (existing) await transaction.raw(`ALTER ROLE "${role}" PASSWORD '${password}'`);
+      else await transaction.raw(`CREATE ROLE "${role}" LOGIN PASSWORD '${password}'`);
+      for (const schema of [names.data, names.results]) {
+        await transaction.raw("CREATE SCHEMA IF NOT EXISTS ??", [schema]);
+        await transaction.raw("REVOKE ALL ON SCHEMA ?? FROM PUBLIC", [schema]);
+        await transaction.raw("GRANT USAGE, CREATE ON SCHEMA ?? TO ??", [schema, role]);
+      }
+    });
+    const url = new URL(this.postgresUrl);
+    url.username = role;
+    url.password = password;
+    return url.toString();
   }
 
   private load(): { binding: Binding } | { reason: string } {
@@ -801,6 +886,13 @@ class Engine implements DataEngine {
     const db = this.databases.get(botId);
     this.databases.delete(botId);
     await db?.close();
+    if (this.postgresDb) {
+      const names = postgresSchemas(botId);
+      await this.postgresDb.schema.dropSchemaIfExists(names.results, true);
+      await this.postgresDb.schema.dropSchemaIfExists(names.data, true);
+      await this.postgresDb.raw("DROP ROLE IF EXISTS ??", [postgresBotRole(botId)]);
+      return;
+    }
     const folder = this.folder(botId);
     for (const name of [DATA_DB_FILE, `${DATA_DB_FILE}.wal`, DATA_TMP_DIR]) {
       // Windows keeps a just-closed file busy for a moment; rm retries EBUSY/EPERM.
@@ -812,6 +904,7 @@ class Engine implements DataEngine {
     const open = [...this.databases.values()];
     this.databases.clear();
     await Promise.all(open.map((db) => db.close()));
+    await this.postgresDb?.destroy();
   }
 }
 
@@ -820,4 +913,4 @@ export function createDataEngine(options: DataEngineOptions = {}): DataEngine {
 }
 
 /** The server's engine. Nothing loads until a bot's database is first asked for. */
-export const dataEngine: DataEngine = createDataEngine();
+export const dataEngine: DataEngine = createDataEngine({ postgresUrl: postgresConnectionUrl(process.env) });

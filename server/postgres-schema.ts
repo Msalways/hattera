@@ -83,10 +83,34 @@ const followupOrder: Knex.Migration = {
   },
 };
 
+const dataRoleSecret: Knex.Migration = {
+  async up(db) {
+    await db.schema.createTable("omb_data_role_secret", (table) => {
+      table.integer("id").primary();
+      table.text("secret").notNullable();
+    });
+  },
+  async down(db) { await db.schema.dropTable("omb_data_role_secret"); },
+};
+
+const fileLines: Knex.Migration = {
+  async up(db) {
+    await db.schema.createTable("omb_file_lines", (table) => {
+      table.bigIncrements("seq").primary();
+      table.text("path").notNullable();
+      table.text("line").notNullable();
+      table.index(["path", "seq"], "omb_file_lines_path_seq");
+    });
+  },
+  async down(db) { await db.schema.dropTable("omb_file_lines"); },
+};
+
 const migrations = new Map([
   ["001_initial_postgres_storage", initial],
   ["002_message_order", messageOrder],
   ["003_followup_order", followupOrder],
+  ["004_data_role_secret", dataRoleSecret],
+  ["005_file_lines", fileLines],
 ]);
 
 /** Knex owns its migration lock and version table; repeated deploys are safe. */

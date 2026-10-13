@@ -8,8 +8,9 @@
 // directory, fire-and-forget. Bookkeeping must never fail the turn it is
 // booking. Rows carry who asked and what it cost, never message text.
 import { readFileSync } from "node:fs";
-import { appendFile, mkdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { appendStructuredFile } from "./atomic.ts";
 import type { CostSource } from "./model-prices.ts";
 import { billableFor, type PriceList } from "./prices.ts";
 
@@ -145,7 +146,7 @@ export function appendUsage(dataDir: string, row: Omit<UsageRow, "at"> & { at?: 
 
 async function write(dataDir: string, record: UsageRow): Promise<void> {
   await mkdir(join(dataDir, DIR), { recursive: true, mode: 0o700 });
-  await appendFile(usageFileFor(dataDir, new Date(record.at)), JSON.stringify(record) + "\n", { mode: 0o600 });
+  await appendStructuredFile(usageFileFor(dataDir, new Date(record.at)), JSON.stringify(record) + "\n", { mode: 0o600 });
 }
 
 /** Test/shutdown seam: wait until everything queued for this directory is on disk. */

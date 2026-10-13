@@ -12,6 +12,7 @@
 // kill -9 still never leaves a torn file; only a power loss or kernel panic
 // can leave such a file empty.
 import { randomUUID } from "node:crypto";
+import { isAbsolute, relative, sep } from "node:path";
 import {
   closeSync,
   constants,
@@ -23,13 +24,85 @@ import {
   renameSync,
   unlinkSync,
   writeFileSync,
+  appendFileSync,
 } from "node:fs";
+import { appendFile } from "node:fs/promises";
 
 export type AtomicWriteOptions = {
   mode?: number;
   /** false skips the fsync. Default true. */
   durable?: boolean;
 };
+
+let structuredDocumentSink: { root: string; write: (path: string, text: string) => void;
+  remove: (path: string) => void; removePrefix: (prefix: string) => void;
+  append: (path: string, text: string) => void; replaceLog: (path: string, text: string) => void;
+  removeLog: (path: string) => void; removeLogPrefix: (prefix: string) => void } | null = null;
+
+/** PostgreSQL mode keeps a disposable file cache for the legacy synchronous
+ * readers. The committed document is the source of truth on restart. */
+export function setStructuredDocumentSink(root: string, sink: Omit<NonNullable<typeof structuredDocumentSink>, "root">): void {
+  structuredDocumentSink = { root, ...sink };
+}
+
+function managedName(path: string): string | null {
+  const sink = structuredDocumentSink;
+  if (!sink) return null;
+  const name = relative(sink.root, path);
+  if (!name || name === ".." || name.startsWith(`..${sep}`) || isAbsolute(name)) return null;
+  return name.replaceAll("\\", "/");
+}
+
+function structuredDocumentName(path: string): string | null {
+  const name = managedName(path);
+  return name && (/\.json$|\.ndjson$/i.test(name) || name === "environment-id") ? name : null;
+}
+
+function structuredLogName(path: string): string | null {
+  const name = managedName(path);
+  return name && /\.(?:ndjson|jsonl)$/i.test(name) ? name : null;
+}
+
+function persistStructuredDocument(path: string, data: string): void {
+  const name = structuredDocumentName(path);
+  if (name) structuredDocumentSink!.write(name, data);
+}
+
+export function removeStructuredDocument(path: string): void {
+  const name = structuredDocumentName(path);
+  if (name) structuredDocumentSink!.remove(name);
+}
+
+export function removeStructuredDocumentsUnder(directory: string): void {
+  const sink = structuredDocumentSink;
+  if (!sink) return;
+  const name = relative(sink.root, directory);
+  if (!name || name === ".." || name.startsWith(`..${sep}`) || isAbsolute(name)) return;
+  sink.removePrefix(`${name.replaceAll("\\", "/")}/`);
+  sink.removeLogPrefix(`${name.replaceAll("\\", "/")}/`);
+}
+
+export async function appendStructuredFile(path: string, data: string, options: { mode?: number } = {}): Promise<void> {
+  const name = structuredLogName(path);
+  if (name) structuredDocumentSink!.append(name, data);
+  await appendFile(path, data, options);
+}
+
+export function appendStructuredFileSync(path: string, data: string, options: { mode?: number } = {}): void {
+  const name = structuredLogName(path);
+  if (name) structuredDocumentSink!.append(name, data);
+  appendFileSync(path, data, options);
+}
+
+export function replaceStructuredFileLog(path: string, data: string): void {
+  const name = structuredLogName(path);
+  if (name) structuredDocumentSink!.replaceLog(name, data);
+}
+
+export function removeStructuredFileLog(path: string): void {
+  const name = structuredLogName(path);
+  if (name) structuredDocumentSink!.removeLog(name);
+}
 
 /** Windows refuses a rename onto an existing path while anything else holds a
  * handle to either file, and a virus scanner or the search indexer opening a
@@ -73,6 +146,7 @@ export function renameWithRetry(
 }
 
 export function writeFileAtomic(path: string, data: string, options: AtomicWriteOptions = {}): void {
+  persistStructuredDocument(path, data);
   const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
   let fd: number | null = null;
   try {

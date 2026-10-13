@@ -21,7 +21,7 @@
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeFileAtomic } from "./atomic.ts";
+import { removeStructuredDocument, writeFileAtomic } from "./atomic.ts";
 import { DATA_DIR } from "./config.ts";
 import { CaptureBuffer, capturePrompt, newCandidates, parseCandidates, type Candidate, type CaptureBatch, type CaptureTurn } from "./memory-capture.ts";
 import { factIdentity, lineFactIdentity, notebookIdentities } from "./memory-entries.ts";
@@ -179,6 +179,7 @@ function takePending(): PendingCapture["batches"] {
   } catch {
     return [];
   }
+  removeStructuredDocument(pendingPath());
   rmSync(pendingPath(), { force: true });
   try {
     const parsed = JSON.parse(raw) as Partial<PendingCapture>;

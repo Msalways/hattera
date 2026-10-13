@@ -29,8 +29,9 @@
 // separate change if it earns its keep.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { readdirSync, readFileSync } from "node:fs";
-import { appendFile, mkdir, readdir, stat, unlink } from "node:fs/promises";
+import { mkdir, readdir, stat, unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { appendStructuredFile, removeStructuredFileLog } from "./atomic.ts";
 
 import type { AutoVerdictSource } from "./auto-approve.ts";
 import { redactSecrets } from "./redact.ts";
@@ -157,7 +158,7 @@ export function decisionFileFor(dataDir: string, at: Date): string {
 async function writeDecision(dataDir: string, record: DecisionRow): Promise<void> {
   const at = new Date(record.at);
   await mkdir(join(dataDir, DIR), { recursive: true, mode: 0o700 });
-  await appendFile(decisionFileFor(dataDir, at), JSON.stringify(record) + "\n", { mode: 0o600 });
+  await appendStructuredFile(decisionFileFor(dataDir, at), JSON.stringify(record) + "\n", { mode: 0o600 });
   if (at.getTime() - (lastPrune.get(dataDir) ?? 0) >= PRUNE_EVERY_MS) {
     lastPrune.set(dataDir, at.getTime());
     await pruneDecisions(dataDir, retentionDays(), at);
@@ -203,6 +204,7 @@ export async function pruneDecisions(dataDir: string, days: number, now = new Da
   for (const name of [`${LEGACY_FILE}.1`, LEGACY_FILE]) {
     try {
       if ((await stat(join(dataDir, name))).mtimeMs > cutoff) continue;
+      removeStructuredFileLog(join(dataDir, name));
       await unlink(join(dataDir, name));
       removed.push(name);
     } catch {
@@ -228,6 +230,7 @@ export async function pruneMonthFiles(dir: string, days: number, now = new Date(
     const match = MONTH_FILE.exec(name);
     if (!match || Date.UTC(Number(match[1]), Number(match[2]), 1) > cutoff) continue;
     try {
+      removeStructuredFileLog(join(dir, name));
       await unlink(join(dir, name));
       removed.push(name);
     } catch {

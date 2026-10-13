@@ -39,6 +39,7 @@ import { hostedWorkspaceConfigured } from "./enterprise.ts";
 import { resolveLoopbackTrust } from "./request-auth.ts";
 import { restartPolicy } from "./restart.ts";
 import { writeFileAtomic } from "./atomic.ts";
+import { postgresConnectionUrl } from "./postgres-config.ts";
 import { ensureCaddy, normalizeDomainOption, startCaddy, type RunningCaddy } from "./caddy.ts";
 import { runServiceCommand } from "./service-cli.ts";
 import { runFleetCommand, type FleetInput } from "./fleet-cli.ts";
@@ -644,6 +645,10 @@ export async function runStatus(options: CliOptions, io: CliIo = defaultIo()): P
  * Written the way the server writes it (atomic, 0600), touching only the
  * one key, so nothing else in the file moves. */
 export async function runAccess(options: CliOptions, io: CliIo = defaultIo()): Promise<number> {
+  if (postgresConnectionUrl(process.env)) {
+    io.error("access edits local config only; manage sign-in access in Settings while PostgreSQL mode is enabled");
+    return 1;
+  }
   const file = join(options.dataDir, "config.json");
   let raw: Record<string, unknown> = {};
   if (existsSync(file)) {

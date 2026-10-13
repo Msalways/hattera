@@ -16,7 +16,8 @@
 // Fire-and-forget, like the decision log: a full disk must not undo a
 // setting that already took effect.
 import { readdirSync, readFileSync } from "node:fs";
-import { appendFile, mkdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
+import { appendStructuredFile } from "./atomic.ts";
 import { basename, join } from "node:path";
 
 import { actorLabel, boundRetentionDays, pruneMonthFiles, type DecisionActor, type DecisionRow } from "./decision-log.ts";
@@ -57,7 +58,7 @@ export function adminActivityFileFor(dataDir: string, at: Date): string {
 async function writeRow(dataDir: string, row: AdminActionRow): Promise<void> {
   const at = new Date(row.at);
   await mkdir(join(dataDir, DIR), { recursive: true, mode: 0o700 });
-  await appendFile(adminActivityFileFor(dataDir, at), JSON.stringify(row) + "\n", { mode: 0o600 });
+  await appendStructuredFile(adminActivityFileFor(dataDir, at), JSON.stringify(row) + "\n", { mode: 0o600 });
   if (at.getTime() - (lastPrune.get(dataDir) ?? 0) >= PRUNE_EVERY_MS) {
     lastPrune.set(dataDir, at.getTime());
     await pruneMonthFiles(join(dataDir, DIR), boundRetentionDays(), at);

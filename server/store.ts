@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, readFileSync, mkdirSync, rmSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeFileAtomic, writeFileAtomicIfChanged } from "./atomic.ts";
+import { removeStructuredDocument, removeStructuredFileLog, writeFileAtomic, writeFileAtomicIfChanged } from "./atomic.ts";
 import { parseToolScope, toolScopeWidens } from "../shared/tool-scope.ts";
 import { ensureSections, readSections, changeEmptySection } from "./section-context.ts";
 import type { TeamComputers } from "./team-computers.ts";
@@ -1332,6 +1332,8 @@ export class Store {
       join(EVENTS_DIR, `${threadId}.ndjson`),
       join(NATIVE_DIR, `${threadId}.ndjson`),
     ]) {
+      removeStructuredDocument(file);
+      removeStructuredFileLog(file);
       try {
         unlinkSync(file);
       } catch {}
@@ -2032,6 +2034,7 @@ export class Store {
     // The journal lives outside the workspace, so removing the workspace
     // does not take it. It is this bot's record of what its memory used to
     // say, and it goes with the bot — the same rule as a thread's event log.
+    removeStructuredFileLog(journalFile(id));
     try {
       rmSync(journalFile(id), { force: true });
     } catch {}

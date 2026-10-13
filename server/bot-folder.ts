@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import { closeSync, mkdirSync, openSync, readSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeFileAtomic } from "./atomic.ts";
+import { removeStructuredDocumentsUnder, writeFileAtomic } from "./atomic.ts";
 import { DATA_DIR } from "./config.ts";
 import { BOT_PROFILE_LIMITS } from "../shared/bot-profile.ts";
 
@@ -80,6 +80,7 @@ export function checkSoulDrift(botId: string, soul: string, hash: string): SoulD
 }
 
 export function removeBotFolder(botId: string): void {
+  removeStructuredDocumentsUnder(botFolder(botId));
   try {
     rmSync(botFolder(botId), { recursive: true, force: true });
   } catch {}

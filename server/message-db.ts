@@ -20,6 +20,7 @@ import type { ResolvedSender, SteerQueueReason } from "../shared/wire.ts";
 import type { Message } from "./store.ts";
 import type { UsageTrigger } from "./usage-ledger.ts";
 import { MessageSearchWorker } from "./message-search-worker.ts";
+import { postgresSync } from "./postgres-sync.ts";
 import { searchMessagesInDatabase, type SearchHit } from "./message-search-query.ts";
 export type { SearchHit } from "./message-search-query.ts";
 
@@ -293,6 +294,7 @@ export interface StoredCommandReceipt {
 }
 
 export function readCommandReceipt(kind: string, key: string): StoredCommandReceipt | null {
+  if (postgresSync()) return postgresSync()!.call("readCommandReceipt", kind, key);
   const row = db()
     .prepare("SELECT kind, key, at, result FROM command_receipts WHERE kind = ? AND key = ?")
     .get(kind, key) as StoredCommandReceipt | undefined;
@@ -310,6 +312,16 @@ export function withCommandReceipt(
   apply: () => string,
   at: number,
 ): { result: string; replayed: boolean } {
+  if (postgresSync()) {
+    const bridge = postgresSync()!;
+    const existing = bridge.call<string | null>("receipt.begin", kind, key);
+    if (existing !== null) return { result: existing, replayed: true };
+    try {
+      const result = apply();
+      bridge.call("receipt.commit", kind, key, at, result);
+      return { result, replayed: false };
+    } catch (error) { bridge.call("receipt.rollback"); throw error; }
+  }
   return transaction((database) => {
     const existing = database
       .prepare("SELECT result FROM command_receipts WHERE kind = ? AND key = ?")
@@ -324,6 +336,7 @@ export function withCommandReceipt(
 }
 
 export function saveChatFollowup(followup: Omit<ChatFollowup, "status">): void {
+  if (postgresSync()) return postgresSync()!.call("saveChatFollowup", followup);
   writeFollowups((connection) => connection.prepare(
     "INSERT INTO chat_followups(id, kind, owner_id, thread_id, send_id, status, payload) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
   ).run(followup.id, followup.kind, followup.ownerId, followup.threadId, followup.payload.sendId ?? null, JSON.stringify(followup.payload)));
@@ -332,6 +345,7 @@ export function saveChatFollowup(followup: Omit<ChatFollowup, "status">): void {
 /** Null retires a dispatch whose canonical transcript is already durable.
  * Cancellation tombstones remain so a retried sendId cannot resurrect it. */
 export function settleChatFollowups(ids: string[], status: FollowupStatus | null): void {
+  if (postgresSync()) return postgresSync()!.call("settleChatFollowups", ids, status);
   if (!ids.length) return;
   writeFollowups((connection) => {
     const statement = connection.prepare(status === null
@@ -347,6 +361,7 @@ export function settleChatFollowups(ids: string[], status: FollowupStatus | null
 }
 
 export function chatFollowups(kind?: ChatFollowup["kind"]): ChatFollowup[] {
+  if (postgresSync()) return postgresSync()!.call("chatFollowups", kind);
   const rows = (kind
     ? db().prepare("SELECT * FROM chat_followups WHERE kind = ? ORDER BY rowid").all(kind)
     : db().prepare("SELECT * FROM chat_followups ORDER BY rowid").all()) as Array<{
@@ -357,6 +372,7 @@ export function chatFollowups(kind?: ChatFollowup["kind"]): ChatFollowup[] {
 }
 
 export function cancelledChatFollowup(kind: ChatFollowup["kind"], ownerId: string, threadId: string, sendId: string): boolean {
+  if (postgresSync()) return postgresSync()!.call("cancelledChatFollowup", kind, ownerId, threadId, sendId);
   return Boolean(db().prepare(
     "SELECT 1 FROM chat_followups WHERE kind = ? AND owner_id = ? AND thread_id = ? AND send_id = ? AND status = 'cancelled'",
   ).get(kind, ownerId, threadId, sendId));
@@ -371,6 +387,7 @@ export interface ThreadRows {
 
 /** Read one thread, importing its legacy JSON file on first touch. */
 export function readThread(threadId: string, legacyFile: string): ThreadRows {
+  if (postgresSync()) return postgresSync()!.call("readThread", threadId);
   const rows = db()
     .prepare("SELECT json FROM messages WHERE thread_id = ? ORDER BY rowid")
     .all(threadId) as Array<{ json: string }>;
@@ -396,6 +413,7 @@ export interface ThreadTailRows extends ThreadRows {
  * on first touch, same as readThread(); that read is a one-time migration
  * cost regardless of how much of the result the caller keeps. */
 export function readThreadTail(threadId: string, legacyFile: string, limit: number): ThreadTailRows {
+  if (postgresSync()) return postgresSync()!.call("readThreadTail", threadId, limit);
   const rows = db()
     .prepare("SELECT json FROM messages WHERE thread_id = ? ORDER BY rowid DESC LIMIT ?")
     .all(threadId, limit + 1) as Array<{ json: string }>;
@@ -449,6 +467,7 @@ function importLegacy(threadId: string, legacyFile: string): ThreadRows {
 }
 
 export function insertMessage(threadId: string, message: Message): void {
+  if (postgresSync()) return postgresSync()!.call("insertMessage", threadId, message);
   db()
     .prepare(UPSERT_MESSAGE)
     .run(threadId, message.id, message.at, message.role, message.kind, message.text ?? null, JSON.stringify(message));
@@ -456,6 +475,7 @@ export function insertMessage(threadId: string, message: Message): void {
 
 /** A backup may only populate a fresh thread, never replace a transcript. */
 export function importThread(threadId: string, messages: Message[], activeLeafId: string | null): void {
+  if (postgresSync()) return postgresSync()!.call("importThread", threadId, messages, activeLeafId);
   transaction((database) => {
     if (database.prepare("SELECT 1 FROM messages WHERE thread_id = ? LIMIT 1").get(threadId) ||
         database.prepare("SELECT 1 FROM thread_state WHERE thread_id = ?").get(threadId)) {
@@ -468,6 +488,7 @@ export function importThread(threadId: string, messages: Message[], activeLeafId
 
 /** Persist a new message and the branch head as one crash-safe mutation. */
 export function appendMessage(threadId: string, message: Message): void {
+  if (postgresSync()) return postgresSync()!.call("appendMessage", threadId, message);
   transaction(() => {
     insertMessage(threadId, message);
     setActiveLeaf(threadId, message.id);
@@ -475,6 +496,7 @@ export function appendMessage(threadId: string, message: Message): void {
 }
 
 export function updateMessage(threadId: string, message: Message): void {
+  if (postgresSync()) return postgresSync()!.call("updateMessage", threadId, message);
   db()
     .prepare("UPDATE messages SET at = ?, role = ?, kind = ?, text = ?, json = ? WHERE thread_id = ? AND id = ?")
     .run(message.at, message.role, message.kind, message.text ?? null, JSON.stringify(message), threadId, message.id);
@@ -484,6 +506,7 @@ export function updateMessage(threadId: string, message: Message): void {
  * the tiny set of unfinished receipts without eagerly loading every room
  * transcript into memory at startup. */
 export function workingGoalRunMessages(): Array<{ threadId: string; message: Message }> {
+  if (postgresSync()) return postgresSync()!.call("workingGoalRunMessages");
   const rows = db()
     .prepare(
       "SELECT thread_id, json FROM messages " +
@@ -494,6 +517,7 @@ export function workingGoalRunMessages(): Array<{ threadId: string; message: Mes
 }
 
 export function setActiveLeaf(threadId: string, leafId: string | null): void {
+  if (postgresSync()) return postgresSync()!.call("setActiveLeaf", threadId, leafId);
   db()
     .prepare(
       "INSERT INTO thread_state (thread_id, active_leaf_id) VALUES (?, ?) " +
@@ -505,6 +529,7 @@ export function setActiveLeaf(threadId: string, leafId: string | null): void {
 /** Newest message timestamp per thread. One grouped read, chunked under
  * SQLite's variable limit. Threads with no rows are absent. */
 export function latestMessageAts(threadIds: readonly string[]): Map<string, number> {
+  if (postgresSync()) return new Map(postgresSync()!.call("latestMessageAts", threadIds));
   return newestAts(threadIds, "");
 }
 
@@ -513,6 +538,7 @@ export function latestMessageAts(threadIds: readonly string[]): Map<string, numb
  * none) that no bot delivered (peerAsk) and no other interface relayed.
  * Threads without one are absent. */
 export function latestPersonLineAts(threadIds: readonly string[]): Map<string, number> {
+  if (postgresSync()) return new Map(postgresSync()!.call("latestPersonLineAts", threadIds));
   return newestAts(threadIds, "AND role = 'user' AND kind = 'text' AND json_extract(json, '$.sendId') IS NOT NULL " +
     "AND json_extract(json, '$.peerAsk') IS NULL AND json_extract(json, '$.relayed') IS NULL");
 }
@@ -536,6 +562,7 @@ function newestAts(threadIds: readonly string[], where: string): Map<string, num
 }
 
 export function deleteThread(threadId: string): void {
+  if (postgresSync()) return postgresSync()!.call("deleteThread", threadId);
   writeFollowups((connection) => {
     connection.prepare("DELETE FROM chat_followups WHERE thread_id = ?").run(threadId);
     connection.prepare("DELETE FROM messages WHERE thread_id = ?").run(threadId);
@@ -547,6 +574,7 @@ export function deleteThread(threadId: string): void {
  * attachment's file name, say). A scan, like search; used only to decide
  * whether a member on a workspace with a restricted bot may fetch a file. */
 export function threadsReferencing(fragment: string): string[] {
+  if (postgresSync()) return postgresSync()!.call("threadsReferencing", fragment);
   if (!fragment) return [];
   const rows = db().prepare("SELECT DISTINCT thread_id FROM messages WHERE instr(json, ?) > 0").all(fragment) as Array<{ thread_id: string }>;
   return rows.map((row) => row.thread_id);
@@ -555,10 +583,12 @@ export function threadsReferencing(fragment: string): string[] {
 /** Case-insensitive substring search over text messages, newest first.
  * Keep literal substring semantics; HTTP callers run the scan off-thread. */
 export function searchMessages(query: string, limit = 40, threadId?: string): SearchHit[] {
+  if (postgresSync()) return postgresSync()!.call("searchMessages", query, limit, threadId);
   return searchMessagesInDatabase(db(), query, limit, threadId);
 }
 
 export function searchMessagesAsync(query: string, limit = 40, threadId?: string): Promise<SearchHit[]> {
+  if (postgresSync()) return Promise.resolve(searchMessages(query, limit, threadId));
   if (!query.trim()) return Promise.resolve([]);
   db(); // The owner initializes/migrates the schema before any read-only scan.
   searchWorker ??= new MessageSearchWorker(DB_FILE());
@@ -667,6 +697,7 @@ export function readMessageText(
   threadId: string,
   messageId: string,
 ): { threadId: string; messageId: string; at: number; role: string; text: string; from?: string; peer?: string } | null {
+  if (postgresSync()) return postgresSync()!.call("readMessageText", threadId, messageId);
   const row = db()
     .prepare(
       "SELECT at, role, text, json_extract(json, '$.from.name') AS from_name, " +
@@ -715,6 +746,7 @@ function rangeClause(range: RecallRange | undefined, column: string): { sql: str
 }
 
 export function recallMessages(query: string, threadIds: readonly string[], limit = 12, range?: RecallRange, mode: SearchMode = "all"): RecallHit[] {
+  if (postgresSync()) return postgresSync()!.call("recallMessages", query, threadIds, limit, range, mode);
   const match = ftsQuery(query, mode);
   if (!match || !threadIds.length) return [];
   const placeholders = threadIds.map(() => "?").join(", ");
@@ -765,6 +797,7 @@ const RECENT_HEAD_CHARS = 240;
  * shape as a ranked hit, with the head of the message standing in for the
  * FTS snippet. */
 export function recentMessages(threadIds: readonly string[], range: RecallRange, limit = 12): RecallHit[] {
+  if (postgresSync()) return postgresSync()!.call("recentMessages", threadIds, range, limit);
   if (!threadIds.length) return [];
   const placeholders = threadIds.map(() => "?").join(", ");
   const window = rangeClause(range, "m.at");
@@ -814,6 +847,7 @@ export interface ThreadLatest {
  * by construction. What a bot last said in a conversation is the shortest
  * honest answer to "what have you been doing there". */
 export function latestSaidByBot(threadIds: readonly string[], botId: string, since: number, limit = 20): ThreadLatest[] {
+  if (postgresSync()) return postgresSync()!.call("latestSaidByBot", threadIds, botId, since, limit);
   if (!threadIds.length) return [];
   const placeholders = threadIds.map(() => "?").join(", ");
   const rows = db()
@@ -844,6 +878,7 @@ export interface MemoryFileStat {
 /** Index one memory file (upsert keeps the rowid, so the update trigger
  * keeps the FTS rows in step — the same reasoning as UPSERT_MESSAGE). */
 export function indexMemoryFile(botId: string, path: string, text: string, stat: { mtimeMs: number; bytes: number }): void {
+  if (postgresSync()) return postgresSync()!.call("indexMemoryFile", botId, path, text, stat);
   db()
     .prepare(
       "INSERT INTO memory_files (bot_id, path, text, mtime_ms, bytes) VALUES (?, ?, ?, ?, ?) " +
@@ -853,6 +888,7 @@ export function indexMemoryFile(botId: string, path: string, text: string, stat:
 }
 
 export function removeMemoryFile(botId: string, path: string): void {
+  if (postgresSync()) return postgresSync()!.call("removeMemoryFile", botId, path);
   db().prepare("DELETE FROM memory_files WHERE bot_id = ? AND path = ?").run(botId, path);
 }
 
@@ -860,11 +896,13 @@ export function removeMemoryFile(botId: string, path: string): void {
  * matching external-content FTS rows, the same way deleting a thread's
  * messages drops theirs. */
 export function deleteBotMemoryFiles(botId: string): void {
+  if (postgresSync()) return postgresSync()!.call("deleteBotMemoryFiles", botId);
   db().prepare("DELETE FROM memory_files WHERE bot_id = ?").run(botId);
 }
 
 /** What is indexed for a bot, so the caller can compare against the disk. */
 export function indexedMemoryFiles(botId: string): MemoryFileStat[] {
+  if (postgresSync()) return postgresSync()!.call("indexedMemoryFiles", botId);
   const rows = db()
     .prepare("SELECT path, mtime_ms, bytes FROM memory_files WHERE bot_id = ?")
     // SAFETY: the SELECT names exactly these three NOT NULL columns
@@ -885,6 +923,7 @@ export interface MemoryHit {
  * in SQL, the same way recallMessages scopes by thread: another bot's
  * memory is not a lower-ranked result, it is not a result. */
 export function recallMemory(query: string, botId: string, limit = 12, mode: SearchMode = "all"): MemoryHit[] {
+  if (postgresSync()) return postgresSync()!.call("recallMemory", query, botId, limit, mode);
   const match = ftsQuery(query, mode);
   if (!match) return [];
   const rows = db()

@@ -102,6 +102,7 @@ export function createGithubIdentity(input: { config: GithubIdentityConfig; data
       return true;
     }
     const issued = sessions.issue({ label: "GitHub owner", scopes: ["admin", "client"], userId: `github:${config.ownerId}` });
+    await sessions.flush();
     res.setHeader("set-cookie", [...cookies, serializeSessionCookie(cookieName, issued.token, { secure: config.publicUrl.startsWith("https:"), maxAgeSeconds: cookieMaxAgeSeconds(issued.session) })]);
     res.writeHead(303, { location: "/" });
     res.end();

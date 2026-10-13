@@ -212,6 +212,13 @@ export interface SessionStoreOptions {
   /** One membership snapshot per revalidation pass, not per session. */
   emailScopesSnapshot?: () => EmailScopesResolver;
   portalMembership?: boolean;
+  /** PostgreSQL mode loads before construction and saves through an async queue. */
+  external?: {
+    initial: unknown;
+    restoreAccounts: boolean;
+    save: (snapshot: { version: 1; sessions: SessionRecord[] }) => Promise<void>;
+    close: () => Promise<void>;
+  };
 }
 
 export class SessionRegistry {
@@ -226,6 +233,8 @@ export class SessionRegistry {
   private readonly options: SessionStoreOptions;
   private readonly openMarker: string;
   private closed = false;
+  private pendingSave: Promise<void> = Promise.resolve();
+  private storageError: unknown = null;
   /** Set on an OMB Cloud home (requireAdmin): only admin scope, anywhere. */
   private adminOnly: string | null = null;
 
@@ -235,29 +244,36 @@ export class SessionRegistry {
     this.options = options;
     this.now = options.now ?? Date.now;
     this.openMarker = `${options.file}.open`;
-    const unclean = existsSync(this.openMarker);
-    try {
-      mkdirSync(dirname(options.file), { recursive: true, mode: 0o700 });
-      // Establish the guard before accepting any persisted bearer. Even if
-      // every subsequent write fails, an unclean restart will see this marker.
-      writeFileAtomic(this.openMarker, "Session registry is open.\n", { mode: 0o600 });
-      this.syncDirectory();
-    } catch {
-      throw new Error("Could not establish safe session storage.");
+    if (options.external) this.load(options.external.restoreAccounts);
+    else {
+      const unclean = existsSync(this.openMarker);
+      try {
+        mkdirSync(dirname(options.file), { recursive: true, mode: 0o700 });
+        // Establish the guard before accepting any persisted bearer. Even if
+        // every subsequent write fails, an unclean restart will see this marker.
+        writeFileAtomic(this.openMarker, "Session registry is open.\n", { mode: 0o600 });
+        this.syncDirectory();
+      } catch {
+        throw new Error("Could not establish safe session storage.");
+      }
+      this.load(!unclean);
     }
-    this.load(!unclean);
     this.revalidateEmailSessions();
   }
 
   private load(restoreAccounts: boolean): void {
-    if (!existsSync(this.options.file)) return;
     let raw: unknown;
-    try {
-      raw = JSON.parse(readFileSync(this.options.file, "utf8"));
-    } catch {
-      return; // unreadable: start empty rather than refuse to boot; pairing again is cheap
+    if (this.options.external) raw = this.options.external.initial;
+    else {
+      if (!existsSync(this.options.file)) return;
+      try {
+        raw = JSON.parse(readFileSync(this.options.file, "utf8"));
+      } catch {
+        return; // unreadable: start empty rather than refuse to boot; pairing again is cheap
+      }
     }
     const parsed = fileSchema.safeParse(raw);
+    if (this.options.external && raw !== undefined && !parsed.success) throw new Error("PostgreSQL session snapshot is invalid.");
     if (parsed.success) this.sessions = parsed.data.sessions.filter(session => restoreAccounts || (session.email === undefined && session.userId === undefined));
   }
 
@@ -272,6 +288,14 @@ export class SessionRegistry {
   /** Atomic write, owner-only, directory owner-only. */
   private persist(): void {
     if (this.closed) throw new Error("Session registry is closed.");
+    if (this.options.external) {
+      if (this.storageError) throw new Error("Session storage is unavailable.");
+      const snapshot = { version: 1 as const, sessions: this.sessions.map((session) => ({ ...session, scopes: [...session.scopes] })) };
+      this.pendingSave = this.pendingSave.then(() => this.options.external!.save(snapshot)).catch((error: unknown) => {
+        this.storageError = error;
+      });
+      return;
+    }
     const dir = dirname(this.options.file);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     writeFileAtomic(this.options.file, JSON.stringify({ version: 1, sessions: this.sessions }, null, 2) + "\n", { mode: 0o600 });
@@ -283,6 +307,7 @@ export class SessionRegistry {
    * remain durable. Never remove the marker before the reduced set is saved. */
   close(): void {
     if (this.closed) return;
+    if (this.options.external) throw new Error("PostgreSQL session storage must be closed asynchronously.");
     try {
       this.revalidateEmailSessions();
       this.persist();
@@ -295,7 +320,23 @@ export class SessionRegistry {
     }
   }
 
+  async flush(): Promise<void> {
+    await this.pendingSave;
+    if (this.storageError) throw new Error("Session storage is unavailable.");
+  }
+
+  async closeAsync(): Promise<void> {
+    if (!this.options.external) { this.close(); return; }
+    if (this.closed) return;
+    this.revalidateEmailSessions();
+    this.persist();
+    await this.flush();
+    await this.options.external.close();
+    this.closed = true;
+  }
+
   private prune(): void {
+    if (this.storageError) throw new Error("Session storage is unavailable.");
     this.revalidateEmailSessions();
     const now = this.now();
     this.pairings = this.pairings.filter((p) => p.expiresAt > now);
@@ -560,6 +601,7 @@ export class SessionRegistry {
 
   authenticate(token: string | undefined): SessionRecord | null {
     if (!token) return null;
+    if (this.storageError) throw new Error("Session storage is unavailable.");
     this.revalidateEmailSessions();
     const hash = sha256(token);
     const now = this.now();
