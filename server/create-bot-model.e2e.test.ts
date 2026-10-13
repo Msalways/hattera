@@ -119,7 +119,7 @@ it("rejects a signed-out engine in Chief bot creation and team setup", async () 
     const token = JSON.parse(readFileSync(fixture.fixtureDumpPath, "utf8")).mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN;
     const selection = { instanceId: "codex", model: codex.models.default };
     const catalog = await api("GET", "/api/internal/team-setup-catalog", undefined, token);
-    expect(catalog.body.instances.find((item: any) => item.instanceId === "codex")).toMatchObject({ ready: false });
+    expect(catalog.body.instances.map((item: any) => item.instanceId)).not.toContain("codex");
     const created = await api("POST", "/api/internal/create-bot", {
       name: "Review", role: "Reviewer", instructions: "Review the work.", modelSelection: selection,
     }, token);
