@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: openmausbot-disposable
+    name: hattera-preview
     runtime: docker
     plan: free
-    branch: prototype/opencode-team
+    branch: main
     dockerfilePath: ./Dockerfile
     dockerContext: .
     dockerCommand: node /app/render/start.mjs
