@@ -65,5 +65,11 @@ records. The server checks the file directory's database marker and refuses
 to mix it with a different database. Switching an existing SQLite install to
 PostgreSQL does not import its data.
 
+For offsite copies of uploads and encrypted SQLite-mode workspace backup
+exports, set `OMB_OBJECT_STORAGE_KIND=s3` and the `OMB_S3_*` values in `.env`.
+Any S3-compatible private bucket can be used. The `/data` volume remains
+required; see the [recovery guide](../../docs/storage-and-recovery.md) for
+restore scope and retention.
+
 Update with `docker compose build --pull` followed by `docker compose up -d`.
 Stop with `docker compose stop`. `docker compose down -v` deletes managed volumes.

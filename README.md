@@ -26,7 +26,7 @@ To enable GitHub sign-in, copy `.env.example` to `.env` and set `GITHUB_CLIENT_I
 
 The included [Render Blueprint](render.yaml) builds the `main` branch of this fork as a Docker web service. Render supplies a public HTTPS URL; the server's own health endpoint is `GET /api/health`. Set GitHub OAuth credentials in Render's dashboard and register `https://<service>.onrender.com/identity/callback/github` for that deployment. A public Render URL does not require Tailscale. On a VM, Tailscale Serve can instead make the app reachable only to devices on your tailnet.
 
-**Do not put important data on Render Free.** This fork currently stores chats, sign-in records, sessions, bot settings, uploads, agent workspaces, and other state on the container filesystem. Render Free does not provide a persistent disk; restarts, redeploys, and idle spin-down can erase it. An external uptime monitor may reduce idle spin-down, but cannot preserve data. The optional PostgreSQL backend is still in development and is not enabled by this Blueprint. See the [hosting readiness checklist](docs/hattera-hosting.md) before using Hattera with data you need to keep.
+**Do not put important data on Render Free.** SQLite is the default. The optional PostgreSQL backend can retain structured records, and an optional S3-compatible bucket can copy uploads and encrypted backup exports, but bot workspaces and CLI credentials still need a durable `/data` filesystem. Render Free does not provide a persistent disk; restarts, redeploys, and idle spin-down can erase those files. An external uptime monitor cannot preserve them. See the [hosting readiness checklist](docs/hattera-hosting.md) before using Hattera with data you need to keep.
 
 ## Project status
 

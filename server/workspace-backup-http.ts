@@ -41,6 +41,7 @@ export function createWorkspaceBackupRoutes(options: {
   authorized: (req: IncomingMessage, auth: RequestAuth) => boolean;
   status: () => { busy: boolean; pendingRestore: boolean };
   restored: RestoreResult;
+  uploadArchive?: (id: string, path: string) => Promise<void>;
 }) {
   // ponytail: one bounded set per server; transfers expire after an hour.
   const artifacts = new Map<string, Artifact>();
@@ -126,14 +127,25 @@ export function createWorkspaceBackupRoutes(options: {
         const body = z.object({ password: passwordSchema, clientState: z.record(z.string(), z.string()).default({}) }).parse(await options.readBody(req, MAX_CLIENT_STATE_BYTES + 8 * 1024));
         if (Buffer.byteLength(JSON.stringify(body.clientState)) > MAX_CLIENT_STATE_BYTES) throw failure("Saved drafts exceed the 2 MB backup preference limit.", 413);
         const clientState = Object.fromEntries(Object.entries(body.clientState).filter(([key]) => WORKSPACE_BACKUP_CLIENT_KEYS.includes(key as typeof WORKSPACE_BACKUP_CLIENT_KEYS[number])));
-        const result = await operate(() => options.exclusive(async () => {
-          check(req, auth);
-          replacePrevious(auth, ["download"]);
-          if (artifacts.size >= 4) throw failure("There are already four backup files in progress. Restart or wait an hour before creating another.", 409);
-          return createWorkspaceBackup(options.dataDir, { password: body.password, clientState, appVersion: options.appVersion });
-        }));
-        try { check(req, auth); } catch (error) { removeWorkspaceBackupJob(options.dataDir, result.id); throw error; }
-        artifacts.set(result.id, { owner: owner(auth), kind: "download", path: result.path, summary: result.summary, expires: Date.now() + EXPIRES_MS });
+        const result = await operate(async () => {
+          const archive = await options.exclusive(async () => {
+            check(req, auth);
+            replacePrevious(auth, ["download"]);
+            if (artifacts.size >= 4) throw failure("There are already four backup files in progress. Restart or wait an hour before creating another.", 409);
+            return createWorkspaceBackup(options.dataDir, { password: body.password, clientState, appVersion: options.appVersion });
+          });
+          try {
+            check(req, auth);
+            try { await options.uploadArchive?.(archive.id, archive.path); }
+            catch (error) {
+              console.warn(`object storage: backup copy failed: ${error instanceof Error ? error.message : String(error)}`);
+              throw failure("Offsite backup copy failed. Try again.", 503);
+            }
+            check(req, auth);
+          } catch (error) { removeWorkspaceBackupJob(options.dataDir, archive.id); throw error; }
+          artifacts.set(archive.id, { owner: owner(auth), kind: "download", path: archive.path, summary: archive.summary, expires: Date.now() + EXPIRES_MS });
+          return archive;
+        });
         json(res, 200, { id: result.id, filename: `OpenMausBot-${result.summary.createdAt.slice(0, 10)}.ombbackup`, bytes: statSync(result.path).size, summary: result.summary });
         return true;
       }

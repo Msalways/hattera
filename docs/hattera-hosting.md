@@ -9,6 +9,7 @@ This checklist covers this fork's container deployment. The inherited [VPS guide
 - [`render.yaml`](../render.yaml) builds this fork's `main` branch, starts the container through [`deploy/render/start.mjs`](../deploy/render/start.mjs), and checks `/api/health`.
 - GitHub OAuth uses a separate `/identity/*` path, checks the configured numeric `GITHUB_OWNER_ID`, and leaves legacy `/api/auth/*` pairing available. The Render launcher derives the public URL and GitHub callback from `RENDER_EXTERNAL_URL`.
 - `.env` is ignored by Git and excluded from the Docker build context. Render OAuth credentials belong in Render's environment settings.
+- Optional `OMB_OBJECT_STORAGE_KIND=s3` mirrors uploads and encrypted SQLite-mode backup exports to any S3-compatible private bucket; it does not replace the writable `/data` volume.
 
 ## What must persist
 
@@ -41,7 +42,7 @@ This branch implements the optional PostgreSQL switch for a **fresh installation
 ## Release gate for durable hosting
 
 1. Verify the optional SQLite/PostgreSQL switch against the target provider, including startup migrations and a restart of a fresh database. SQLite remains the default; an existing SQLite dataset does not automatically migrate to PostgreSQL.
-2. Decide where attachments, workspaces, browser profiles, and engine CLI credentials persist, and define cleanup and retention rules for each. A database URL alone does not solve those files.
+2. Provide a durable `/data` volume for attachments, workspaces, browser profiles, and engine CLI credentials. Configure optional object storage copies and bucket retention using the [recovery guide](storage-and-recovery.md).
 3. Restore a backup into an isolated deployment. Verify bots, chats, GitHub sign-in, pairing, uploads, agent workspaces, and an OpenCode turn after a restart.
 4. Set a stable HTTPS origin and its matching GitHub callback. Keep `GITHUB_CLIENT_SECRET` and `BETTER_AUTH_SECRET` out of Git and logs. Verify an account other than the owner is rejected.
 5. Monitor health and capacity, and document how to roll back an image and recover state. A passing health probe shows that the process responds; it does not prove the agent engine or storage is healthy.

@@ -13,6 +13,7 @@ import { SessionRegistry } from "./sessions.ts";
 import { WorkspaceBackupMaintenance } from "./workspace-backup-maintenance.ts";
 
 const archive = vi.hoisted(() => ({ create: vi.fn(), stage: vi.fn(), commit: vi.fn(), remove: vi.fn() }));
+const uploadArchive = vi.fn<(id: string, path: string) => Promise<void>>();
 vi.mock("./workspace-backup.ts", async (original) => ({
   ...await original<typeof import("./workspace-backup.ts")>(),
   createWorkspaceBackup: archive.create, stageWorkspaceBackup: archive.stage,
@@ -40,6 +41,7 @@ function fakeArchive() {
 
 beforeEach(async () => {
   vi.resetAllMocks();
+  uploadArchive.mockResolvedValue(undefined);
   dataDir = mkdtempSync(join(tmpdir(), "omb-backup-http-"));
   maintenance = new WorkspaceBackupMaintenance();
   sessions = new SessionRegistry({ file: join(dataDir, "sessions.json") });
@@ -51,6 +53,7 @@ beforeEach(async () => {
   const authenticate = (req: IncomingMessage) => resolveRequestAuth(req, { sessions, cookieName: "fixture", streamPath: "/api/events", url: new URL(req.url!, url) });
   const routes = createWorkspaceBackupRoutes({
     dataDir, appVersion: "0.1.71", restored: {},
+    uploadArchive,
     readBody: async (req, limit = 1_000_000) => {
       const chunks: Buffer[] = [];
       let bytes = 0;
@@ -104,6 +107,23 @@ afterEach(async () => {
 function post(path: string, body: unknown, token = admin.token) {
   return fetch(`${url}${path}`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
 }
+
+it("copies a backup export offsite before offering its download", async () => {
+  const response = await post("/api/workspace-backup/export", { password: PASSWORD });
+  const result = await response.json() as { id: string };
+  expect(response.status).toBe(200);
+  expect(uploadArchive).toHaveBeenCalledWith(result.id, join(dataDir, ".backups", result.id, "workspace.ombbackup"));
+});
+
+it("rejects an export when its offsite copy fails and removes the temporary archive", async () => {
+  uploadArchive.mockRejectedValueOnce(new Error("provider unavailable"));
+  const response = await post("/api/workspace-backup/export", { password: PASSWORD });
+  expect(response.status).toBe(503);
+  expect((await response.json() as { error: string }).error).toMatch(/Offsite backup copy failed/);
+  const id = uploadArchive.mock.calls[0]![0];
+  expect(archive.remove).toHaveBeenCalledWith(dataDir, id);
+  expect(existsSync(join(dataDir, ".backups", id))).toBe(false);
+});
 
 it.each(["revoke", "logout"])("keeps session controls authenticated and usable during a held export (%s)", async (action) => {
   let started!: () => void;
