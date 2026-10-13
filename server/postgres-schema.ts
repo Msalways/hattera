@@ -72,9 +72,21 @@ const messageOrder: Knex.Migration = {
   },
 };
 
+const followupOrder: Knex.Migration = {
+  async up(db) {
+    await db.raw("ALTER TABLE omb_chat_followups ADD COLUMN seq BIGSERIAL");
+    await db.raw("CREATE INDEX omb_followups_seq ON omb_chat_followups (seq)");
+  },
+  async down(db) {
+    await db.raw("DROP INDEX omb_followups_seq");
+    await db.schema.alterTable("omb_chat_followups", (table) => table.dropColumn("seq"));
+  },
+};
+
 const migrations = new Map([
   ["001_initial_postgres_storage", initial],
   ["002_message_order", messageOrder],
+  ["003_followup_order", followupOrder],
 ]);
 
 /** Knex owns its migration lock and version table; repeated deploys are safe. */

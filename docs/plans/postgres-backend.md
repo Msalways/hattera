@@ -13,10 +13,11 @@ default. The PostgreSQL identity adapter has passed a disposable database
 test, but the server does not select it yet.
 
 Async Knex stores now read and replace named JSON records and persist
-transcripts plus branch heads in PostgreSQL. A versioned sequence column keeps
-message insertion order when timestamps match. Disposable database tests cover
-both stores across connections and a failed append rollback. The server does
-not call these stores yet.
+transcripts, branch heads, queued followups, command receipts, literal search,
+and memory-file index metadata in PostgreSQL. Versioned sequence columns keep
+message and followup insertion order. Disposable database tests cover the
+stores across connections, receipt replay, rollback, and restart. The server
+does not call these stores yet.
 
 **Do not enable the flag on a running server or Render yet.** The server
 deliberately rejects it before creating its data directory. The active chat,
