@@ -25081,7 +25081,14 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         }
         if (action === "install") {
           if (!(await registry.installRuntime(instanceId))) return json(res, 404, { error: "Installing this engine from Settings is not available on this server. Use the install command on the machine running OpenMausBot." });
-          return json(res, 200, { instances: await describeInstances() });
+          const instances = await describeInstances();
+          // OpenCode's first catalog probe can take over a minute on a small
+          // host. Start it only after the install response's version probe,
+          // so the two CLI processes do not compete for Render Free's CPU.
+          if (registry.get(instanceId)?.driverKind === "opencodeGo") {
+            res.once("finish", () => { void registry.refreshModels(instanceId).catch(() => {}); });
+          }
+          return json(res, 200, { instances });
         }
         if (action === "auth/start") {
           const instance = registry.get(instanceId);

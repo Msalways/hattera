@@ -4,7 +4,7 @@
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { ModelCatalog } from "../contracts.ts";
 import { resetPathCacheForTests } from "../env-path.ts";
@@ -338,13 +338,10 @@ process.exit(0);
     Object.assign(fake.driver, { install: { command: { linux: "npm install -g fake-engine", darwin: "npm install -g fake-engine" }, needsNode: true } });
     const registry = new ProviderRegistry([fake.driver], { enginesBaseDir: join(scratch, "data") });
     await registry.load({ a: { driver: "fake" } });
-    const refreshModels = vi.fn(async () => {});
-    Object.defineProperty(registry.get("a"), "refreshModels", { value: refreshModels });
     const [described] = await registry.describe();
     expect(described.install?.server).toEqual({ package: "fake-engine" });
     expect(described.install?.platform).toBe(process.platform);
     expect(await registry.installRuntime("a")).toBe(true);
-    expect(refreshModels).toHaveBeenCalledOnce();
     const calls = readFileSync(process.env.FAKE_NPM_LOG!, "utf8").trim().split("\n").map((line) => JSON.parse(line) as string[]);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toEqual(["install", "-g", "--prefix", join(scratch, "data", "tools", "npm"), "--loglevel=error", "--include=optional", "--allow-scripts=fake-engine", "fake-engine@latest"]);

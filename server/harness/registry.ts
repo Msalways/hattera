@@ -216,10 +216,6 @@ export class ProviderRegistry {
     const server = serverInstallFor(driver?.install, this.npmPresent());
     if (!server) return false;
     await installNpmEngine(server.package, { baseDir: this.enginesBaseDir, cli: cliDefaultOf(driver) });
-    // A live instance created before installation still has its empty model
-    // catalog. Discover in the background so the install request can finish
-    // before small hosts' HTTP proxy times out.
-    void entry.live?.refreshModels?.().catch(() => {});
     return true;
   }
 
