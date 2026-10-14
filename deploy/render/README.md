@@ -13,10 +13,10 @@ random `BETTER_AUTH_SECRET` of at least 32 characters in its Environment
 page. The Blueprint generates the secret for you. The default startup
 derives `OMB_PUBLIC_URL` and `GITHUB_REDIRECT_URI` from
 Render's `RENDER_EXTERNAL_URL`; entering those two values manually is not
-needed. The image includes OpenCode and Codex by default; set `ENGINES` only
-when you want a different list of engine CLI packages, and rebuild after
-changing it. If the service already has an `ENGINES` environment value, set
-it to `opencode-ai @openai/codex` to match this default.
+needed. Engine CLIs are installed from **Manage AI accounts** when needed.
+For a custom image that includes selected CLIs, `ENGINES` is an optional
+build argument; the default image includes none.
+Remove any `ENGINES` value from an existing Render service to use this default.
 
 1. Create a separate GitHub OAuth app for Render with temporary Homepage URL
    `http://127.0.0.1:8080` and callback
@@ -37,8 +37,8 @@ it to `opencode-ai @openai/codex` to match this default.
    Render URL. A separate OAuth app keeps local sign-in working.
 4. Visit `https://<service>.onrender.com/api/health`; it should return HTTP 200
    with `{"app":"openmausbot"}`. Then visit `/pair` and use GitHub sign-in.
-   The image already contains OpenCode and Codex; use **Manage AI accounts**
-   to sign in after deployment. For Codex on a remote server, first enable
+   Use **Manage AI accounts** to install and sign in to an engine when needed.
+   For Codex on a remote server, first enable
    device-code sign-in in your ChatGPT account's Security Settings (or ask
    your workspace admin to allow it), then start Codex sign-in in the app.
 5. Optionally create an external HTTP(s) monitor for `/api/health` with a

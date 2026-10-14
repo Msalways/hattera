@@ -9,8 +9,6 @@ services:
     dockerCommand: node /app/render/start.mjs
     healthCheckPath: /api/health
     envVars:
-      - key: ENGINES
-        value: opencode-ai @openai/codex
       - key: OMB_LOOPBACK_TRUST
         value: service
       - key: GITHUB_CLIENT_ID
