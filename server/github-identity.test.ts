@@ -37,6 +37,7 @@ afterEach(async () => {
 it("requires an exact callback, a safe origin, and a stable numeric owner ID", () => {
   expect(githubIdentityConfig({})).toBeNull();
   expect(githubIdentityConfig({ OMB_PUBLIC_URL: "http://localhost:8080" })).toBeNull();
+  expect(() => githubIdentityConfig({ GITHUB_CLIENT_ID: "client" })).toThrow("GitHub sign-in is missing OMB_PUBLIC_URL, GITHUB_REDIRECT_URI, GITHUB_CLIENT_SECRET, BETTER_AUTH_SECRET, GITHUB_OWNER_ID");
   expect(githubIdentityConfig(config)?.ownerId).toBe("12345");
   expect(githubIdentityConfig(localConfig)?.publicUrl).toBe("http://127.0.0.1:8080");
   expect(() => githubIdentityConfig({ ...localConfig, OMB_PUBLIC_URL: "http://localhost:8080" })).toThrow("OMB_PUBLIC_URL");

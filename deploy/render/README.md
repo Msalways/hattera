@@ -6,6 +6,15 @@ provides HTTPS and the canonical `RENDER_EXTERNAL_URL`; the startup script
 derives `OMB_PUBLIC_URL` and `GITHUB_REDIRECT_URI` from it. No local Compose
 volume or `.env` is included in the image.
 
+If you create a Docker web service manually instead of using the Blueprint,
+set its **Docker Command** to `node /app/render/start.mjs`. Add
+`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, numeric `GITHUB_OWNER_ID`, and a
+random `BETTER_AUTH_SECRET` of at least 32 characters in its Environment
+page. The Blueprint sets the command and generates the secret for you. The
+startup command derives `OMB_PUBLIC_URL` and `GITHUB_REDIRECT_URI` from
+Render's `RENDER_EXTERNAL_URL`; entering those two values manually is not
+needed.
+
 1. Create a separate GitHub OAuth app for Render with temporary Homepage URL
    `http://127.0.0.1:8080` and callback
    `http://127.0.0.1:8080/identity/callback/github`. Copy its client ID and

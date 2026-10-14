@@ -24,7 +24,8 @@ export function githubIdentityConfig(env: NodeJS.ProcessEnv): GithubIdentityConf
   const keys = ["OMB_PUBLIC_URL", "GITHUB_REDIRECT_URI", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "BETTER_AUTH_SECRET", "GITHUB_OWNER_ID"] as const;
   const values = keys.map((key) => env[key]?.trim() ?? "");
   if (values.slice(1).every((value) => !value)) return null;
-  if (values.some((value) => !value)) throw new Error(`GitHub sign-in requires ${keys.join(", ")}`);
+  const missing = keys.filter((_, index) => !values[index]);
+  if (missing.length) throw new Error(`GitHub sign-in is missing ${missing.join(", ")}`);
   const [publicUrl, redirectUri, clientId, clientSecret, secret, ownerId] = values as [string, string, string, string, string, string];
   const url = new URL(publicUrl);
   const loopback = url.protocol === "http:" && url.hostname === "127.0.0.1" && Boolean(url.port);
