@@ -13,7 +13,10 @@ random `BETTER_AUTH_SECRET` of at least 32 characters in its Environment
 page. The Blueprint generates the secret for you. The default startup
 derives `OMB_PUBLIC_URL` and `GITHUB_REDIRECT_URI` from
 Render's `RENDER_EXTERNAL_URL`; entering those two values manually is not
-needed.
+needed. The image includes OpenCode and Codex by default; set `ENGINES` only
+when you want a different list of engine CLI packages, and rebuild after
+changing it. If the service already has an `ENGINES` environment value, set
+it to `opencode-ai @openai/codex` to match this default.
 
 1. Create a separate GitHub OAuth app for Render with temporary Homepage URL
    `http://127.0.0.1:8080` and callback

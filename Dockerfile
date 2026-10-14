@@ -159,8 +159,9 @@ CMD ["node", "/app/dist-server/cloud-home-start.js"]
 
 # The self-hosted server, last so a plain `docker build .` builds it.
 FROM runtime AS server
-# Optional engine CLIs baked into the image (space-separated npm packages).
-ARG ENGINES=""
+# Engine CLIs baked into the image (space-separated npm packages). A manual
+# Render service gets OpenCode and Codex even when it does not use render.yaml.
+ARG ENGINES="opencode-ai @openai/codex"
 RUN if [ -n "$ENGINES" ]; then HOME=/tmp/omb-build-home npm install -g $ENGINES && rm -rf /tmp/omb-build-home /tmp/node-compile-cache; fi
 COPY --from=build --chown=maus:maus /src/dist-native/duckdb/linux-x64 ./duckdb
 COPY --from=build --chown=maus:maus /src/dist-server ./dist-server
