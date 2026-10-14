@@ -269,6 +269,8 @@ export interface AcpSupport {
   modelVariants?: boolean;
   /** Default CLI binary name if the instance config doesn't override it. */
   defaultCli: string;
+  /** A slow CLI may need longer than the default 8 seconds to report its version. */
+  versionProbeTimeoutMs?: number;
   /** Optional live model catalog. A failed lookup keeps the last usable catalog.
    *  `config` is the instance decode so a support can ask the same binary it
    *  will spawn (custom `cli` paths), not whatever happens to be named on PATH. */
@@ -2331,8 +2333,9 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
       const snapshot = async (): Promise<ProviderSnapshot> => {
         const env = childEnv();
         if (support.snapshot) return support.snapshot(env, config, instanceId);
+        const versionProbeTimeoutMs = support.versionProbeTimeoutMs ?? 8_000;
         const probe = await new Promise<{ version?: string; reason?: string }>((resolve) => {
-          execCli(config.cli, ["--version"], { timeout: 8000, env }, (err, stdout, stderr) => {
+          execCli(config.cli, ["--version"], { timeout: versionProbeTimeoutMs, env }, (err, stdout, stderr) => {
             if (err) {
               const failure = err as NodeJS.ErrnoException & { killed?: boolean };
               const reason = failure.code === "ENOENT"
@@ -2340,7 +2343,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                 : failure.code === "EACCES" || failure.code === "EPERM"
                   ? `\`${config.cli}\` isn't executable. Check its file permissions, then check again.`
                   : failure.killed && failure.code == null
-                    ? `\`${config.cli}\` version check timed out after 8 seconds. Check it in a terminal on the server, then try again.`
+                    ? `\`${config.cli}\` version check timed out after ${versionProbeTimeoutMs / 1000} seconds. Check it in a terminal on the server, then try again.`
                     : `\`${config.cli}\` version check failed. Run it with --version on the server to diagnose the installation, then check again.`;
               // Do not echo arbitrary CLI output or its environment into Settings.
               resolve({ reason });

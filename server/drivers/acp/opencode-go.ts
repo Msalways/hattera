@@ -844,6 +844,7 @@ const support = (loadCatalog: OpenCodeCatalogLoader): AcpSupport => ({
   displayName: "OpenCode",
   models: NO_MODELS,
   defaultCli: "opencode",
+  versionProbeTimeoutMs: 30_000,
   nativeSource: "opencode.acp",
   loginNote: "OpenCode has no usable models. Add an OpenCode key in Settings → API keys.",
   install: {

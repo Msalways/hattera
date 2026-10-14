@@ -5,6 +5,7 @@ import { join } from "node:path";
 import * as procs from "../../procs.ts";
 import { removeTempDir } from "../../testing/cleanup.ts";
 import { KimiAgentDriver } from "./kimi.ts";
+import { createOpenCodeDriver } from "./opencode-go.ts";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -48,4 +49,17 @@ it("detects a newly installed and then signed-in fake Kimi without recreating th
     await instance.dispose();
     await removeTempDir(home);
   }
+});
+
+it("lets OpenCode use the installer's 30-second version probe allowance", async () => {
+  const probe = vi.spyOn(procs, "execCli").mockImplementation((_cli, _args, options, callback) => {
+    expect(options.timeout).toBe(30_000);
+    callback(null, "opencode 1.19.0", "");
+  });
+  const driver = createOpenCodeDriver(async () => ({ default: "opencode/test-free", options: [{ id: "opencode/test-free", label: "Test" }] }));
+  const instance = await driver.create({ instanceId: "opencode", displayName: "OpenCode", environment: {}, enabled: true, config: driver.defaultConfig() });
+  try {
+    expect(await instance.snapshot()).toMatchObject({ state: "available", version: "opencode 1.19.0" });
+    expect(probe).toHaveBeenCalled();
+  } finally { await instance.dispose(); }
 });
