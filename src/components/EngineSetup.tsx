@@ -200,7 +200,10 @@ function ServerEngineInstall({ instance, mode, command }: { instance: InstanceIn
         throw new Error(t("engineSetup.installNotVerified", { reason: installed?.snapshot.reason ?? t("engineSetup.noReason") }));
       }
       setDone(true);
-      await refreshModels(instance.instanceId).catch(() => {});
+      // OpenCode's first model probe can outlast a hosted HTTP request. The
+      // server already starts it after installation; EngineCard picks up the
+      // resulting catalog when it is ready.
+      if (instance.driverKind !== "opencodeGo") await refreshModels(instance.instanceId).catch(() => {});
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {

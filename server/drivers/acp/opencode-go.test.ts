@@ -8,7 +8,6 @@ import { fileURLToPath } from "node:url";
 import { removeTempDir } from "../../testing/cleanup.ts";
 import { recordEvents, type EventRecorder } from "../../testing/events.ts";
 import {
-  canRunOpenCode,
   catalogFromOpenCodeSession,
   classifyOpenCodeError,
   configuredOpenCodeFolderAction,
@@ -80,16 +79,6 @@ describe("OpenCode catalog", () => {
       expect.objectContaining({ id: "ollama/qwen3", custom: true, loaded: true }),
       expect.objectContaining({ id: "lmstudio/qwen3-ipv6", custom: true, loaded: true }),
     ]);
-  });
-
-  it("caches the setup check's catalog probe across snapshots", async () => {
-    resetOpenCodeModelCache();
-    const discover = vi.fn(async () => catalog("opencode/big-pickle"));
-
-    await expect(canRunOpenCode({}, "counting-opencode", discover)).resolves.toBe(true);
-    await expect(canRunOpenCode({}, "counting-opencode", discover)).resolves.toBe(true);
-
-    expect(discover).toHaveBeenCalledOnce();
   });
 
   it("accepts header-only output from older CLIs and rejects malformed lines", () => {
@@ -241,6 +230,23 @@ describe("OpenCode catalog", () => {
     } finally {
       await instance.dispose();
       await removeTempDir(scratch);
+    }
+  });
+
+  it("does not mistake a slow or empty model catalog for a required sign-in", async () => {
+    const driver = createOpenCodeDriver(async () => ({ default: "", options: [] }));
+    const instance = await driver.create({
+      instanceId: "opencode-slow-catalog",
+      displayName: "OpenCode",
+      environment: { FAKE_ACP_MODELS: "opencode/big-pickle" },
+      enabled: true,
+      config: { cli: FAKE_CLI, fullAuto: false },
+    });
+    try {
+      expect(instance.models.options).toHaveLength(0);
+      expect(await instance.snapshot()).toMatchObject({ state: "available", authenticated: true });
+    } finally {
+      await instance.dispose();
     }
   });
 
@@ -418,8 +424,8 @@ describe("OpenCode catalog", () => {
   // it, the policy did not apply to that probe; and a server whose sign-in
   // list lets others in would bill every member's OpenCode bot to the
   // operator's keys.
-  it("is wired in index.ts before the first catalog probe, with the sign-in list", () => {
-    const source = readFileSync(new URL("../../index.ts", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  it("is wired in runtime.ts before the first catalog probe, with the sign-in list", () => {
+    const source = readFileSync(new URL("../../runtime.ts", import.meta.url), "utf8").replace(/\r\n/g, "\n");
     const wired = source.indexOf("setOpenCodeProviderKeyPolicy(openCodeKeysAllowed);");
     const firstLoad = source.indexOf("await registry.load(providerConfigs(), decorateHostedProvider);");
     expect(wired).toBeGreaterThan(0);
@@ -556,29 +562,28 @@ describe("OpenCode catalog discovery from the ACP session", () => {
     expect(preferredOpenCodeModel([], null)).toBe("");
   });
 
-  it("builds the catalog from ACP and adds OpenCode 1's metadata", async () => {
+  it("builds the catalog from ACP without starting a second expensive probe", async () => {
     const scratch = mkdtempSync(join(tmpdir(), "omb-opencode-discover-"));
     try {
       const found = await discoverOpenCodeModels({
         ...process.env, HOME: scratch, FAKE_ACP_MODELS: "opencode/big-pickle,opencode-go/minimax-m3",
       }, FAKE_CLI);
       expect(found.options.map((option) => option.id)).toEqual(["opencode/big-pickle", "opencode-go/minimax-m3"]);
-      // context windows come from `models --verbose`
-      expect(found.options[0]).toMatchObject({ contextWindow: 200_000 });
+      expect(found.default).toBe("opencode/big-pickle");
     } finally {
       await removeTempDir(scratch);
     }
   });
 
-  it("reads OpenCode 1's metadata again when a first run in a new home loses the database race", async () => {
+  it("does not run OpenCode 1's verbose command when ACP answered", async () => {
     const scratch = mkdtempSync(join(tmpdir(), "omb-opencode-discover-race-"));
     try {
       const found = await discoverOpenCodeModels({
         ...process.env, HOME: scratch, FAKE_ACP_MODELS: "opencode/big-pickle",
         FAKE_ACP_VERBOSE_FAIL_ONCE: join(scratch, "failed-once"),
       }, FAKE_CLI);
-      expect(existsSync(join(scratch, "failed-once"))).toBe(true);
-      expect(found.options[0]).toMatchObject({ id: "opencode/big-pickle", contextWindow: 200_000 });
+      expect(existsSync(join(scratch, "failed-once"))).toBe(false);
+      expect(found.options[0]).toMatchObject({ id: "opencode/big-pickle" });
     } finally {
       await removeTempDir(scratch);
     }
@@ -1122,7 +1127,7 @@ describe("OpenCode session variants", () => {
   // The app hid an unprefixed notice with the tool steps (Tool calls is off
   // by default); `notice:` makes it a status row (src/lib/activity-runs.ts).
   it("is stored as a status row the person always sees", () => {
-    const source = readFileSync(new URL("../../index.ts", import.meta.url), "utf8");
+    const source = readFileSync(new URL("../../runtime.ts", import.meta.url), "utf8");
     const handler = source.slice(source.indexOf('case "runtime.notice":'), source.indexOf('case "runtime.error":'));
     expect(handler).toContain("name: `notice: ${event.message.slice(0, 240)}`");
   });

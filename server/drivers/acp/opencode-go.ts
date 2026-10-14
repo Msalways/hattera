@@ -28,9 +28,8 @@ const lastSuccessfulCatalog = new Map<string, ModelCatalog>();
 const freeModels = new Set<string>();
 const paidModels = new Set<string>();
 
-const DISCOVERY_TIMEOUT_MS = 20_000;
-const DISCOVERY_PROBE_TTL_MS = 30_000;
-const discoveryProbeCache = new Map<string, { expiresAt: number; result: Promise<boolean> }>();
+// OpenCode's first ACP session can take over a minute on a 0.1 CPU host.
+const DISCOVERY_TIMEOUT_MS = 180_000;
 
 export type OpenCodeCatalogLoader = (
   environment: Record<string, string | undefined>,
@@ -237,7 +236,7 @@ function runOpenCodeModelsVerbose(
     execCli(
       cli,
       ["models", "--verbose"],
-      { timeout: 20_000, maxBuffer: 8 * 1024 * 1024, env: environment },
+      { timeout: DISCOVERY_TIMEOUT_MS, maxBuffer: 8 * 1024 * 1024, env: environment },
       (error, stdout, stderr) => {
         if (error) {
           reject(Object.assign(new Error(stderr?.trim() || error.message, { cause: error }), {
@@ -386,73 +385,36 @@ export async function probeOpenCodeSession(
 }
 
 /** Ask the same OpenCode binary that will run ACP for its effective catalog.
- *
- * The list comes from an ACP session/new in the turn's own environment: it
- * is what the session will accept, on OpenCode 1 and 2 alike. `models
- * --verbose` (OpenCode 1 only; 2 rejects the flag) runs alongside for
- * metadata the session does not carry: prices, context windows, reasoning
- * variants, and which models are local. Plain `opencode models` is not a
- * fallback: on OpenCode 2 it answers from a shared background service that
- * keeps whatever environment it started with, and its first answer after
- * that service starts is empty. */
+ * The ACP session lists the models this environment actually offers. Run
+ * only one OpenCode process at a time: simultaneous probes compete for the
+ * tiny CPU on free hosts and can both time out. OpenCode 1's verbose listing
+ * is a fallback when ACP cannot answer; OpenCode 2 rejects that flag. */
 export async function discoverOpenCodeModels(
   environment: Record<string, string | undefined>,
   cli = "opencode",
 ): Promise<ModelCatalog> {
-  const probeSession = () => probeOpenCodeSession(cli, environment);
-  const readMetadata = () => runOpenCodeModelsVerbose(cli, environment).then(parseOpenCodeModels);
-  let [session, verbose] = await Promise.allSettled([probeSession(), readMetadata()]);
-  // Two OpenCode processes starting together in a home that has never run
-  // OpenCode race to create its database, and one of them fails (seen 1 in 8
-  // fresh homes). Once is enough to lose Zen's prices, which is what keeps a
-  // paid model from becoming the default, so a failed half runs again alone.
-  // A half that timed out is not retried: a wedged CLI must not double the
-  // wait at startup.
-  const retry = (result: PromiseSettledResult<unknown>) =>
-    result.status === "rejected" && (result.reason as { timedOut?: boolean } | null)?.timedOut !== true;
-  if (retry(session)) [session] = await Promise.allSettled([probeSession()]);
-  if (retry(verbose)) [verbose] = await Promise.allSettled([readMetadata()]);
-  const metadata = verbose.status === "fulfilled" ? verbose.value : null;
-  if (metadata) rememberPrices(metadata);
-  const live = session.status === "fulfilled" ? catalogFromOpenCodeSession(session.value) : null;
-  let catalog: ModelCatalog | null = null;
-  if (live) {
-    const details = new Map((metadata?.options ?? []).map((option) => [option.id, option]));
-    const options = live.options.map((option) => ({ ...option, ...details.get(option.id), id: option.id }));
-    catalog = { default: preferredOpenCodeModel(options.map((option) => option.id), live.current), options };
-  } else if (metadata?.options.length) {
-    catalog = { default: preferredOpenCodeModel(metadata.options.map((option) => option.id)), options: metadata.options };
+  let live: ReturnType<typeof catalogFromOpenCodeSession> = null;
+  let timedOut = false;
+  try {
+    live = catalogFromOpenCodeSession(await probeOpenCodeSession(cli, environment));
+  } catch (error) {
+    timedOut = (error as { timedOut?: boolean } | null)?.timedOut === true;
+  }
+  let catalog: ModelCatalog | null = live && {
+    default: preferredOpenCodeModel(live.options.map((option) => option.id), live.current),
+    options: live.options,
+  };
+  if (!catalog && !timedOut) {
+    try { catalog = parseOpenCodeModelsOutput(await runOpenCodeModelsVerbose(cli, environment)); } catch { /* keep last good list */ }
   }
   if (!catalog) return lastSuccessfulCatalog.get(cli) ?? NO_MODELS;
   lastSuccessfulCatalog.set(cli, catalog);
   return catalog;
 }
 
-/** Whether this OpenCode can run a turn at all: it offers at least one
- * model. Zen's free models need no login, so a working CLI almost always
- * can. Answered from the last discovery when there is one. */
-export async function canRunOpenCode(
-  environment: Record<string, string | undefined>,
-  cli: string,
-  discover: OpenCodeCatalogLoader = discoverOpenCodeModels,
-): Promise<boolean> {
-  if (lastSuccessfulCatalog.get(cli)?.options.length) return true;
-  const cached = discoveryProbeCache.get(cli);
-  if (cached && cached.expiresAt > Date.now()) return cached.result;
-  const entry = { expiresAt: Number.POSITIVE_INFINITY, result: Promise.resolve(false) };
-  entry.result = discover(environment, cli)
-    .then((catalog) => catalog.options.length > 0, () => false)
-    .finally(() => {
-      entry.expiresAt = Date.now() + DISCOVERY_PROBE_TTL_MS;
-    });
-  discoveryProbeCache.set(cli, entry);
-  return entry.result;
-}
-
 export function resetOpenCodeModelCache() {
   discoveryFolder = null;
   lastSuccessfulCatalog.clear();
-  discoveryProbeCache.clear();
   freeModels.clear();
   paidModels.clear();
 }
@@ -589,36 +551,6 @@ function storedAuthPaths(env: Record<string, string | undefined>): string[] {
         : "",
   ].filter(Boolean);
   return [...new Set(roots)].map((root) => join(root, "opencode", "auth.json"));
-}
-
-/** True when auth.json contains any usable provider login managed by
- * OpenCode. The generic harness can run all of them, including `opencode`
- * (Zen), `opencode-go`, and third-party providers such as OpenRouter. */
-function usableAuthEntry(parsed: Record<string, unknown>): boolean {
-  return Object.values(parsed).some((auth) => {
-    if (!auth || typeof auth !== "object" || Array.isArray(auth)) return false;
-    const entry = auth as { key?: unknown; access?: unknown; refresh?: unknown };
-    return Boolean(entry.key || entry.access || entry.refresh);
-  });
-}
-
-function hasStoredOpenCodeAuth(env: Record<string, string | undefined>) {
-  const candidates: string[] = [];
-  if (env.OPENCODE_AUTH_CONTENT) candidates.push(env.OPENCODE_AUTH_CONTENT);
-  for (const path of storedAuthPaths(env)) {
-    try {
-      candidates.push(readFileSync(path, "utf8"));
-    } catch {
-      // A missing or unreadable file simply means there is no ambient login.
-    }
-  }
-  return candidates.some((raw) => {
-    try {
-      return usableAuthEntry(JSON.parse(raw) as Record<string, unknown>);
-    } catch {
-      return false;
-    }
-  });
 }
 
 /** Whether `path` is `folder` itself or somewhere inside it. */
@@ -846,7 +778,7 @@ const support = (loadCatalog: OpenCodeCatalogLoader): AcpSupport => ({
   defaultCli: "opencode",
   versionProbeTimeoutMs: 30_000,
   nativeSource: "opencode.acp",
-  loginNote: "OpenCode has no usable models. Add an OpenCode key in Settings → API keys.",
+  loginNote: "OpenCode returned no models. Refresh its model list in Settings.",
   install: {
     command: {
       darwin: "npm install -g opencode-ai",
@@ -891,13 +823,10 @@ const support = (loadCatalog: OpenCodeCatalogLoader): AcpSupport => ({
   },
   pickAuthMethod: () => null,
   authFailure: "continue",
-  // Setup status only. Turns are never gated on it: a missing or rejected
-  // key comes back from the prompt itself and is shown with its fix.
-  isAuthenticated: async (env, config) => (
-    Boolean(env.OPENCODE_API_KEY)
-    || hasStoredOpenCodeAuth(env)
-    || await canRunOpenCode(env, config.cli, loadCatalog)
-  ),
+  // OpenCode has anonymous models. Its catalog can be slow or temporarily
+  // unavailable, which says nothing about whether sign-in is required.
+  // Account errors are reported from the actual turn instead.
+  isAuthenticated: async () => true,
   classifyError: classifyOpenCodeError,
   describeAccountError: describeOpenCodeAccountError,
   resolveModels: async (environment, config) => mergeLocalInject(

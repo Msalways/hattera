@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ArrowUpRight, Check, ChevronDown, RefreshCw } from "lucide-react";
 import { useStore, type InstanceInfo } from "@/state/store";
 import { cn } from "@/lib/cn";
@@ -23,6 +23,15 @@ const providers: Record<string, string> = {
 /** One disclosure, not a second settings dialog. Keep its children mounted so
  * closing a card does not abandon an in-progress sign-in or a CLI path draft. */
 export function EngineCard({ instance, children }: { instance: InstanceInfo; children: ReactNode }) {
+  const { refreshInstances } = useStore();
+  // Installing OpenCode starts its catalog discovery on the server. On small
+  // hosts that can finish after the install response, so update the card when
+  // the real model list arrives without asking the person to use a terminal.
+  useEffect(() => {
+    if (instance.driverKind !== "opencodeGo" || instance.snapshot.state !== "available" || instance.models.options.length) return;
+    const timer = window.setInterval(() => void refreshInstances(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [instance.driverKind, instance.snapshot.state, instance.models.options.length, refreshInstances]);
   const ready = engineReady(instance);
   const email = instance.snapshot.authenticated === true ? instance.snapshot.account?.email : undefined;
   const subtitle = email ?? (instance.access === "custom"
