@@ -6,7 +6,7 @@ This checklist covers this fork's container deployment. The inherited [VPS guide
 
 - The `server` target in [`Dockerfile`](../Dockerfile) builds this repository's web UI and server. It includes Caddy, the browser runtime, and the engine packages selected by the `ENGINES` build argument. `render.yaml` selects `opencode-ai`.
 - [`compose.yaml`](../compose.yaml) binds the web edge to `127.0.0.1:8080` by default, runs Caddy beside the server, and mounts a named volume at `/data`. The existing `openmausbot` project and volume defaults are intentionally retained so local upgrades use the same data.
-- [`render.yaml`](../render.yaml) builds this fork's `main` branch, starts the container through [`deploy/render/start.mjs`](../deploy/render/start.mjs), and checks `/api/health`.
+- [`render.yaml`](../render.yaml) builds this fork's `main` branch, requires an external `DATABASE_URL` with PostgreSQL enabled, starts the container through [`deploy/render/start.mjs`](../deploy/render/start.mjs), and checks `/api/health`.
 - GitHub OAuth uses a separate `/identity/*` path, checks the configured numeric `GITHUB_OWNER_ID`, and leaves legacy `/api/auth/*` pairing available. The Render launcher derives the public URL and GitHub callback from `RENDER_EXTERNAL_URL`.
 - `.env` is ignored by Git and excluded from the Docker build context. Render OAuth credentials belong in Render's environment settings.
 - Optional `OMB_OBJECT_STORAGE_KIND=s3` mirrors uploads and encrypted SQLite-mode backup exports to any S3-compatible private bucket; it does not replace the writable `/data` volume.
@@ -27,9 +27,9 @@ The [Free web plan has 512 MB RAM and 0.1 CPU](https://render.com/docs/compute-p
 
 ## Paths to use
 
-### Disposable public preview
+### Public Render preview with PostgreSQL
 
-Use the Render Blueprint with GitHub OAuth and the public Render HTTPS URL. No Tailscale installation is needed on Render. Treat chats, files, and logins as disposable. Check `/api/health`, then test the GitHub callback, a paired browser, and an OpenCode turn after each deploy. This path has no recovery promise.
+Use the Render Blueprint with an external PostgreSQL database, GitHub OAuth, and the public Render HTTPS URL. No Tailscale installation is needed on Render. Structured records survive container restarts; treat files and engine logins as disposable. Check `/api/health`, then test the GitHub callback, a paired browser, and an OpenCode turn after each deploy. This path has no file recovery promise.
 
 ### Persistent self-hosting
 

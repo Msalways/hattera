@@ -13,6 +13,10 @@ services:
         value: opencode-ai
       - key: OMB_LOOPBACK_TRUST
         value: service
+      - key: OMB_POSTGRES_ENABLED
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
       - key: GITHUB_CLIENT_ID
         sync: false
       - key: GITHUB_CLIENT_SECRET
