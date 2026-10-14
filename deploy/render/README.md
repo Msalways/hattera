@@ -37,6 +37,10 @@ it to `opencode-ai @openai/codex` to match this default.
    Render URL. A separate OAuth app keeps local sign-in working.
 4. Visit `https://<service>.onrender.com/api/health`; it should return HTTP 200
    with `{"app":"openmausbot"}`. Then visit `/pair` and use GitHub sign-in.
+   The image already contains OpenCode and Codex; use **Manage AI accounts**
+   to sign in after deployment. For Codex on a remote server, first enable
+   device-code sign-in in your ChatGPT account's Security Settings (or ask
+   your workspace admin to allow it), then start Codex sign-in in the app.
 5. Optionally create an external HTTP(s) monitor for `/api/health` with a
    10-minute interval, if your monitor plan supports it. This can reduce idle
    spin-down, but it does not prevent Render from restarting the service.
