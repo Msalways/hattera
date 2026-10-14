@@ -1,16 +1,19 @@
 import { spawn } from "node:child_process";
 
 const publicUrl = process.env.RENDER_EXTERNAL_URL;
-if (!publicUrl?.startsWith("https://")) {
+const onRender = process.env.RENDER === "true" || Boolean(publicUrl);
+if (onRender && !publicUrl?.startsWith("https://")) {
   console.error("Render must provide RENDER_EXTERNAL_URL as an HTTPS origin.");
   process.exit(1);
 }
-process.env.OMB_PUBLIC_URL = publicUrl;
-process.env.OMB_WEBHOOK_PUBLIC_URL = publicUrl;
-process.env.GITHUB_REDIRECT_URI = `${publicUrl}/identity/callback/github`;
+if (onRender) {
+  process.env.OMB_PUBLIC_URL = publicUrl;
+  process.env.OMB_WEBHOOK_PUBLIC_URL = publicUrl;
+  process.env.GITHUB_REDIRECT_URI = `${publicUrl}/identity/callback/github`;
+}
 
 const children = [
-  spawn("caddy", ["run", "--config", "/app/render/Caddyfile", "--adapter", "caddyfile"], { stdio: "inherit" }),
+  ...(onRender ? [spawn("caddy", ["run", "--config", "/app/render/Caddyfile", "--adapter", "caddyfile"], { stdio: "inherit" })] : []),
   spawn(process.execPath, ["/app/dist-server/server-launcher.js"], { stdio: "inherit" }),
 ];
 let stopping = false;

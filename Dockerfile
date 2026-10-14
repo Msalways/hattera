@@ -165,8 +165,8 @@ RUN if [ -n "$ENGINES" ]; then HOME=/tmp/omb-build-home npm install -g $ENGINES 
 COPY --from=build --chown=maus:maus /src/dist-native/duckdb/linux-x64 ./duckdb
 COPY --from=build --chown=maus:maus /src/dist-server ./dist-server
 COPY --from=build --chown=maus:maus /src/dist ./dist
-# Render runs this image with deploy/render/start.mjs; local Compose keeps the
-# default command below and its separate Caddy service.
+# The default launcher starts Caddy on Render and only the server in local
+# Compose, which has its own Caddy service.
 COPY --from=edge /caddy /usr/local/bin/caddy
 COPY deploy/render/Caddyfile ./render/Caddyfile
 COPY deploy/render/start.mjs ./render/start.mjs
@@ -178,4 +178,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # The launcher runs dist-server/index.js and starts it again when it asks to
 # (a copied workspace committing, server/restart.ts), so the container, and a
 # Caddy sharing its network, stays up through that restart.
-CMD ["node", "dist-server/server-launcher.js"]
+CMD ["node", "/app/render/start.mjs"]
