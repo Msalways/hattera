@@ -64,10 +64,23 @@ services:
         if [ -n "$$OMB_HTTPS_HOST" ]; then
           export OMB_UPSTREAM_SCHEME=https
         fi
+        # Docker does not restart a network-namespace sidecar when its owner
+        # restarts automatically. Exit if that namespace loses the app; the
+        # restart policy then attaches Caddy to the current app namespace.
+        (
+          while sleep 10; do
+            if ! wget -q -T 3 -O /dev/null http://127.0.0.1:8799/api/health; then
+              echo "app unreachable; restarting Caddy to follow its network namespace" >&2
+              kill -TERM 1
+              exit
+            fi
+          done
+        ) &
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     depends_on:
       omb:
         condition: service_healthy
+        restart: true
     volumes:
       - ./deploy/local/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

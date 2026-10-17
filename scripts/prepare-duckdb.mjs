@@ -110,9 +110,13 @@ export async function packedPackage(name, version, cache, scope = SCOPE) {
 }
 
 /** The trees to stage on this host: both mac arches on macOS (each app is
- *  single-arch), x64 elsewhere, matching electron-builder.yml. */
-export function targetsFor(platform = process.platform, env = process.env) {
+ *  single-arch), the native arch on Linux, x64 for Windows packaging. */
+export function targetsFor(platform = process.platform, env = process.env, arch = process.arch) {
   if (platform === "darwin") return resolveCuaMacArches(env).map((arch) => ({ platform, arch }));
+  if (platform === "linux") {
+    if (arch !== "x64" && arch !== "arm64") throw new Error(`Unsupported Linux DuckDB architecture: ${arch}`);
+    return [{ platform, arch }];
+  }
   return [{ platform, arch: "x64" }];
 }
 

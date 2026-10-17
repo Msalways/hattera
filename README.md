@@ -22,7 +22,7 @@ To enable GitHub sign-in, copy `.env.example` to `.env` and set `GITHUB_CLIENT_I
 | --- | --- | --- | --- |
 | Local Compose | While your computer is on | Named Docker volume | Development and private use |
 | [Render Free preview](deploy/render/README.md) | Can sleep or restart | Ephemeral container filesystem | Disposable testing only |
-| Always-on VM with Compose | While the VM runs | VM-backed Docker volume | A path to durable self-hosting, with backups |
+| [Oracle Always Free VM](deploy/oracle/README.md) | While the VM runs | PostgreSQL and VM-backed Docker volumes | Durable private hosting with backups |
 
 The included [Render Blueprint](render.yaml) builds the `main` branch of this fork as a Docker web service. Render supplies a public HTTPS URL; the server's own health endpoint is `GET /api/health`. Set GitHub OAuth credentials in Render's dashboard and register `https://<service>.onrender.com/identity/callback/github` for that deployment. A public Render URL does not require Tailscale. On a VM, Tailscale Serve can instead make the app reachable only to devices on your tailnet.
 

@@ -3,7 +3,7 @@
 #
 # Build the renderer + the self-contained server bundle, then ship only those
 # artifacts on a slim Node runtime. The runtime stage holds what changes
-# rarely (Chrome's libraries, agent-browser and its Chrome), and each image
+# rarely (browser libraries, agent-browser and Chromium), and each image
 # adds its engine CLIs before the app files, which change with every commit:
 # a code-only change rebuilds only the small app layers, so a pull downloads
 # only those. The server keeps binding 127.0.0.1 inside the container (the
@@ -25,7 +25,7 @@ FROM caddy:2.10.2 AS edge
 # capability (and the build user's ownership).
 RUN cp /usr/bin/caddy /caddy
 
-FROM node:24-bookworm-slim AS build
+FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS build
 WORKDIR /src
 # pinned to package.json#packageManager; corepack is being removed from Node
 RUN npm install -g pnpm@10.33.0
@@ -45,7 +45,9 @@ COPY . .
 # The Cloud home runs these as root, so nobody else may write them.
 # The Data engine's native modules (server/data/engine.ts), staged like the
 # desktop app's extraResources; the runtime stages copy this tree.
-RUN node scripts/prepare-duckdb.mjs && chmod -R go-w dist-native/duckdb
+ARG TARGETARCH
+RUN node --input-type=module -e 'import { stageDuckdb } from "./scripts/prepare-duckdb.mjs"; const arch = process.env.TARGETARCH === "amd64" ? "x64" : process.env.TARGETARCH; if (arch !== "x64" && arch !== "arm64") throw new Error(`Unsupported Docker architecture: ${arch}`); await stageDuckdb({ root: process.cwd(), targets: [{ platform: "linux", arch }] });' \
+  && chmod -R go-w dist-native/duckdb
 RUN pnpm build:server && pnpm exec vite build && chmod -R go-w dist dist-server
 
 FROM node:24-bookworm-slim AS runtime
@@ -61,10 +63,11 @@ RUN apt-get update \
     libfontconfig1 libdbus-1-3 libnss3 libnss3-tools libnspr4 \
     libatk-bridge2.0-0 libdrm2 libxkbcommon0 libatspi2.0-0 libcups2 \
     libxshmfence1 libgbm1 fonts-noto-color-emoji fonts-noto-cjk fonts-freefont-ttf \
+  && if [ "$(dpkg --print-architecture)" = "arm64" ]; then apt-get install -y --no-install-recommends chromium; fi \
   && rm -rf /var/lib/apt/lists/* \
   && useradd --create-home --home-dir /data --shell /bin/bash maus
 # The bots' browser (docs/plans/browser-engine.md): the pinned agent-browser
-# and a Chrome for Testing with its libraries, so a server bot can browse.
+# and Chrome for Testing on x64 or Debian Chromium on ARM64.
 # Pin here and in server/browser-engine-release.ts together.
 ARG AGENT_BROWSER_VERSION=0.37.0
 # `agent-browser install` fetches Chrome for Testing's last-known-good Stable;
@@ -74,8 +77,13 @@ ARG CHROME_CACHE_TAG=""
 # postinstall points it there); the other platforms' binaries are never run.
 RUN echo "agent-browser ${AGENT_BROWSER_VERSION}, Chrome for Testing ${CHROME_CACHE_TAG:-Stable}" \
   && npm install -g --cache /tmp/npm-cache agent-browser@${AGENT_BROWSER_VERSION} \
-  && HOME=/opt/openmausbot-browser agent-browser install \
-  && ln -s /opt/openmausbot-browser/.agent-browser/browsers/chrome-*/chrome /opt/openmausbot-browser/chrome \
+  && mkdir -p /opt/openmausbot-browser \
+  && if [ "$(dpkg --print-architecture)" = "arm64" ]; then \
+       ln -s /usr/bin/chromium /opt/openmausbot-browser/chrome; \
+     else \
+       HOME=/opt/openmausbot-browser agent-browser install \
+       && ln -s /opt/openmausbot-browser/.agent-browser/browsers/chrome-*/chrome /opt/openmausbot-browser/chrome; \
+     fi \
   && native="$(readlink -f "$(command -v agent-browser)")" \
   && case "$native" in */agent-browser/bin/agent-browser-linux-*) ;; *) echo "agent-browser is not a native binary: $native" >&2; exit 1;; esac \
   && [ "$(head -c 4 "$native")" = "$(printf '\177ELF')" ] \
@@ -133,7 +141,8 @@ COPY deploy/fly/Caddyfile /app/cloud/Caddyfile
 # copies stay root's. Only the /data volume is maus's; the launcher refuses to
 # start otherwise (codeTrustProblem), and this check refuses to build.
 # DuckDB and resvg change on a version bump, not per commit: beneath the app files.
-COPY --from=build /src/dist-native/duckdb/linux-x64 ./duckdb
+COPY --from=build /src/dist-native/duckdb ./duckdb-platforms
+RUN ln -s "duckdb-platforms/linux-$(node -p process.arch)" duckdb
 COPY --from=build /src/dist-server ./dist-server
 COPY --from=build /src/dist ./dist
 RUN export HOME=/tmp/omb-build-home \
@@ -162,7 +171,8 @@ FROM runtime AS server
 # Optional engine CLIs baked into the image (space-separated npm packages).
 ARG ENGINES=""
 RUN if [ -n "$ENGINES" ]; then HOME=/tmp/omb-build-home npm install -g $ENGINES && rm -rf /tmp/omb-build-home /tmp/node-compile-cache; fi
-COPY --from=build --chown=maus:maus /src/dist-native/duckdb/linux-x64 ./duckdb
+COPY --from=build --chown=maus:maus /src/dist-native/duckdb ./duckdb-platforms
+RUN ln -s "duckdb-platforms/linux-$(node -p process.arch)" duckdb
 COPY --from=build --chown=maus:maus /src/dist-server ./dist-server
 COPY --from=build --chown=maus:maus /src/dist ./dist
 # The default launcher starts Caddy on Render and only the server in local

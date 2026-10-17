@@ -1,0 +1,14 @@
+# Optional public-domain mode. Combine after compose.yaml and
+# deploy/oracle/compose.yaml. Caddy obtains and renews the TLS certificate.
+services:
+  omb:
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+
+  caddy:
+    environment:
+      OMB_HTTPS_HOST: ""
+      OMB_PUBLIC_HOST: ${OMB_PUBLIC_HOST:?Set OMB_PUBLIC_HOST to your DNS hostname}
+    volumes:
+      - ./deploy/oracle/Caddyfile.public:/etc/caddy/Caddyfile:ro

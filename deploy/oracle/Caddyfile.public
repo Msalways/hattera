@@ -1,0 +1,15 @@
+{$OMB_PUBLIC_HOST} {
+	tls {
+		issuer acme https://acme-v02.api.letsencrypt.org/directory
+	}
+	encode zstd gzip
+	handle /hooks/* {
+		reverse_proxy 127.0.0.1:8800
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8799 {
+			header_up X-Forwarded-Proto https
+			flush_interval -1
+		}
+	}
+}

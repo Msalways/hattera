@@ -76,10 +76,12 @@ describe("the pin", () => {
     expect(() => pinnedDuckdbVersion(root)).toThrow(/found nothing/);
   });
 
-  it("stages both mac arches and x64 elsewhere", () => {
+  it("stages both mac arches, the native Linux arch, and Windows x64", () => {
     expect(targetsFor("darwin", {})).toEqual([{ platform: "darwin", arch: "arm64" }, { platform: "darwin", arch: "x64" }]);
     expect(targetsFor("darwin", { OPENMAUSBOT_CUA_ARCHES: "arm64", OPENMAUSBOT_CUA_ARCHES_PARTIAL: "1" })).toEqual([{ platform: "darwin", arch: "arm64" }]);
-    expect(targetsFor("linux", {})).toEqual([{ platform: "linux", arch: "x64" }]);
+    expect(targetsFor("linux", {}, "x64")).toEqual([{ platform: "linux", arch: "x64" }]);
+    expect(targetsFor("linux", {}, "arm64")).toEqual([{ platform: "linux", arch: "arm64" }]);
+    expect(() => targetsFor("linux", {}, "s390x")).toThrow(/Unsupported Linux DuckDB architecture/);
     expect(targetsFor("win32", {})).toEqual([{ platform: "win32", arch: "x64" }]);
   });
 });

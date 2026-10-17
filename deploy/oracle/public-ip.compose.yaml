@@ -1,0 +1,15 @@
+# Public IPv4 without a domain. Combine after compose.yaml and
+# deploy/oracle/compose.yaml. Let's Encrypt IP certificates last six days;
+# Caddy requests the shortlived profile and renews automatically.
+services:
+  omb:
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+
+  caddy:
+    environment:
+      OMB_HTTPS_HOST: ""
+      OMB_PUBLIC_HOST: ${OMB_PUBLIC_HOST:?Set OMB_PUBLIC_HOST to the VM public IPv4 address}
+    volumes:
+      - ./deploy/oracle/Caddyfile.public-ip:/etc/caddy/Caddyfile:ro

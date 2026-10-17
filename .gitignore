@@ -39,4 +39,5 @@ deploy/.env
 deploy/podman/.env
 deploy/podman/.env.*
 !deploy/podman/.env.example
+deploy/oracle/.env
 /.env

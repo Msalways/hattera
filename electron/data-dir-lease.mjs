@@ -77,6 +77,25 @@ function uptimeMs() {
   return Number.isFinite(seconds) && seconds >= 0 ? Math.floor(seconds * 1000) : 0;
 }
 
+// PID namespaces reuse small PIDs when a container restarts. The kernel's
+// process start tick distinguishes two occupants of the same PID on one boot.
+function linuxProcessStartTicks(pid) {
+  if (process.platform !== "linux") return null;
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const fields = stat.slice(stat.lastIndexOf(")") + 2).trim().split(/\s+/);
+    const ticks = fields[19]; // field 22; fields here begin at state (field 3)
+    return typeof ticks === "string" && /^\d{1,32}$/.test(ticks) ? ticks : null;
+  } catch {
+    return null;
+  }
+}
+
+function linuxIdentityRecord() {
+  const ticks = linuxProcessStartTicks(process.pid);
+  return ticks === null ? {} : { linuxStartTicks: ticks };
+}
+
 function isBootIdentity(value) {
   return value === null || (typeof value === "string" && normalizeBootId(value) === value);
 }
@@ -134,7 +153,8 @@ function isLeaseOwner(value) {
     // Optional so a lease written by an older build stays readable rather
     // than bricking startup on an "invalid lease" during the upgrade.
     && (value.boot === undefined || isBootIdentity(value.boot))
-    && (value.uptime === undefined || (Number.isInteger(value.uptime) && value.uptime >= 0));
+    && (value.uptime === undefined || (Number.isInteger(value.uptime) && value.uptime >= 0))
+    && (value.linuxStartTicks === undefined || (typeof value.linuxStartTicks === "string" && /^\d{1,32}$/.test(value.linuxStartTicks)));
 }
 
 function isReaperOwner(value, targetToken) {
@@ -239,6 +259,14 @@ function processCreationTimeMs(pid) {
  * the lease cannot be the original owner.
  */
 function ownerIdentityMatches(owner) {
+  if (process.platform === "linux") {
+    // Old leases have no start tick. If this very process inherited its PID,
+    // the recorded host uptime still proves an earlier process owned it.
+    const ownStartUptime = uptimeMs() - Math.floor(process.uptime() * 1000);
+    if (owner.pid === process.pid && Number.isInteger(owner.uptime) && owner.uptime + 1000 < ownStartUptime) return false;
+    const currentTicks = linuxProcessStartTicks(owner.pid);
+    return owner.linuxStartTicks === undefined || currentTicks === null || currentTicks === owner.linuxStartTicks;
+  }
   if (process.platform !== "win32") return true;
   const created = processCreationTimeMs(owner.pid);
   if (created === null) return true;
@@ -299,6 +327,7 @@ function claimReaperAuthority(leasePath, expected) {
       createdAt: Date.now(),
       boot: bootSession(),
       uptime: uptimeMs(),
+      ...linuxIdentityRecord(),
       targetToken: expected.token,
     };
     if (publishRecord(
@@ -455,6 +484,7 @@ function acquireDataDirLeaseInternal(dataDir, options = {}) {
     createdAt: Date.now(),
     boot: bootSession(),
     uptime: uptimeMs(),
+    ...linuxIdentityRecord(),
   };
   const candidatePath = `${leasePath}.candidate-${owner.pid}-${owner.token}`;
   try {

@@ -438,6 +438,25 @@ test("a live owner from the current boot still blocks a second instance", () => 
   assert.throws(() => acquireDataDirLease(dataDir), /already using this data directory/i);
 });
 
+test("Linux recovers a lease after its PID is reused in a restarted container", (t) => {
+  if (process.platform !== "linux") return t.skip("Linux process identity only");
+  const { dataDir } = temporaryDirectory();
+  const original = recordWrittenByThisProcess(dataDir);
+  assert.match(original.linuxStartTicks, /^\d+$/);
+
+  // The previous image has no start tick. A new server may inherit exactly
+  // that PID after container restart, while host boot identity stays the same.
+  const { linuxStartTicks: _discarded, ...legacy } = original;
+  plantOwner(dataDir, { ...legacy, token: randomUUID(), uptime: 0 });
+  const recoveredLegacy = acquireDataDirLease(dataDir);
+  assert.equal(recoveredLegacy.release(), true);
+
+  // New records compare the kernel start tick even when uptime looks current.
+  plantOwner(dataDir, { token: randomUUID(), linuxStartTicks: "99999999999999999999999999999999" });
+  const recoveredCurrent = acquireDataDirLease(dataDir);
+  assert.equal(recoveredCurrent.release(), true);
+});
+
 test("a reaper from an earlier boot is succeeded even when its pid is live", (t) => {
   const { dataDir } = temporaryDirectory();
   const current = recordWrittenByThisProcess(dataDir);

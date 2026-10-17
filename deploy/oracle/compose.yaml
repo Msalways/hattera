@@ -1,0 +1,32 @@
+# Combine with ../../compose.yaml. Caddy stays in the base stack; PostgreSQL
+# and the app's files use separate named volumes on the Docker host.
+services:
+  omb:
+    shm_size: 1gb
+    build:
+      args:
+        ENGINES: ${ENGINES:-}
+    environment:
+      OMB_POSTGRES_ENABLED: "true"
+      DATABASE_URL: postgres://hattera:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/oracle/.env}@postgres:5432/hattera
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hattera
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/oracle/.env}
+      POSTGRES_DB: hattera
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hattera -d hattera"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
