@@ -10,6 +10,9 @@ import { copyText } from "@/lib/copy-text";
 import { DEVICE_SIGN_IN_COPY, DeviceSignIn, deviceSignInProvider } from "./DeviceSignIn";
 import { ClaudeSignIn } from "./ClaudeSignIn";
 import { RefreshEngines } from "./EngineLibrary";
+import { providerAccountForm } from "../../shared/provider-account-setup";
+import { ProviderAccountSetup } from "./ProviderAccountSetup";
+import { ApiKeyRow, OpenCodeProviderKeys } from "./ApiKeys";
 
 type Platform = "darwin" | "win32" | "linux";
 
@@ -345,9 +348,10 @@ function ManagedEngineSetup({ instance, signInOnly }: { instance: InstanceInfo; 
       return;
     }
     if (!auth.flowId || !auth.authorizationUrl) throw new Error(t("engineSetup.googleNoLink"));
+    const page = new URL(auth.authorizationUrl);
+    if (page.origin !== "https://accounts.google.com" || page.username || page.password || page.hash) throw new Error(t("engineSetup.googleNoLink"));
     setFlow({ flowId: auth.flowId, authorizationUrl: auth.authorizationUrl });
     if (window.ogb?.openExternal) await window.ogb.openExternal(auth.authorizationUrl);
-    else window.open(auth.authorizationUrl, "_blank", "noopener,noreferrer");
   });
 
   const complete = () => run("complete", async () => {
@@ -388,7 +392,7 @@ function ManagedEngineSetup({ instance, signInOnly }: { instance: InstanceInfo; 
 
   return (
     <div className="mt-3 space-y-2">
-      <button
+      {flow ? <a href={flow.authorizationUrl} target="_blank" rel="noopener noreferrer" className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2 text-[12.5px] font-semibold text-white hover:brightness-110"><ExternalLink size={14} />{t("engineSetup.openGoogleAgain")}</a> : <button
         type="button"
         disabled={busy !== null}
         onClick={() => void signIn()}
@@ -400,7 +404,7 @@ function ManagedEngineSetup({ instance, signInOnly }: { instance: InstanceInfo; 
           : flow
             ? t("engineSetup.openGoogleAgain")
             : t("engineSetup.signInGoogle")}
-      </button>
+      </button>}
       {busy === "signin" && <p role="status" className="text-[11.5px] text-ink-secondary">{t("engineSetup.antigravitySlow")}</p>}
       {flow && (
         <>
@@ -574,6 +578,14 @@ export function EngineSetup({
         ? t("engineSetup.installDescSignIn")
         : t("engineSetup.installDesc"));
 
+  if (!instance.snapshot.authenticationUnavailableReason && !deviceSignIn && !browserSignIn && providerAccountForm(instance.driverKind, instance.instanceId) && (instance.snapshot.state === "available" || !install?.command)) {
+    return <ProviderAccountSetup instance={instance} />;
+  }
+
+  if (signInOnly && instance.driverKind === "opencodeGo") {
+    return <div className="mt-3 space-y-3"><ApiKeyRow section="opencodeGo" /><OpenCodeProviderKeys /></div>;
+  }
+
   if (apiKeySetup(instance)) {
     return <ApiKeyEngineSetup instance={instance} className={className} unframed={unframed} />;
   }
@@ -616,6 +628,7 @@ export function EngineSetup({
       {deviceSignIn || browserSignIn ? (
         <>
           <DeviceSignIn key={instance.instanceId} instanceId={instance.instanceId} browserPkce={browserSignIn} provider={provider} availableMethods={instance.authentication?.methods} />
+          {providerAccountForm(instance.driverKind, instance.instanceId) && <details className="mt-3"><summary className="cursor-pointer text-[12px] text-ink-secondary">{t("engineSetup.account.useKey")}</summary><ProviderAccountSetup instance={instance} /></details>}
           {/* Grok keeps its terminal sign-in for people who prefer one, where
               a terminal runs on this server; the code above needs none. */}
           {deviceSignIn && provider === "grok" && signInCommand && serverTerminal(cloudHome) && (

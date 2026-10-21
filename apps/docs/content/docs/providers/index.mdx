@@ -12,19 +12,31 @@ Hattera starts supported agent CLIs on the computer running its server and prese
 
 | Engine | Authentication shape | Notes |
 |---|---|---|
-| Claude | Claude CLI login | Strong support for tools, approvals, sessions, and local computer use |
+| Claude | In-app browser link and pasted authorization code | Strong support for tools, approvals, sessions, and local computer use |
 | Codex | Codex CLI login | Model discovery, approvals, steering, and computer tools |
 | Grok | Grok CLI login | ACP-based local model catalog and session support |
 | Cursor | Cursor Agent CLI login or API key | ACP driver with live model discovery |
-| Kimi | Kimi CLI login | ACP integration |
-| Droid | Factory Droid CLI login | ACP integration |
+| Kimi | In-app browser link and one-time code | ACP integration |
+| Droid | Factory API key entered in Settings | ACP integration |
+| Cline | In-app browser link and one-time code, or compatible API credentials | ACP integration |
 | Antigravity | Google account through the official ACP server | Managed install, isolated accounts, live models, and approval cards |
-| OpenCode | Existing OpenCode provider login or optional API key | Live Zen, Go, third-party, and local model discovery through ACP |
-| Qwen | Run `qwen`, then `/auth` to configure a provider | ACP integration; [Qwen authentication guide](https://github.com/QwenLM/qwen-code/blob/main/docs/users/configuration/auth.md) |
-| Hermes | Hermes CLI login | ACP integration |
-| Pi | Run `pi`, then `/login` to connect a provider | Native driver; [pi provider guide](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/providers.md) |
+| OpenCode | Provider API keys in Settings; existing native accounts are retained | Live Zen, Go, third-party, and local model discovery through ACP |
+| Qwen | Provider URL, model and API key in Settings | ACP integration |
+| Hermes | Provider URL, model and API key in Settings | ACP integration |
+| Pi | Provider URL, model and API key in Settings | Native driver |
+| Amazon Bedrock | AWS region, model or inference profile ID, and Bedrock API key in Settings | Native Converse API; no CLI installation |
 
 Additional driver instances can be declared in local configuration. Gemini CLI is available for enterprise and paid API-key deployments; consumer Google AI Pro, Ultra, and free-tier requests moved to Antigravity. An installed CLI is not proof of account access, and models appear only after Hattera can discover a usable route. Unavailable engines remain visible with a reason.
+
+## Set up a hosted server from your browser
+
+Open **Settings → Model providers and accounts**, expand an engine, and choose **Install on this server** if needed. Hattera installs it into its own tools directory as the server's user. Follow the sign-in link or enter the provider credentials in the same card. Cursor offers browser sign-in and an API-key alternative; optional Gemini CLI uses a Gemini API key. No server terminal is required for these built-in setup paths. Custom ACP commands still use the external provider's own setup process.
+
+Installation and sign-in have separate states. An installed executable does not prove account access. A saved key is checked when the provider is used; model access and billing belong to the provider account. Existing native accounts remain usable, including accounts established with other vendor CLI login methods.
+
+### Amazon Bedrock
+
+Expand **Amazon Bedrock**, enter its **AWS region**, an enabled **model or inference profile ID**, and a **Bedrock API key**. Hattera uses the native Converse endpoint for text, images and tools. The selected ID is shown explicitly; Hattera does not invent an accessible AWS model catalog. Replies currently arrive as complete messages. This setup uses Bedrock API keys, not IAM access key pairs or automatic role credentials.
 
 To use OpenRouter, Fireworks AI, DeepSeek, Cline, or your own OpenAI- or Anthropic-compatible service, see [Other model providers](./model-providers.mdx).
 
@@ -65,7 +77,7 @@ selected computer/account and do not automatically replay uncertain actions.
 
 ## Multiple Claude accounts
 
-Open **Settings → Engines → Add Claude account** and give the account a name, such as **Work** or **Personal**. OpenMausBot creates a separate configuration-directory setting for it; it does not copy your existing login. Under **Manage account and sign-in**, copy the sign-in command and run it on the computer hosting OpenMausBot, then choose **Check account**. On Windows, use PowerShell. Claude handles the browser sign-in and stores its own credentials.
+Open **Settings → Engines → Add Claude account** and give the account a name, such as **Work** or **Personal**. Hattera creates a separate configuration-directory setting for it; it does not copy your existing login. Under **Manage account and sign-in**, start sign-in, open the browser link and paste the returned authorization code into Hattera. Claude stores its own credentials on the server.
 
 In a bot's model picker, choose **Claude**, select **Work** or **Personal** in the **Account** dropdown, then choose a model to save the selection. Claude appears only once in the provider list. Each bot keeps its own selection, and the chat header shows the account name. Account changes apply to future turns and are blocked while that bot is responding; other bots are unaffected. Conversation history is not erased when you change the selection.
 

@@ -33,7 +33,25 @@ await writeFile(join(installPackageDir, "package.json"), JSON.stringify({
   name: installPackage, version: "1.0.0", type: "module", bin: { cline: "bin/cline.js" },
 }));
 const fakeCli = await readFile(resolve(root, "server/testing/fake-acp-cli.ts"), "utf8");
-await writeFile(join(installPackageDir, "bin/cline.js"), transformSync(fakeCli, { loader: "ts", format: "esm", target: "node24" }).code);
+const fakeAuth = `
+import * as clineAuthFs from 'node:fs';
+import { join as clineAuthJoin } from 'node:path';
+if (process.argv.slice(2).join(' ') === 'auth --provider cline') {
+  console.error('[auth] Enter this code in your browser: ABCD-EFGH');
+  console.error('[auth] https://authkit.cline.bot/device?user_code=ABCD-EFGH');
+  await new Promise(done => { const timer = setInterval(() => {
+    if (!clineAuthFs.existsSync(clineAuthJoin(process.env.HOME, 'cline-auth-approved'))) return;
+    clearInterval(timer);
+    const directory = clineAuthJoin(process.env.HOME, '.cline', 'data', 'settings');
+    clineAuthFs.mkdirSync(directory, { recursive: true });
+    clineAuthFs.writeFileSync(clineAuthJoin(directory, 'providers.json'), JSON.stringify({ version: 1, lastUsedProvider: 'cline',
+      providers: { cline: { settings: { provider: 'cline', model: 'fixture-model', auth: { accessToken: 'fixture-only' } } } } }));
+    done();
+  }, 100); });
+  process.exit(0);
+}
+`;
+await writeFile(join(installPackageDir, "bin/cline.js"), "#!/usr/bin/env node\n" + fakeAuth + transformSync(fakeCli, { loader: "ts", format: "esm", target: "node24" }).code.replace(/^#![^\n]*\n/, ""));
 const npmCli = [join(dirname(process.execPath), "node_modules/npm/bin/npm-cli.js"),
   join(process.env.ProgramFiles ?? "", "nodejs/node_modules/npm/bin/npm-cli.js")].find(existsSync);
 if (!npmCli) throw new Error("Node.js installation has no npm CLI");
@@ -72,6 +90,12 @@ const mime: Record<string, string> = {
 let browserTestVisits = 0;
 let fixtureBotId: string | undefined;
 const server = createServer(async (req, res) => {
+  if (req.url === "/__hattera-cline-auth/approve" && req.method === "POST") {
+    await writeFile(join(fixture.info.dataDir, "cline-auth-approved"), "fixture only");
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
   if (req.url === "/__hattera-browser-test") {
     browserTestVisits++;
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });

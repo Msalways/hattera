@@ -416,10 +416,9 @@ export interface ProviderSnapshot {
 // hardcoding per-engine copy in the UI.
 //
 // Installing is rarely the whole job — most CLIs then need an interactive
-// sign-in, which is why signInCommand exists and why the UI sends people to a
-// terminal rather than trying to shell out silently. A CLI with a device-code
-// login (Codex, Grok) signs in from the app instead (drivers/device-auth.ts),
-// and signInCommand stays its terminal route.
+// sign-in. The app offers its supported browser/device flow or a write-only
+// account form. signInCommand is an optional terminal alternative; it is not
+// evidence that a hosted browser can finish setup.
 export interface EngineInstall {
   /** Added by the registry: commands run on this server, not its web client. */
   platform?: "darwin" | "win32" | "linux";

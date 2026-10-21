@@ -4,6 +4,7 @@ import { api, useStore, type InstanceInfo } from "@/state/store";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import { CommandLine } from "./SettingsPrimitives";
+import { ClaudeSignIn } from "./ClaudeSignIn";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 export function ClaudeAccountForm({ instance, onSaved, onCancel }: {
@@ -179,9 +180,14 @@ export function ClaudeAccountSettings({ instance }: { instance: InstanceInfo }) 
       <details>
         <summary className="cursor-pointer rounded-md py-1 font-medium text-ink-secondary outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent">{t("engines.account.manage")}</summary>
         <div className="mt-3 space-y-4 rounded-xl bg-inset p-4">
-          <p className="leading-relaxed text-ink-secondary">{t("engines.account.signInHint")}</p>
-          {account.signInShell === "powershell" && <p className="text-ink-secondary">{t("engines.account.powershell")}</p>}
-          <CommandLine command={account.signInCommand} copyLabel={t("engineSetup.copyCommand")} />
+          {instance.authentication?.method === "paste-code" ? <>
+            <p className="leading-relaxed text-ink-secondary">{t("engineSetup.claude.description")}</p>
+            {!authenticated && <ClaudeSignIn instanceId={instance.instanceId} />}
+          </> : <>
+            <p className="leading-relaxed text-ink-secondary">{t("engines.account.signInHint")}</p>
+            {account.signInShell === "powershell" && <p className="text-ink-secondary">{t("engines.account.powershell")}</p>}
+            <CommandLine command={account.signInCommand} copyLabel={t("engineSetup.copyCommand")} />
+          </>}
           <fieldset disabled={busy || signingOut} className="min-w-0">
             <ClaudeAccountForm key={`${instance.displayName}:${account.configDir}`} instance={instance} onSaved={() => {}} />
           </fieldset>

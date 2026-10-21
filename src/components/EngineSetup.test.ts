@@ -87,6 +87,22 @@ describe("managed engine setup errors", () => {
 });
 
 describe("engines set up with a key in Settings", () => {
+  it.each(["cursorAgent", "droidAgent", "geminiAgent", "qwenAgent", "piAgent", "hermesAgent"])("gives installed %s a browser account form", driverKind => {
+    vi.stubGlobal("window", { ogb: { platform: "linux" } });
+    const engine: InstanceInfo = { ...instance({ state: "available", authenticated: false }), instanceId: driverKind, driverKind,
+      displayName: driverKind, install: { signInCommand: "terminal-command-must-not-appear" } };
+    const markup = renderToStaticMarkup(createElement(StoreProvider, null, createElement(EngineSetup, { instance: engine })));
+    expect(markup).toContain("data-provider-account-setup");
+    expect(markup).toContain("Save account setup");
+    expect(markup).not.toContain("terminal-command-must-not-appear");
+  });
+  it("gives Bedrock its region, model and API-key form without an installer", () => {
+    vi.stubGlobal("window", { ogb: { platform: "linux" } });
+    const engine: InstanceInfo = { ...instance({ state: "unavailable" }), instanceId: "bedrock", driverKind: "openai-compat", displayName: "Amazon Bedrock", access: "api" };
+    const markup = renderToStaticMarkup(createElement(StoreProvider, null, createElement(EngineSetup, { instance: engine })));
+    expect(markup).toContain("AWS region"); expect(markup).toContain("Model or inference profile ID"); expect(markup).toContain("Bedrock API key");
+    expect(markup).not.toContain("Install");
+  });
   it("routes an xAI API instance to saved-key setup", () => {
     vi.stubGlobal("window", { ogb: { platform: "win32" } });
     const engine: InstanceInfo = {

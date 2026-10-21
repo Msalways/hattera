@@ -105,6 +105,8 @@ interface RuntimeOptions<Config> {
   driverKind: string;
   apiKey: string;
   apiUrl: string;
+  /** A native provider transport that preserves this runtime's tool/approval contract. */
+  fetch?: typeof fetch;
   models: () => ModelCatalog;
   requestBody(model: string, messages: OpenAIChatMessage[], stream: boolean): Record<string, unknown>;
   httpErrorLabel: string;
@@ -378,7 +380,7 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
         ? AbortSignal.any([signal, timeoutController.signal])
         : timeoutController.signal;
 
-      const response = await fetch(`${options.apiUrl}/chat/completions`, {
+      const response = await (options.fetch ?? fetch)(`${options.apiUrl}/chat/completions`, {
         method: "POST",
         ...(messages.some(message => Array.isArray(message.content) && message.content.some(part => part.type === "image_url")) ? { redirect: "error" as const } : {}),
         headers: { authorization: `Bearer ${options.apiKey}`, "content-type": "application/json" },

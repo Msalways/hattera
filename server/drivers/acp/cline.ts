@@ -15,16 +15,20 @@ const MODELS: ModelCatalog = {
 
 type ClineSettings = { provider: string; model?: string; apiKey?: string; auth?: { accessToken?: string; apiKey?: string } };
 
+export function clineProviderSettingsPath(env: Record<string, string | undefined>, config: AcpConfig): string {
+  const args = resolveCli(config.cli, [], env).args;
+  const flag = (name: string) => {
+    const index = args.lastIndexOf(name);
+    return index >= 0 ? args[index + 1] : args.find((arg) => arg.startsWith(`${name}=`))?.slice(name.length + 1);
+  };
+  const home = flag("--config") || env.CLINE_DIR || join(env.HOME || env.USERPROFILE || homedir(), ".cline");
+  const data = flag("--data-dir") || env.CLINE_DATA_DIR || join(home, "data");
+  return env.CLINE_PROVIDER_SETTINGS_PATH || join(data, "settings", "providers.json");
+}
+
 function savedProvider(env: Record<string, string | undefined>, config: AcpConfig): { settings: ClineSettings; fingerprint: string } | null {
   try {
-    const args = resolveCli(config.cli, [], env).args;
-    const flag = (name: string) => {
-      const index = args.lastIndexOf(name);
-      return index >= 0 ? args[index + 1] : args.find((arg) => arg.startsWith(`${name}=`))?.slice(name.length + 1);
-    };
-    const home = flag("--config") || env.CLINE_DIR || join(env.HOME || env.USERPROFILE || homedir(), ".cline");
-    const data = flag("--data-dir") || env.CLINE_DATA_DIR || join(home, "data");
-    const path = env.CLINE_PROVIDER_SETTINGS_PATH || join(data, "settings", "providers.json");
+    const path = clineProviderSettingsPath(env, config);
     if (statSync(path).size > 256 * 1024) return null;
     const text = readFileSync(path, "utf8");
     const stored = JSON.parse(text);
@@ -50,7 +54,14 @@ function savedProvider(env: Record<string, string | undefined>, config: AcpConfi
 
 const OAUTH = new Set(["cline", "cline-pass", "openai-codex"]);
 
-const LOGIN_NOTE = "Cline is not configured. Run cline auth in a terminal, then try again.";
+const LOGIN_NOTE = "Cline is not signed in. Choose Sign in to Cline in model provider setup.";
+
+function authenticated(env: Record<string, string | undefined>, config: AcpConfig): boolean {
+  if (env.CLINE_API_KEY?.trim()) return true;
+  const saved = savedProvider(env, config)?.settings;
+  return Boolean(saved && OAUTH.has(saved.provider) &&
+    (saved.auth?.accessToken?.trim() || saved.apiKey?.trim() || saved.auth?.apiKey?.trim()));
+}
 
 const SUPPORT: AcpSupport = {
   driverKind: "clineAgent",
@@ -85,18 +96,12 @@ const SUPPORT: AcpSupport = {
   pickAuthMethod: (methods, env) => !env.CLINE_API_KEY && OAUTH.has(env.CLINE_PROVIDER ?? "")
     && methods.some((method) => method.id === env.CLINE_PROVIDER) ? env.CLINE_PROVIDER! : null,
   authFailure: "fail-request",
-  // Cline reuses its own terminal login. Missing credentials are rejected by
-  // session/new; don't launch an interactive sign-in during a chat turn.
-  isAuthenticated: (env, config) => {
-    if (env.CLINE_API_KEY?.trim()) return true;
-    const saved = savedProvider(env, config)?.settings;
-    return Boolean(saved && OAUTH.has(saved.provider) &&
-      (saved.auth?.accessToken?.trim() || saved.apiKey?.trim() || saved.auth?.apiKey?.trim()));
-  },
+  // Account setup is an explicit Settings action, never launched during chat.
+  isAuthenticated: authenticated,
   requireAuthenticationBeforeSpawn: true,
   resolveTurnModel(model, env) {
     if (model && model !== "cline-default") {
-      throw new Error("Select Cline default (configured). Change Cline's provider or model with cline auth in a terminal.");
+      throw new Error("Select Cline default (configured). Change Cline's provider or model in model provider setup.");
     }
     return env.CLINE_MODEL?.trim();
   },
@@ -123,6 +128,15 @@ export const ClineAgentDriver = {
     try {
       const driver = createAcpDriver({
         ...SUPPORT,
+        deviceSignIn: {
+          provider: "cline", product: "Cline", account: "Cline", authHost: "authkit.cline.bot",
+          homeEnv: "CLINE_DIR", homeDir: ".cline", suppressBrowser: true,
+          credentialHome: (env) => clineProviderSettingsPath(env, input.config),
+          loginArgs: ["auth", "--provider", "cline"],
+          install: "Install Cline in model provider setup, then try again.",
+          failure: () => "Cline sign-in did not finish. Check the server's connection to authkit.cline.bot and try again.",
+          signedIn: (env) => authenticated({ ...env, CLINE_API_KEY: undefined, CLINE_PROVIDER: "cline" }, input.config),
+        },
         applyTurnEnv(env, { threadId, mcpServers }) {
           const path = join(directory, `${createHash("sha256").update(threadId).digest("hex")}.json`);
           const mcp = Object.fromEntries(mcpServers.map(({ name, command, args, env: serverEnv }) => [name, {

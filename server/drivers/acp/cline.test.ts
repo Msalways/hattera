@@ -12,6 +12,7 @@ import { BUILT_IN_DRIVERS } from "../builtIn.ts";
 import { ClineAgentDriver } from "./cline.ts";
 import { supportsApprovalMode } from "../../../shared/approval-mode.ts";
 import { assertToolScopeSupported } from "../../../shared/tool-scope-support.ts";
+import { deviceSignInPrompt, deviceSignInLink } from "../../../shared/device-sign-in.ts";
 
 const FAKE_CLI = join(dirname(fileURLToPath(import.meta.url)), "../../testing/fake-acp-cli.ts");
 
@@ -48,6 +49,75 @@ describe("Cline ACP driver", () => {
     recorder = recordEvents(instance.adapter);
     return { instance, recorder };
   }
+
+  async function signedOut(mode = "success") {
+    const cli = join(scratch, "cline-auth.mjs");
+    writeFileSync(cli, `#!/usr/bin/env node
+      import { mkdirSync, writeFileSync } from 'node:fs';
+      import { join } from 'node:path';
+      if (process.argv.includes('--version')) { console.log('Cline 3.0.73'); process.exit(0); }
+      if (process.argv.slice(2).join(' ') !== 'auth --provider cline') process.exit(2);
+      if (process.env.FAKE_AUTH_MODE === 'network') { console.error('network unreachable secret-token'); process.exit(1); }
+      console.error('[auth] Enter this code in your browser: ABCD-EFGH');
+      console.error('[auth] https://authkit.cline.bot/device?user_code=ABCD-EFGH');
+      if (process.env.FAKE_AUTH_MODE === 'wait') setInterval(() => {}, 1000);
+      else setTimeout(() => {
+        if (process.env.FAKE_AUTH_MODE !== 'unconfirmed') {
+          const dir = join(process.env.CLINE_DATA_DIR, 'settings'); mkdirSync(dir, { recursive: true });
+          writeFileSync(join(dir, 'providers.json'), JSON.stringify({ version: 1, lastUsedProvider: 'cline',
+            providers: { cline: { settings: { provider: 'cline', model: 'fixture-model', auth: { accessToken: 'fixture-only' } } } } }));
+        }
+        process.exit(0);
+      }, 150);
+    `, { mode: 0o700 });
+    instance = await ClineAgentDriver.create({
+      instanceId: "cline-auth", displayName: "Cline", enabled: true,
+      environment: { HOME: scratch, USERPROFILE: scratch, CLINE_DATA_DIR: join(scratch, "data"), FAKE_AUTH_MODE: mode },
+      config: { cli, fullAuto: false },
+    });
+    return instance;
+  }
+
+  it("provides browser device sign-in from an empty account home and verifies the saved account", async () => {
+    const instance = await signedOut();
+    expect(await instance.snapshot()).toMatchObject({ authenticated: false });
+    const flow = await instance.startAuthentication!();
+    expect(flow).toMatchObject({ phase: "waiting", userCode: "ABCD-EFGH", authorizationUrl: "https://authkit.cline.bot/device?user_code=ABCD-EFGH" });
+    await vi.waitFor(async () => expect(await instance.getAuthentication!(flow.flowId!)).toMatchObject({ phase: "succeeded" }), { timeout: 10_000 });
+    expect(await instance.snapshot()).toMatchObject({ authenticated: true });
+  });
+
+  it("does not declare success when the login exits without saving a usable account", async () => {
+    const instance = await signedOut("unconfirmed");
+    const flow = await instance.startAuthentication!();
+    await vi.waitFor(async () => expect(await instance.getAuthentication!(flow.flowId!)).toMatchObject({ phase: "failed" }), { timeout: 10_000 });
+    expect(await instance.snapshot()).toMatchObject({ authenticated: false });
+  });
+
+  it("cancels an unfinished login without creating credentials", async () => {
+    const instance = await signedOut("wait");
+    const flow = await instance.startAuthentication!();
+    await instance.cancelAuthentication!();
+    expect(await instance.getAuthentication!(flow.flowId!)).toMatchObject({ phase: "cancelled", authorizationUrl: null });
+    expect(await instance.snapshot()).toMatchObject({ authenticated: false });
+    expect(existsSync(join(scratch, "data", "settings", "providers.json"))).toBe(false);
+  });
+
+  it("returns a safe network failure instead of raw process output", async () => {
+    const instance = await signedOut("network");
+    await expect(instance.startAuthentication!()).rejects.toThrow("could not reach authkit.cline.bot");
+    await expect(instance.startAuthentication!()).rejects.not.toThrow("secret-token");
+  });
+
+  it("accepts only complete Cline device links with one bounded code", () => {
+    const page = "https://authkit.cline.bot/device?user_code=ABCD-EFGH";
+    expect(deviceSignInPrompt("cline", `[auth] ${page}\n`)).toEqual({ authorizationUrl: page, userCode: "ABCD-EFGH" });
+    expect(deviceSignInPrompt("cline", `[auth] ${page}`)).toBeNull();
+    for (const url of [page + "&token=private", page + "&user_code=IJKL-MNOP", page.replace("cline.bot", "cline.bot.evil.test"), page.replace("https:", "http:"), page + "#secret"]) {
+      expect(deviceSignInPrompt("cline", `[auth] ${url}\n`)).toBeNull();
+    }
+    expect(deviceSignInLink("cline", page, "IJKL-MNOP")).toBeNull();
+  });
 
   it("is discoverable in fresh and existing product fleets", () => {
     expect(BUILT_IN_DRIVERS.some((driver) => driver.driverKind === "clineAgent")).toBe(true);
@@ -172,7 +242,7 @@ describe("Cline ACP driver", () => {
     expect(await recorder.until((event) => event.type === "turn.completed")).toMatchObject({ ok: false });
     expect(recorder.events.some((event) => event.type === "content.delta")).toBe(false);
     expect(existsSync(join(scratch, "launch.json.session.json"))).toBe(false);
-    await expect(instance.generateMemoryText!("remember this")).rejects.toThrow("not configured");
+    await expect(instance.generateMemoryText!("remember this")).rejects.toThrow("not signed in");
   });
 
   it("uses the configured model for tool-free memory upkeep too", async () => {

@@ -1,6 +1,7 @@
 // Transcript-replay driver for OpenRouter, Groq, Together, llama.cpp, and
 // other endpoints that speak the OpenAI chat-completions contract.
 import type { ModelCatalog, ProviderDriver } from "../contracts.ts";
+import { bedrockConverseFetch } from "./bedrock-converse.ts";
 import { createOpenAIChatRuntime } from "./openai-chat.ts";
 
 const DRIVER_KIND = "openai-compat";
@@ -23,7 +24,7 @@ const DEFAULT_KEY_ENV = "OPENAI_COMPAT_API_KEY";
 /** A provider's own key (the built-in OpenAI and OpenRouter instances). An
  * instance reading one of these never falls back to the workspace
  * OpenAI-compatible key, URL, model or routing. */
-const OWN_KEY_ENVS = new Set(["OMB_OPENAI_API_KEY", "OMB_OPENROUTER_API_KEY"]);
+const OWN_KEY_ENVS = new Set(["OMB_OPENAI_API_KEY", "OMB_OPENROUTER_API_KEY", "OMB_BEDROCK_API_KEY"]);
 
 /** OpenAI's own API, seeded until its live catalog loads. */
 const OPENAI_MODELS: ModelCatalog = {
@@ -48,7 +49,7 @@ export interface OpenAICompatConfig {
   /** Where the key comes from; see OWN_KEY_ENVS. */
   apiKeyEnv: string;
   /** "openai": seed and filter the catalog for OpenAI's own API. */
-  catalog?: "openai";
+  catalog?: "openai" | "bedrock";
   key?: string;
   model?: string;
   provider?: string;
@@ -69,7 +70,7 @@ function decodeConfig(raw: unknown): OpenAICompatConfig {
   if (config.tools !== undefined && typeof config.tools !== "boolean") throw new Error("tools must be a boolean");
   if (config.managedModels !== undefined && (!Array.isArray(config.managedModels) || !config.managedModels.length || config.managedModels.some(model => typeof model !== "string" || !model.trim()))) throw new Error("Invalid managed models.");
   const ownKey = typeof config.apiKeyEnv === "string" && OWN_KEY_ENVS.has(config.apiKeyEnv);
-  if (config.catalog !== undefined && config.catalog !== "openai") throw new Error("catalog must be \"openai\"");
+  if (config.catalog !== undefined && config.catalog !== "openai" && config.catalog !== "bedrock") throw new Error("catalog must be openai or bedrock");
   // Workspace defaults belong to the shared OpenAI-compatible connection only.
   const envUrl = ownKey ? undefined : process.env.OPENAI_COMPAT_URL;
   return {
@@ -80,7 +81,7 @@ function decodeConfig(raw: unknown): OpenAICompatConfig {
     apiKeyEnv: typeof config.apiKeyEnv === "string" && config.apiKeyEnv
       ? config.apiKeyEnv
       : DEFAULT_KEY_ENV,
-    ...(config.catalog === "openai" ? { catalog: "openai" as const } : {}),
+    ...(config.catalog === "openai" || config.catalog === "bedrock" ? { catalog: config.catalog } : {}),
     key: typeof config.key === "string" && config.key ? config.key : undefined,
     model: typeof config.model === "string" && config.model
       ? config.model
@@ -127,10 +128,11 @@ export const OpenAICompatDriver: ProviderDriver<OpenAICompatConfig> = {
       "";
     // The default key and the built-in providers' keys are saved in
     // Settings → API keys; any other variable is configured where it was written.
-    const missingKey = !ownKeyVariable || OWN_KEY_ENVS.has(config.apiKeyEnv)
+    const missingKey = config.catalog === "bedrock" ? "Configure a Bedrock API key, AWS region and model ID in this provider's setup."
+      : !ownKeyVariable || OWN_KEY_ENVS.has(config.apiKeyEnv)
       ? "No API key — open Settings → API keys."
       : `no API key — set ${config.apiKeyEnv} or add it to the instance config`;
-    const seeded = config.catalog === "openai" ? OPENAI_MODELS : DEFAULT_MODELS;
+    const seeded = config.catalog === "bedrock" ? { default: "", options: [] } : config.catalog === "openai" ? OPENAI_MODELS : DEFAULT_MODELS;
     let catalog: ModelCatalog = config.managedModels
       ? { default: config.managedModels[0], options: config.managedModels.map(id => ({ id, label: id })) }
       : config.model
@@ -143,6 +145,9 @@ export const OpenAICompatDriver: ProviderDriver<OpenAICompatConfig> = {
       : seeded;
 
     const fetchModels = async () => {
+      // Bedrock's native model discovery requires separate control-plane permissions.
+      // Only list the model/profile the owner explicitly configured.
+      if (config.catalog === "bedrock") return;
       if (config.managedModels) return;
       if (!apiKey) return;
       try {
@@ -188,8 +193,9 @@ export const OpenAICompatDriver: ProviderDriver<OpenAICompatConfig> = {
     return createOpenAIChatRuntime({
       input,
       driverKind: DRIVER_KIND,
-      apiKey,
+      apiKey: config.catalog === "bedrock" && !config.model ? "" : apiKey,
       apiUrl: config.url,
+      ...(config.catalog === "bedrock" ? { fetch: bedrockConverseFetch } : {}),
       tools: config.tools,
       computerUse: true,
       models: () => catalog,

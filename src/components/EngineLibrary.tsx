@@ -16,7 +16,7 @@ export function engineReady(instance: InstanceInfo): boolean {
 /** These runtimes report installed separately from whether they have any
  * configured provider/model route. A local route counts too. */
 export function needsConfiguredRoute(instance: InstanceInfo): boolean {
-  return instance.driverKind === "qwenAgent" || instance.driverKind === "piAgent";
+  return instance.driverKind === "qwenAgent" || instance.driverKind === "piAgent" || instance.driverKind === "hermesAgent";
 }
 
 const providers: Record<string, string> = {

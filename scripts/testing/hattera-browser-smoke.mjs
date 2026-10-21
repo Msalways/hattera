@@ -155,9 +155,9 @@ try {
   const miniMaxShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(miniMaxScreenshot, Buffer.from(miniMaxShot.data, 'base64'));
   await evaluate('document.querySelector("[data-engine-card=qwen] summary").click()');
-  await until(() => evaluate('document.querySelector("[data-engine-card=qwen]")?.innerText.includes("Sign in to Qwen")'), 10_000, 'Qwen setup card');
+  await until(() => evaluate('!!document.querySelector("[data-engine-card=qwen] [data-provider-account-setup=model]")'), 10_000, 'Qwen model provider setup form');
   const qwenCard = await evaluate('document.querySelector("[data-engine-card=qwen]").innerText');
-  if (!qwenCard.includes('Sign-in required') || !qwenCard.includes('qwen') || qwenCard.includes('Install Qwen on this server')) {
+  if (!qwenCard.includes('Sign-in required') || !qwenCard.includes('Model ID') || qwenCard.includes('Install Qwen on this server') || qwenCard.includes('Copy command')) {
     throw new Error(`Unconfigured Qwen has an incorrect setup path: ${qwenCard}`);
   }
   await evaluate('document.querySelector("[data-engine-card=qwen]").scrollIntoView({block:"center"})');
@@ -165,6 +165,9 @@ try {
   const qwenScreenshot = resolve('output/playwright/hattera-qwen-setup.png');
   const qwenShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(qwenScreenshot, Buffer.from(qwenShot.data, 'base64'));
+  await evaluate('document.querySelector("[data-engine-card=bedrock] summary").click()');
+  await until(() => evaluate('!!document.querySelector("[data-engine-card=bedrock] [data-provider-account-setup=bedrock]")'), 10_000, 'Bedrock account setup');
+  if (await evaluate('document.querySelector("[data-engine-card=bedrock]").innerText.includes("Install Amazon Bedrock")')) throw new Error('Bedrock was treated as a downloadable CLI');
   await evaluate('document.querySelector("[data-engine-card=codex] summary").click()');
   await until(() => evaluate('!!document.querySelector("[data-engine-card=codex] [data-device-sign-in=codex]")'), 10_000, 'Codex sign-in card').catch(async (cause) => {
     const card = await evaluate('document.querySelector("[data-engine-card=codex]")?.innerText');
@@ -356,7 +359,21 @@ try {
     return data.instances?.find((instance) => instance.instanceId === 'cline')?.snapshot.version?.includes('fake-acp 1.0.0');
   }, 90_000, 'Cline installed by browser action');
   await until(() => evaluate(`!!document.querySelector(${JSON.stringify(`${clineCard} [role=status]`)}) || !document.querySelector(${JSON.stringify(`${clineCard} button`)})?.textContent?.includes('Installing')`), 10_000, 'Cline install feedback');
-  console.log(JSON.stringify({ ok: true, checks: ['chat-reply', 'opencode-model-picker', 'opencode-acp-reply', 'opencode-provider-card', 'minimax-setup-card', 'qwen-setup-card', 'codex-auth-choices', 'cline-browser-server-install', 'browser-navigation', 'browser-release', 'bot-settings-navigation', 'bot-browser-permission', 'bot-creation', 'bot-identity-edit', 'bot-memory-edit', 'bot-tool-selection', 'bot-skill-authoring', 'bot-approval-level', 'mobile-chat-layout', 'pairing-skin-contrast', 'remote-browser-pairing'], previewUrl: base.href, testPage, screenshots: [pickerScreenshot, providerScreenshot, miniMaxScreenshot, qwenScreenshot, codexScreenshot, codexCodeScreenshot, output, mobileScreenshot, darkPairScreenshot, pairScreenshot] }));
+  await until(() => evaluate('!!document.querySelector("[data-device-sign-in=cline] button")'), 10_000, 'Cline browser sign-in after install');
+  if (await evaluate(`document.querySelector(${JSON.stringify(clineCard)}).innerText.includes('Finish signing in to your account in Terminal')`)) throw new Error('Cline still requires a server terminal');
+  await evaluate('document.querySelector("[data-device-sign-in=cline] button").click()');
+  await until(() => evaluate('Array.from(document.querySelectorAll("[data-device-sign-in=cline] a")).some(link => link.href === "https://authkit.cline.bot/device?user_code=ABCD-EFGH")'), 10_000, 'Cline one-time code');
+  await evaluate('Array.from(document.querySelectorAll("[data-device-sign-in=cline] button")).find(button => button.textContent?.includes("Cancel")).click()');
+  await until(() => evaluate('document.querySelector("[data-device-sign-in=cline]")?.innerText.includes("cancelled")'), 10_000, 'Cline auth cancellation');
+  await evaluate('Array.from(document.querySelectorAll("[data-device-sign-in=cline] button")).find(button => button.textContent?.includes("Try again")).click()');
+  await until(() => evaluate('!!document.querySelector("[data-device-sign-in=cline] a")'), 10_000, 'Cline auth retry');
+  const clineAuthScreenshot = resolve('output/playwright/hattera-cline-browser-sign-in.png');
+  await evaluate('document.querySelector("[data-device-sign-in=cline]").scrollIntoView({ block: "center" })');
+  const clineAuthShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(clineAuthScreenshot, Buffer.from(clineAuthShot.data, 'base64'));
+  await fetch(new URL('/__hattera-cline-auth/approve', base), { method: 'POST' });
+  await until(async () => (await (await fetch(new URL('/api/instances', base))).json()).instances?.find(instance => instance.instanceId === 'cline')?.snapshot.authenticated === true, 20_000, 'Cline saved account confirmation');
+  console.log(JSON.stringify({ ok: true, checks: ['chat-reply', 'opencode-model-picker', 'opencode-acp-reply', 'opencode-provider-card', 'minimax-setup-card', 'qwen-setup-card', 'codex-auth-choices', 'cline-browser-server-install', 'cline-browser-device-auth', 'bedrock-provider-setup', 'browser-navigation', 'browser-release', 'bot-settings-navigation', 'bot-browser-permission', 'bot-creation', 'bot-identity-edit', 'bot-memory-edit', 'bot-tool-selection', 'bot-skill-authoring', 'bot-approval-level', 'mobile-chat-layout', 'pairing-skin-contrast', 'remote-browser-pairing'], previewUrl: base.href, testPage, screenshots: [pickerScreenshot, providerScreenshot, miniMaxScreenshot, qwenScreenshot, codexScreenshot, codexCodeScreenshot, output, mobileScreenshot, darkPairScreenshot, pairScreenshot, clineAuthScreenshot] }));
 } finally {
   socket?.close();
   chrome.kill();

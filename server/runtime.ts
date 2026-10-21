@@ -5,6 +5,7 @@
 // secrets off the launcher's pipe (cloud-secrets-boot.ts).
 import { BOOT_CLOUD_SECRETS } from "./cloud-secrets-boot.ts";
 import { postgresRuntime } from "./postgres-runtime.ts";
+import { configureProviderAccount, providerAccountInput } from "./provider-account-setup.ts";
 import { openPostgresSessions } from "./postgres-sessions.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
@@ -16488,6 +16489,13 @@ async function describeInstances() {
       ...instance,
       ...(entry?.icon ? { icon: entry.icon } : {}),
       ...(entry?.access ? { access: entry.access } : {}),
+      ...(instance.instanceId === "bedrock" && entry?.driver === "openai-compat" ? {
+        accountSetup: (() => {
+          const config = entry.config as { url?: string; model?: string } | undefined;
+          const region = /^https:\/\/bedrock-runtime\.([a-z0-9-]+)\.amazonaws\.com\/?$/.exec(config?.url ?? "")?.[1];
+          return { ...(region ? { region } : {}), ...(config?.model ? { model: config.model } : {}) };
+        })(),
+      } : {}),
     };
     if (hostedModels) return { ...described, readOnly: true,
       install: undefined, authentication: undefined, cli: undefined, cliCandidates: [],
@@ -25062,6 +25070,37 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       } finally { providerConfigBusy = false; }
     }
 
+    const busyProviderSelections = () => store.bots.flatMap((bot) => {
+      const busyTasks = store.tasks(bot.id).filter((task) => threadBusy(bot.id, task.threadId));
+      const selections = busyTasks.map((task) => botForThread(bot.id, task.threadId)!.modelSelection);
+      if (activeGroupTurnForBot(bot.id) || (bot.busy && busyTasks.length === 0)) selections.push(bot.modelSelection);
+      return selections;
+    });
+    const providerAccount = /^\/api\/instances\/([\w.-]+)\/account$/.exec(path);
+    if (method === "POST" && providerAccount) {
+      if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) return json(res, 415, { error: "content-type must be application/json" });
+      const parsed = providerAccountInput.safeParse(await readBody(req, 16_384));
+      if (!parsed.success) return json(res, 400, { error: "Enter a valid API key and the provider's required model, URL or AWS region." });
+      const instanceId = providerAccount[1];
+      if (providerConfigBusy || providerAuthSessions.isActive(instanceId)) return json(res, 409, { error: "Finish or cancel the account operation already in progress before changing this provider." });
+      if (busyProviderSelections().some(selection => selection.instanceId === instanceId)) return json(res, 409, { error: "Wait for bots using this provider to finish before changing its account." });
+      const instances = persistableInstanceConfigs(cfg);
+      if (!Object.hasOwn(instances, instanceId)) return json(res, 404, { error: "Unknown provider." });
+      providerConfigBusy = true;
+      providerInstancesChanging.add(instanceId);
+      res.setHeader("cache-control", "no-store");
+      try {
+        instances[instanceId] = configureProviderAccount(instanceId, instances[instanceId], parsed.data);
+        await persistProviderInstance(instanceId, instances);
+        return json(res, 200, { instances: await describeInstances() });
+      } catch (error) {
+        return json(res, 400, { error: error instanceof Error ? error.message : "Account setup could not be saved." });
+      } finally {
+        providerInstancesChanging.delete(instanceId);
+        providerConfigBusy = false;
+      }
+    }
+
     const authStatus = /^\/api\/instances\/([\w.-]+)\/auth\/status$/.exec(path);
     if (method === "GET" && authStatus) {
       res.setHeader("cache-control", "no-store");
@@ -25191,13 +25230,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     // executable already configured for this Claude instance. The JSON gate
     // keeps a hostile page from triggering a local process with a simple
     // cross-origin form request.
-    const busyProviderSelections = () => store.bots.flatMap((bot) => {
-      const busyTasks = store.tasks(bot.id).filter((task) => threadBusy(bot.id, task.threadId));
-      const selections = busyTasks.map((task) => botForThread(bot.id, task.threadId)!.modelSelection);
-      // Rooms still run from the profile default; a direct thread does not.
-      if (activeGroupTurnForBot(bot.id) || (bot.busy && busyTasks.length === 0)) selections.push(bot.modelSelection);
-      return selections;
-    });
     const claudeUpdate = /^\/api\/instances\/([\w.-]+)\/claude-update$/.exec(path);
     if (method === "POST" && claudeUpdate) {
       if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {

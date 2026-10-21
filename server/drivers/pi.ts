@@ -398,7 +398,7 @@ export async function applyPiLocalCatalog(
 }
 
 function piAgentDir(env: Record<string, string | undefined>): string {
-  return join(env.HOME || env.USERPROFILE || homedir(), ".pi", "agent");
+  return env.PI_CODING_AGENT_DIR || join(env.HOME || env.USERPROFILE || homedir(), ".pi", "agent");
 }
 
 /** Upsert a live local host into ~/.pi/agent/models.json so `set_model`

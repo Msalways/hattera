@@ -37,16 +37,16 @@ only `PATH` from your shell. Use the steps below instead.
 OpenCode already supports OpenRouter, Fireworks AI, DeepSeek and ClinePass. It
 just needs your key.
 
-1. In a terminal, run `opencode auth login`.
-2. Pick **OpenRouter**, **Fireworks AI**, **DeepSeek** or **ClinePass** and
-   paste your key.
+1. In Settings, expand **OpenCode → Provider accounts and API keys**.
+2. Save the supported provider's key. Existing native accounts established with
+   `opencode auth login` also remain usable.
 3. In Hattera, open a bot's model picker, choose OpenCode and press the
    refresh button (**Refresh models**). The provider's models appear in the
    list. Hattera reads the model list from an ACP session on both
    OpenCode 1.x and 2.x.
 
-Hattera uses your normal OpenCode sign-ins and settings, so there is
-nothing to set up inside the app. Sign in with the same OpenCode version that
+Hattera uses your normal OpenCode sign-ins and settings. You can save supported
+provider keys inside the app. Sign in with the same OpenCode version that
 your bots use (see [OpenCode 2.x](#opencode-2x)).
 
 **Your own OpenAI-compatible address** (this includes Cline credits, at
@@ -120,12 +120,12 @@ Connections and sends it to that engine's address.
 ### Cline engine
 
 1. In Hattera Settings, choose **Install Cline on this server**.
-2. Run `cline auth` in a terminal to choose its provider, model and account.
+2. Choose **Sign in to Cline**, open the displayed browser link and approve the one-time code. Alternatively, expand **Use API key instead** and save a compatible provider URL, model ID and key.
 3. In Hattera's bot model picker, select **Cline** and
    **Cline default (configured)**.
 
 Hattera uses Cline's selected provider and saved credentials. Change the
-provider or model through `cline auth`; the configured model is pinned before
+provider or model in Settings; `cline auth` remains an optional terminal alternative. The configured model is pinned before
 each prompt. An unconfigured account remains unavailable. **Set CLI** can
 select a wrapper with `--config` or `--data-dir` for a separate Cline home.
 

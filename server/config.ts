@@ -1693,9 +1693,14 @@ function injectedEnvironment(cfg: AppConfig, instanceId: string, driver: string)
  * is saved (unavailable without one). */
 export const OPENAI_API_INSTANCE = "openai";
 export const OPENROUTER_API_INSTANCE = "openrouter";
+export const BEDROCK_API_INSTANCE = "bedrock";
 export const XAI_API_INSTANCE = "xaiApi";
 export const CLAUDE_API_INSTANCE = "claudeApi";
 const API_KEY_FLEET: InstanceConfigMap = {
+  [BEDROCK_API_INSTANCE]: {
+    driver: "openai-compat", displayName: "Amazon Bedrock", access: "api", icon: { kind: "preset", preset: "aws" },
+    config: { url: "https://bedrock-runtime.us-east-1.amazonaws.com", apiKeyEnv: "OMB_BEDROCK_API_KEY", catalog: "bedrock" },
+  },
   [OPENAI_API_INSTANCE]: {
     driver: "openai-compat", displayName: "OpenAI", access: "api", icon: { kind: "preset", preset: "openai" },
     config: { url: "https://api.openai.com/v1", apiKeyEnv: "OMB_OPENAI_API_KEY", catalog: "openai" },
@@ -1827,7 +1832,7 @@ export function instanceConfigs(cfg: AppConfig): InstanceConfigMap {
     // intentionally not consulted by ProviderRegistry when it decodes a
     // driver's config, so carry the workspace default into the transient
     // instance map while preserving a per-instance override.
-    if (entry.driver === "openai-compat" && cfg.openaiCompat && id !== OPENAI_API_INSTANCE && id !== OPENROUTER_API_INSTANCE) {
+    if (entry.driver === "openai-compat" && cfg.openaiCompat && id !== OPENAI_API_INSTANCE && id !== OPENROUTER_API_INSTANCE && id !== BEDROCK_API_INSTANCE) {
       const defaults: Record<string, string> = {};
       if (cfg.openaiCompat.url) defaults.url = cfg.openaiCompat.url;
       if (cfg.openaiCompat.model) defaults.model = cfg.openaiCompat.model;

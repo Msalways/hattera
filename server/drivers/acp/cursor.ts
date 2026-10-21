@@ -12,6 +12,7 @@ import type { ModelCatalog, ProviderErrorCode } from "../../contracts.ts";
 import { titleCaseModelId } from "../../contracts.ts";
 import { execCli } from "../../procs.ts";
 import { createAcpDriver, type AcpSupport } from "./core.ts";
+import { cursorBrowserSignInPrompt } from "../../../shared/device-sign-in.ts";
 
 /** Translate an argv `--model` slug into the id this ACP session will accept.
  *
@@ -391,7 +392,19 @@ const support = (run: typeof execCli): AcpSupport => ({
   // Cursor's compatibility alias is unambiguous and ships with the same CLI.
   defaultCli: "cursor-agent",
   nativeSource: "cursor.acp",
-  loginNote: "Cursor CLI is not signed in — run `cursor-agent login` in a terminal, or set CURSOR_API_KEY",
+  loginNote: "Cursor CLI is not signed in. Connect your Cursor account or API key in model provider setup.",
+  deviceSignIn: {
+    provider: "cursor", product: "Cursor", account: "Cursor", authHost: "cursor.com",
+    homeEnv: "XDG_CONFIG_HOME", homeDir: ".config/cursor", loginArgs: ["login"],
+    prompt: cursorBrowserSignInPrompt, loginEnvironment: { NO_OPEN_BROWSER: "1" },
+    install: "Install Cursor in model provider setup, then try again.",
+    status: { args: ["status"], read: (_code, output) => {
+      const authenticated = decodeCursorAuthText(output);
+      return authenticated === true ? "signed-in" : authenticated === false ? "signed-out" : "unknown";
+    } },
+    logoutArgs: ["logout"],
+    failure: () => "Cursor sign-in did not finish. Check the server's connection to cursor.com and try again.",
+  },
 
   install: {
     command: {

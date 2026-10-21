@@ -18,6 +18,18 @@ const waiting: DeviceSignInStatus = {
 };
 const render = (auth: DeviceSignInStatus) => renderToStaticMarkup(createElement(DeviceSignInProgress, { auth }));
 
+it("shows Cline's browser sign-in page and never sends it through the Codex flow", () => {
+  expect(deviceSignInProvider("clineAgent")).toBe("cline");
+  const auth = { ...waiting, authorizationUrl: "https://authkit.cline.bot/device?user_code=ABCD-EFGH", userCode: "ABCD-EFGH" };
+  const html = renderToStaticMarkup(createElement(DeviceSignInProgress, { auth, provider: "cline" }));
+  expect(html).toContain("Open Cline sign-in");
+  expect(html).toContain('href="https://authkit.cline.bot/device?user_code=ABCD-EFGH"');
+  expect(html).not.toContain("ChatGPT");
+  expect(html).not.toContain("Terminal");
+  const invalid = renderToStaticMarkup(createElement(DeviceSignInProgress, { auth: { ...auth, authorizationUrl: auth.authorizationUrl + "&token=private" }, provider: "cline" }));
+  expect(invalid).not.toContain("href=");
+});
+
 describe("Codex device sign-in UI", () => {
   it("offers browser SSO and a one-time code on the server computer", async () => {
     const host = document.createElement("div");
@@ -218,5 +230,28 @@ describe("Grok Build device sign-in UI", () => {
     expect(html).toContain(line);
     expect(html).not.toContain(grok.userCode);
     expect(html).not.toContain("href=");
+  });
+});
+
+describe("hosted Kimi and Cursor account setup", () => {
+  it("shows Kimi's native device code without a terminal handoff", () => {
+    expect(deviceSignInProvider("kimiAgent")).toBe("kimi");
+    const html = renderToStaticMarkup(createElement(DeviceSignInProgress, { provider: "kimi", auth: {
+      ...waiting, authorizationUrl: "https://www.kimi.ai/code/authorize_device?user_code=ABCD-EFGH", userCode: "ABCD-EFGH",
+    } }));
+    expect(html).toContain("ABCD-EFGH");
+    expect(html).toContain('href="https://www.kimi.ai/code/authorize_device?user_code=ABCD-EFGH"');
+    expect(html).not.toMatch(/ChatGPT|terminal/i);
+  });
+
+  it("shows Cursor's browser link without inventing a device code", () => {
+    expect(deviceSignInProvider("cursorAgent")).toBe("cursor");
+    const authorizationUrl = "https://cursor.com/loginDeepControl?challenge=abcdefghijklmnopqrstuvwxyz12345678901234567&uuid=12345678-1234-1234-1234-123456789012&mode=login&redirectTarget=cli&supportsSelectedTeamLogin=true";
+    const html = renderToStaticMarkup(createElement(DeviceSignInProgress, { provider: "cursor", auth: { ...waiting, authorizationUrl, userCode: undefined } }));
+    expect(html).toContain("https://cursor.com/loginDeepControl");
+    expect(html).not.toContain("Copy sign-in code");
+    expect(html).not.toMatch(/ChatGPT|terminal/i);
+    const invalid = renderToStaticMarkup(createElement(DeviceSignInProgress, { provider: "cursor", auth: { ...waiting, authorizationUrl: authorizationUrl + "&token=private" } }));
+    expect(invalid).not.toContain("href=");
   });
 });

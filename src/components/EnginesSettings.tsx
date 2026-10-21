@@ -17,6 +17,9 @@ import { AddClaudeAccount, ClaudeAccountSettings } from "./ClaudeAccountSettings
 import { AddProviderAccount, CodexAccountSettings } from "./CodexAccountSettings";
 import { DEVICE_SIGN_IN_COPY, deviceSignInProvider } from "./DeviceSignIn";
 import { AntigravityFreeSpace } from "./AntigravityFreeSpace";
+import { providerAccountForm } from "../../shared/provider-account-setup";
+import { ProviderAccountSetup } from "./ProviderAccountSetup";
+import { ApiKeyRow, OpenCodeProviderKeys } from "./ApiKeys";
 
 interface ProbeResult {
   ok: boolean;
@@ -271,7 +274,9 @@ function EngineRow({ instance }: { instance: InstanceInfo }) {
     <EngineCard instance={instance}>
       {policyNote}
       {!engineReady(instance) && <EngineSetup instance={instance} intent={needsConfiguredRoute(instance) ? "cloud" : instance.access === "custom" ? "inject" : "cloud"} unframed />}
-      {engineReady(instance) && <ApiKeyEngineManage instance={instance} className="mt-3" />}
+      {engineReady(instance) && (providerAccountForm(instance.driverKind, instance.instanceId)
+        ? <details className="mt-3"><summary className="cursor-pointer text-[12px] text-ink-secondary">{t("engineSetup.account.change")}</summary><ProviderAccountSetup instance={instance} /></details>
+        : <ApiKeyEngineManage instance={instance} className="mt-3" />)}
       {instance.snapshot.update && <EngineUpdateNotice update={instance.snapshot.update} instance={instance} className="mt-3" />}
       {instance.snapshot.warning && <EngineWarningNotice warning={instance.snapshot.warning} className="mt-3" />}
       {instance.claudeAccount && <ClaudeAccountSettings instance={instance} />}
@@ -291,6 +296,10 @@ function EngineRow({ instance }: { instance: InstanceInfo }) {
           <AddProviderAccount antigravityInstanceId={instance.instanceId} />
         </div>
       )}
+      {instance.driverKind === "opencodeGo" && instance.snapshot.state === "available" && <details className="mt-3">
+        <summary className="cursor-pointer text-[12px] text-ink-secondary">{t("engineSetup.account.providerKeys")}</summary>
+        <div className="mt-3 space-y-3"><ApiKeyRow section="opencodeGo" /><OpenCodeProviderKeys /></div>
+      </details>}
       {instance.driverKind === "claudeAgent" && instance.access !== "custom" && (
         <div className="mt-3"><AddClaudeAccount /></div>
       )}

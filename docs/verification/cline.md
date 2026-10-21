@@ -1,7 +1,9 @@
 # Cline engine
 
-Install the standalone Cline CLI (`npm install -g cline`) and run `cline auth`
-in a terminal to choose its provider, model and account. OpenMausBot's **Cline**
+In Settings, install Cline on the server and start **Sign in to Cline**. Open
+the official browser link and approve its one-time code. Compatible provider
+URL, model and API-key setup is also available in the card. `cline auth` is
+an optional terminal alternative. Hattera's **Cline**
 model provider uses **Cline default (configured)**; provider/model selection
 stays in Cline. A missing CLI or unconfigured account remains unavailable.
 Use **Set CLI** for a wrapper with `--config` or `--data-dir` when needed.

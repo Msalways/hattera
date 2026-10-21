@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { openExternalLink } from "@/lib/app-links";
 import { useCopyFeedback } from "@/lib/copy-text";
 import type { LocaleKey } from "@/locales";
-import { codexBrowserSignInLink, deviceSignInLink, isDeviceSignInCode, type DeviceSignInProvider } from "../../shared/device-sign-in";
+import { codexBrowserSignInLink, cursorBrowserSignInLink, deviceSignInLink, isDeviceSignInCode, type DeviceSignInProvider } from "../../shared/device-sign-in";
 import { CodexMark } from "./ProviderIcons";
 
 export interface DeviceSignInStatus {
@@ -24,11 +24,32 @@ export interface DeviceSignInStatus {
 
 /** Whose page an engine's device code is entered at. */
 export function deviceSignInProvider(driverKind: string): DeviceSignInProvider {
-  return driverKind === "grokAgent" ? "grok" : "codex";
+  return driverKind === "grokAgent" ? "grok" : driverKind === "clineAgent" ? "cline" : driverKind === "kimiAgent" ? "kimi" : driverKind === "cursorAgent" ? "cursor" : "codex";
 }
 
 /** The words that differ by whose account the code signs in. */
 export const DEVICE_SIGN_IN_COPY: Record<DeviceSignInProvider, Record<"description" | "start" | "enterCode" | "open" | "security" | "connected" | "connectedAccount" | "failed" | "invalidChallenge", LocaleKey>> = {
+  kimi: {
+    description: "engineSetup.kimi.description", start: "engineSetup.kimi.start", enterCode: "engineSetup.kimi.enterCode",
+    open: "engineSetup.kimi.open", security: "engineSetup.kimi.security", connected: "engineSetup.kimi.connected",
+    connectedAccount: "engineSetup.kimi.connectedAccount", failed: "engineSetup.kimi.failed", invalidChallenge: "engineSetup.kimi.invalidChallenge",
+  },
+  cursor: {
+    description: "engineSetup.cursor.description", start: "engineSetup.cursor.start", enterCode: "engineSetup.cursor.enterCode",
+    open: "engineSetup.cursor.open", security: "engineSetup.cursor.security", connected: "engineSetup.cursor.connected",
+    connectedAccount: "engineSetup.cursor.connectedAccount", failed: "engineSetup.cursor.failed", invalidChallenge: "engineSetup.cursor.invalidChallenge",
+  },
+  cline: {
+    description: "engineSetup.cline.description",
+    start: "engineSetup.cline.start",
+    enterCode: "engineSetup.cline.enterCode",
+    open: "engineSetup.cline.open",
+    security: "engineSetup.cline.security",
+    connected: "engineSetup.cline.connected",
+    connectedAccount: "engineSetup.cline.connectedAccount",
+    failed: "engineSetup.cline.failed",
+    invalidChallenge: "engineSetup.cline.invalidChallenge",
+  },
   codex: {
     description: "engineSetup.device.description",
     start: "engineSetup.device.start",
@@ -84,24 +105,25 @@ export function DeviceSignInProgress({ auth, browserPkce = false, provider = "co
   // The code stays select-all, so one click selects it for Cmd/Ctrl+C when copying is blocked.
   const { state: codeCopy, copy: copyCode } = useCopyFeedback(auth.userCode ?? "");
   const copy = DEVICE_SIGN_IN_COPY[provider];
-  const link = browserPkce ? chatgptPlanLink(auth.authorizationUrl) : deviceSignInLink(provider, auth.authorizationUrl, auth.userCode);
+  const linkOnly = provider === "cursor";
+  const link = browserPkce ? chatgptPlanLink(auth.authorizationUrl) : linkOnly ? cursorBrowserSignInLink(auth.authorizationUrl) : deviceSignInLink(provider, auth.authorizationUrl, auth.userCode);
   const copyLabel = t(codeCopy === "failed" ? "common.copyFailed" : "engineSetup.device.copyCode");
 
   if (auth.phase !== "waiting") {
     const label = auth.phase === "succeeded" ? t(copy.connected)
-      : auth.phase === "cancelled" ? t(browserPkce ? "engineSetup.chatgpt.cancelled" : "engineSetup.device.cancelled")
-      : auth.phase === "expired" ? t(browserPkce ? "engineSetup.chatgpt.expired" : "engineSetup.device.expired")
+      : auth.phase === "cancelled" ? t(linkOnly ? "engineSetup.account.cancelled" : browserPkce ? "engineSetup.chatgpt.cancelled" : "engineSetup.device.cancelled")
+      : auth.phase === "expired" ? t(linkOnly ? "engineSetup.account.expired" : browserPkce ? "engineSetup.chatgpt.expired" : "engineSetup.device.expired")
       : auth.message || t(browserPkce ? "engineSetup.chatgpt.failed" : copy.failed);
     return <p role="status" className={auth.phase === "succeeded" ? "text-[12px] text-success" : "text-[12px] text-ink-secondary"}>{label}</p>;
   }
 
-  if (!link || (!browserPkce && !isDeviceSignInCode(provider, auth.userCode))) {
+  if (!link || (!browserPkce && !linkOnly && !isDeviceSignInCode(provider, auth.userCode))) {
     return <p role="alert" className="text-[12px] text-danger">{t(browserPkce ? "engineSetup.chatgpt.invalidChallenge" : copy.invalidChallenge)}</p>;
   }
 
   return (
     <div className="space-y-2 rounded-lg border border-hairline/50 bg-app p-3">
-      {!browserPkce && <><p className="text-[12px] text-ink-secondary">{t(copy.enterCode)}</p>
+      {!browserPkce && !linkOnly && <><p className="text-[12px] text-ink-secondary">{t(copy.enterCode)}</p>
       <div className="flex items-center justify-between gap-2 rounded-lg bg-inset px-3 py-2">
         <code className="select-all font-mono text-lg font-semibold tracking-widest text-ink">{auth.userCode}</code>
         <button
@@ -124,7 +146,7 @@ export function DeviceSignInProgress({ auth, browserPkce = false, provider = "co
         <Loader2 size={12} className="animate-spin" /> {t("engineSetup.device.waiting")}
       </p>
       {auth.expiresAt && Number.isFinite(Date.parse(auth.expiresAt)) && (
-        <p className="text-[11px] text-ink-secondary">{t(browserPkce ? "engineSetup.chatgpt.expires" : "engineSetup.device.expires", { time: new Date(auth.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })}</p>
+        <p className="text-[11px] text-ink-secondary">{t(browserPkce || linkOnly ? "engineSetup.chatgpt.expires" : "engineSetup.device.expires", { time: new Date(auth.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })}</p>
       )}
       <p className="text-[11px] leading-relaxed text-ink-secondary">{t(browserPkce ? "engineSetup.chatgpt.security" : copy.security)}</p>
     </div>

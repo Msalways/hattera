@@ -505,7 +505,14 @@ const support: AcpSupport = {
   resolveModels: (env) => mergeLocalInject(readKimiModelCatalog(env), env),
   defaultCli: "kimi",
   nativeSource: "kimi.acp",
-  loginNote: "Kimi Code CLI is not signed in — run `kimi login` in a terminal",
+  loginNote: "Kimi Code CLI is not signed in. Choose Sign in to Kimi in model provider setup.",
+  deviceSignIn: {
+    provider: "kimi", product: "Kimi", account: "Kimi", authHost: "Kimi's authorization service",
+    homeEnv: "KIMI_CODE_HOME", homeDir: ".kimi-code", loginArgs: ["login"], suppressBrowser: true,
+    install: "Install Kimi in model provider setup, then try again.",
+    failure: () => "Kimi sign-in did not finish. Check the server's connection and try again.",
+    signedIn: (env) => existsSync(credentialsPath(env)),
+  },
 
   // Official installers put the binary on PATH without requiring an existing
   // Node install. Keep the commands platform-specific so Windows never gets a

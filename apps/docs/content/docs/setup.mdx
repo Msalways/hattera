@@ -30,7 +30,27 @@ The server needs outbound HTTPS to download CLIs and complete provider sign-in. 
 
 For Codex, choose **Browser sign-in** or **One-time code** in the web app. Browser sign-in opens OpenAI's page. On a local Docker deployment, Compose forwards the CLI's `127.0.0.1:1455` callback automatically. When you open Hattera from another computer, the final localhost page may fail to load there; copy its complete address into **Final browser address** in Hattera to finish on the server. The server accepts only the callback for the sign-in you started. The one-time-code method may need enabling in ChatGPT security or workspace settings. Both methods require outbound HTTPS from the server. See [OpenAI's authentication guide](https://learn.chatgpt.com/docs/auth) for provider requirements.
 
-Other providers use the method they expose: Claude offers a code to paste back into Hattera, Grok offers a one-time code, and Antigravity starts Google's browser flow. OpenCode, Cursor, Kimi, Droid, Cline, Hermes, Qwen, and pi use their own interactive account setup on the computer hosting Hattera. After installing Qwen, run `qwen` and choose `/auth`; after installing pi, run `pi` and choose `/login`. The card in **Model providers and accounts** shows the command and a setup guide. API providers such as OpenAI, xAI, OpenRouter, Mistral, MiniMax, Cerebras, and Groq use **Settings → API keys**. MiniMax checks the saved key when a model request runs; it has no separate non-billing key test in Hattera. For Qwen and pi, Hattera keeps an installed CLI in setup until it can see a configured model route. Installing a command does not grant access to a provider account.
+Every built-in engine has an account setup path in the browser. Install the engine from its card, then use its sign-in controls or credential form:
+
+| Engine | Account setup in Hattera |
+| --- | --- |
+| Claude | Open the provider link and paste its authorization code back |
+| Codex / ChatGPT plan | Browser sign-in or one-time code |
+| Grok, Kimi, Cline | Browser link and one-time code; Cline also offers compatible API credentials |
+| Cursor | Browser sign-in or Cursor API key |
+| Antigravity | Google browser sign-in |
+| OpenCode | Supported provider API keys; existing native accounts remain usable |
+| Droid | Factory API key |
+| Qwen, pi, Hermes | Compatible provider URL, model ID and API key |
+| Gemini CLI (optional enterprise/paid setup) | Gemini API key |
+| OpenAI, xAI, OpenRouter, Mistral, MiniMax, Cerebras, Groq, compatible API | API-key settings; no CLI required |
+| Amazon Bedrock | AWS region, enabled model/inference profile ID and Bedrock API key; no CLI required |
+
+These paths do not require access to a server terminal. Custom ACP engines still follow the external provider's own setup instructions. Existing native CLI sign-ins remain usable; optional vendor OAuth methods beyond those listed are not exposed by the compatible-provider forms.
+
+For Bedrock, Hattera sends text, images and tools through AWS's native Converse API. Replies currently arrive as complete messages. This setup supports Bedrock API keys; IAM key pairs and automatic role credentials are not implemented. Hattera lists the model ID you configure instead of claiming access to an unverified AWS catalog.
+
+MiniMax checks the saved key when a model request runs; it has no separate non-billing key test in Hattera. Qwen, pi and Hermes stay in setup until Hattera can see a configured model route. Saving credentials does not prove entitlement or billing access; the provider validates them when used.
 
 See [local deployment](https://github.com/Msalways/hattera/blob/main/deploy/local/README.md) for port changes, CLI login, pairing, and optional Tailscale Serve. Never commit `.env`.
 

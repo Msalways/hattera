@@ -19,6 +19,11 @@ const failure = (message: string, status: number) => Object.assign(new Error(mes
 export class ProviderAuthSessions {
   private readonly flows = new Map<string, Flow>();
 
+  isActive(instanceId: string): boolean {
+    const flow = this.flows.get(instanceId);
+    return Boolean(flow && (flow.busy || (!flow.revoked && flow.expiresAt > Date.now())));
+  }
+
   get active(): boolean {
     return [...this.flows.values()].some((flow) => flow.busy || (!flow.revoked && flow.expiresAt > Date.now()));
   }

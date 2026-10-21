@@ -226,6 +226,15 @@ export function hermesConfiguredModel(
   }
 
   const configuredProvider = configuredDefault?.provider.toLowerCase() ?? "";
+  if (configuredProvider === "custom:hattera" && configuredDefault?.model) {
+    try {
+      const stored = parseYaml(readFileSync(join(dir, "config.yaml"), "utf8"));
+      if (typeof stored?.providers?.hattera?.api_key === "string" && stored.providers.hattera.api_key.trim()) {
+        return { id: `custom:hattera:${configuredDefault.model}`, label: configuredDefault.model, custom: true };
+      }
+    } catch { /* incomplete custom setup */ }
+    return null;
+  }
   // The model/provider selected in config.yaml is the user's explicit routing
   // choice. A stale hosted key must not override an explicitly local setup.
   const configIsLocal =
@@ -456,7 +465,7 @@ const support: AcpSupport = {
   },
   pickAuthMethod: () => null,
   authFailure: "continue",
-  isAuthenticated: () => true,
+  isAuthenticated: async (env) => Boolean(hermesConfiguredModel(env)) || (await mergeLocalInject(EMPTY, env)).options.length > 0,
   async configureSession({ request, sessionId, turn }) {
     // Decode only — resolveTurnModel already wrote the named provider using
     // the instance HOME. Calling ensure* again here would hit process.env

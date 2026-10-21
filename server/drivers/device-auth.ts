@@ -7,9 +7,9 @@
 // controller.
 import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { realpathSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { basename, delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { deviceSignInPrompt, type DeviceSignInProvider } from "../../shared/device-sign-in.ts";
 import type { ProviderAuthenticationStart, ProviderAuthenticationStatus } from "../contracts.ts";
@@ -49,6 +49,13 @@ export interface DeviceSignIn {
    * sign-in at a time runs per home. */
   homeEnv: string;
   homeDir: string;
+  /** Resolve a CLI's explicit config/data flags to the same credential lock. */
+  credentialHome?(env: Env): string;
+  /** Some Linux CLIs crash if their automatic browser opener is absent.
+   * The browser UI opens the validated URL; only this login child gets a no-op opener. */
+  suppressBrowser?: boolean;
+  /** Fixed provider flags for suppressing its automatic browser opener. */
+  loginEnvironment?: Record<string, string>;
   loginArgs: readonly string[];
   /** CLI-specific safe challenge parser. Device code is the default. */
   prompt?(output: string): { authorizationUrl: string; userCode?: string } | null;
@@ -107,6 +114,7 @@ export class DeviceAuthController {
   private flow: Flow | null = null;
   private command: ChildProcess | null = null;
   private disposed = false;
+  private openerDirectory: string | undefined;
   private readonly spec: DeviceSignIn;
   private readonly options: DeviceAuthOptions;
 
@@ -119,7 +127,7 @@ export class DeviceAuthController {
   private home(env: Env, action: "signing in" | "signing out"): { home: string; homeKey: string } {
     const { homeEnv, homeDir, product } = this.spec;
     const home = env.HOME || env.USERPROFILE || homedir();
-    const named = env[homeEnv];
+    const named = this.spec.credentialHome?.(env) ?? env[homeEnv];
     if (!isAbsolute(home) || (named && !isAbsolute(named))) {
       throw new Error(`Use an absolute HOME and ${homeEnv} path for this server's ${product} provider before ${action}.`);
     }
@@ -198,6 +206,10 @@ export class DeviceAuthController {
     this.disposed = true;
     await this.cancel();
     this.flow = null;
+    if (this.openerDirectory) {
+      rmSync(this.openerDirectory, { recursive: true, force: true });
+      this.openerDirectory = undefined;
+    }
   }
 
   /** Remove the sign-in the CLI stores for this server account so a
@@ -310,7 +322,15 @@ export class DeviceAuthController {
     if (flow.status.phase !== "waiting") return;
     let child: ReturnType<typeof spawnCli>;
     try {
-      child = spawnCli(this.options.cli, args, { env: { ...env, NO_COLOR: "1" }, cwd, stdio: ["pipe", "pipe", "pipe"] });
+      const launchEnv: Env = { ...env, ...(parsePrompt ? this.spec.loginEnvironment : {}), NO_COLOR: "1" };
+      if (parsePrompt && this.spec.suppressBrowser && process.platform === "linux") {
+        if (!this.openerDirectory) {
+          this.openerDirectory = mkdtempSync(join(tmpdir(), "omb-auth-opener-"));
+          writeFileSync(join(this.openerDirectory, "xdg-open"), "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+        }
+        launchEnv.PATH = `${this.openerDirectory}${delimiter}${env.PATH ?? ""}`;
+      }
+      child = spawnCli(this.options.cli, args, { env: launchEnv, cwd, stdio: ["pipe", "pipe", "pipe"] });
     } catch {
       this.finish(flow, "failed", `${product} could not start on this server. Install or update the configured ${product} CLI, then try again.`);
       return;

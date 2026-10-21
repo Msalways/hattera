@@ -1,4 +1,4 @@
-# Provider setup audit — 20 October 2026
+# Provider setup audit — 21 October 2026
 
 Scope: every built-in provider driver and the browser Settings path. The evidence uses an isolated server and fake CLIs or local API substitutes. No live account or user data was imported.
 
@@ -12,7 +12,7 @@ Scope: every built-in provider driver and the browser Settings path. The evidenc
 
    ![Isolated Codex sign-in choices](../../output/playwright/hattera-codex-auth-options.png)
 
-3. Expand installed Qwen with no configured provider. It remains in setup, shows the `qwen` first-run action, and links its setup guide. This check is in the built-app browser smoke.
+3. Expand installed Qwen with no configured provider. It remains in setup and offers provider URL, model and API-key inputs. A terminal command does not count as a hosted setup path.
 
    ![Isolated Qwen setup card](../../output/playwright/hattera-qwen-setup.png)
 
@@ -28,16 +28,22 @@ Scope: every built-in provider driver and the browser Settings path. The evidenc
 | Codex and ChatGPT plan | Server install; browser OAuth locally or one-time code remotely | Isolated HTTP method and network tests; browser choice check |
 | Grok CLI | Server install; in-app code | Device-flow tests and component tests |
 | Antigravity | Managed server install; Google browser flow | Managed installer and auth tests |
-| OpenCode | Server install; provider login in its CLI, or supported provider key | Browser ACP reply and provider card; key-flow tests |
-| Cursor, Hermes | Official server installers; vendor CLI setup | Local installer substitutes and install verification |
-| Kimi, Droid, Cline | Server npm installer; vendor CLI setup | Loopback npm installer regression and setup component tests; public Cline 3.0.73 install in disposable Docker container |
-| Qwen, pi | Server npm installer; `qwen` → `/auth` or `pi` → `/login` | Installer regression; Qwen signed-out browser state and catalog tests; pi driver tests |
-| Gemini CLI (optional) | Server npm installer; `gemini` for enterprise or paid API-key access | Installer regression and credential-shape tests; no live enterprise account |
+| OpenCode | Server install; supported provider keys in its Settings card; existing native accounts retained | Browser ACP reply and provider card; key-flow tests |
+| Cursor | Official server installer; in-app browser sign-in or Cursor API key | Shared login controller, strict vendor-link validation and component checks |
+| Kimi, Cline | Server npm installer; in-app device sign-in; Cline also supports compatible API setup | Native prompt validation, private login lifecycle and component checks; Cline confirmation/failure/cancellation regressions |
+| Droid | Server npm installer; Factory API-key form | Fixed credential mapping and setup component tests |
+| Qwen, pi, Hermes | Server npm or official installer; provider URL, model and key form | Native configuration preservation, discovery and setup component tests |
+| Gemini CLI (optional) | Server npm installer; Gemini API-key form | Fixed credential mapping, component and credential-shape tests; no live enterprise account |
+| Amazon Bedrock | No installer; region, model/inference profile ID and Bedrock API-key form | Isolated HTTP setup/private-key checks; local native Converse reply, image/tool translation and cancellation tests |
 | OpenAI, Claude API key, xAI, OpenRouter, Mistral, Cerebras, Groq, compatible API | Settings API-key form; configured-key status and provider test | Provider key-flow and check tests; registry access-override regression |
 | MiniMax API | Settings API-key form; configured-key status; optional legacy MiniMax CLI key | Isolated key-flow and driver tests; no separate read-only provider test |
 | Custom ACP | User-supplied command and provider-owned account setup | Generic ACP runtime tests; no universal authentication protocol |
 
-The registry previously dropped each instance's configured access type from `/api/instances`. Settings therefore could treat an API-key instance as a subscription provider even though runtime routing used the configured type. The registry now preserves the override in descriptions and replaces it when the instance changes. Qwen and pi previously treated an installed executable as ready without a configured model route. Their readiness now depends on a discovered route. Gemini, Qwen, and pi now advertise their interactive first-run command. A built-in-driver contract test rejects future CLI providers with no setup action.
+The built-in-driver contract now requires a browser account form, a native in-app login controller, or managed app setup. A terminal command alone cannot satisfy the check. Configured access types are preserved, and Qwen, pi and Hermes readiness requires a usable route. Key fields are write-only; account updates are admin-scoped and blocked during active provider work or sign-in. Existing provider files are preserved, and malformed documents are not overwritten.
+
+Cline's CLI attempts to launch `xdg-open` during device sign-in. In a headless Linux container this can crash after publishing a valid code. Hattera supplies a private no-op browser launcher only to the explicit login child; the browser app opens the validated official link. Cursor uses its supported `NO_OPEN_BROWSER` flag. Starting a flow never pre-authorizes the user's account.
+
+Bedrock uses native Converse with one explicitly configured model or inference profile. The API-key path does not implement IAM role credentials, automatic model discovery or incremental streaming. Existing native vendor accounts remain usable, but the new compatible-provider forms do not implement every optional OAuth method offered by the vendor CLIs.
 
 On 20 October 2026, a disposable Linux container downloaded Cline 3.0.73 from the public npm registry through Hattera's server API. The install request returned promptly, status polling reached verified success, and the installed CLI answered `--version` as the non-root app user. This proves public registry access for Cline in that Docker environment; other vendor downloads and account sign-ins remain deployment-specific.
 

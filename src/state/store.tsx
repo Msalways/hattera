@@ -857,6 +857,8 @@ export interface EngineInstall {
 
 /** One row of GET /api/instances — the model picker's data. */
 export interface InstanceInfo {
+  /** Public setup defaults only; credentials are write-only. */
+  accountSetup?: { region?: string; model?: string };
   instanceId: string;
   driverKind: string;
   displayName: string;

@@ -12,10 +12,12 @@ on:
       - .dockerignore
       - deploy/**
       - server/**
+      - shared/**
       - src/**
       - enterprise/**
       - scripts/bundle-server.mjs
       - scripts/testing/verify-public-provider-installs.mjs
+      - scripts/testing/verify-public-provider-auth.mjs
       - package.json
       - pnpm-lock.yaml
       - .github/workflows/docker.yml
@@ -24,7 +26,11 @@ on:
       - Dockerfile
       - .dockerignore
       - deploy/**
+      - server/**
+      - shared/**
+      - src/**
       - scripts/testing/verify-public-provider-installs.mjs
+      - scripts/testing/verify-public-provider-auth.mjs
       - .github/workflows/docker.yml
 
 permissions:
@@ -66,6 +72,12 @@ jobs:
             done
             docker cp scripts/testing/verify-public-provider-installs.mjs omb-install:/tmp/verify-public-provider-installs.mjs
             docker exec omb-install node /tmp/verify-public-provider-installs.mjs --"$group"
+            docker cp scripts/testing/verify-public-provider-auth.mjs omb-install:/tmp/verify-public-provider-auth.mjs
+            if [ "$group" = "npm" ]; then
+              docker exec omb-install node /tmp/verify-public-provider-auth.mjs claude codex-browser codex-device grok cline kimi
+            else
+              docker exec omb-install node /tmp/verify-public-provider-auth.mjs cursor antigravity
+            fi
             docker rm -fv omb-install
           done
       - name: Prove the image finds its enterprise layer
