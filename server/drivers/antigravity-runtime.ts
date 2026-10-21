@@ -402,34 +402,60 @@ async function installOnce(options: AntigravityInstallOptions): Promise<Antigrav
     const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
     timeout.unref?.();
     try {
-      const response = await (options.fetchImpl ?? fetch)(asset.url, { signal: controller.signal, redirect: "follow" });
-      if (!response.ok || !response.body) throw new Error(`Google download failed (${response.status}).`);
-      const finalUrl = new URL(response.url || asset.url);
-      if (finalUrl.protocol !== "https:" || finalUrl.hostname !== "dl.google.com") {
-        throw new Error("The Antigravity download redirected outside dl.google.com.");
-      }
-      const encoding = response.headers.get("content-encoding")?.trim().toLowerCase();
-      const length = response.headers.get("content-length");
-      if ((!encoding || encoding === "identity") && length && Number(length) !== asset.archiveBytes) {
-        throw new Error("The Antigravity download size did not match the pinned release.");
-      }
       const handle = await open(archivePath, "wx", 0o600);
-      const hash = createHash("sha256");
+      let hash = createHash("sha256");
       let downloaded = 0;
       try {
-        for await (const raw of response.body as unknown as AsyncIterable<Uint8Array>) {
-          const chunk = Buffer.from(raw);
-          if (downloaded + chunk.length > asset.archiveBytes) {
-            throw new Error("The Antigravity download exceeded its pinned size.");
+        for (let attempt = 0; attempt < 3 && downloaded < asset.archiveBytes; attempt++) {
+          let response: Response;
+          try {
+            response = await (options.fetchImpl ?? fetch)(asset.url, { signal: controller.signal, redirect: "follow",
+              headers: { "accept-encoding": "identity", ...(downloaded ? { range: `bytes=${downloaded}-` } : {}) } });
+          } catch {
+            if (controller.signal.aborted || attempt === 2) throw new Error("The Antigravity download was interrupted. Retry installation from Settings after checking this server's network access.");
+            continue;
           }
-          let offset = 0;
-          while (offset < chunk.length) {
-            const { bytesWritten } = await handle.write(chunk, offset, chunk.length - offset, null);
-            if (bytesWritten <= 0) throw new Error("The Antigravity download could not be written completely.");
-            offset += bytesWritten;
+          if (!response.ok || !response.body) throw new Error(`Google download failed (${response.status}).`);
+          const finalUrl = new URL(response.url || asset.url);
+          if (finalUrl.protocol !== "https:" || finalUrl.hostname !== "dl.google.com") {
+            throw new Error("The Antigravity download redirected outside dl.google.com.");
           }
-          hash.update(chunk);
-          downloaded += chunk.length;
+          if (response.status === 206) {
+            if (response.headers.get("content-range") !== `bytes ${downloaded}-${asset.archiveBytes - 1}/${asset.archiveBytes}`) {
+              throw new Error("The Antigravity download returned an unexpected byte range. Nothing was installed.");
+            }
+          } else if (downloaded) {
+            // A server that ignores Range must restart, never append a second archive.
+            await handle.truncate(0);
+            downloaded = 0;
+            hash = createHash("sha256");
+          }
+          const encoding = response.headers.get("content-encoding")?.trim().toLowerCase();
+          const length = response.headers.get("content-length");
+          if ((!encoding || encoding === "identity") && length && Number(length) !== asset.archiveBytes - downloaded) {
+            throw new Error("The Antigravity download size did not match the pinned release.");
+          }
+          const reader = response.body.getReader();
+          try {
+            for (;;) {
+              let result: Awaited<ReturnType<typeof reader.read>>;
+              try { result = await reader.read(); } catch { break; }
+              if (result.done) break;
+              const chunk = Buffer.from(result.value);
+              if (downloaded + chunk.length > asset.archiveBytes) throw new Error("The Antigravity download exceeded its pinned size.");
+              let offset = 0;
+              while (offset < chunk.length) {
+                const { bytesWritten } = await handle.write(chunk, offset, chunk.length - offset, downloaded + offset);
+                if (bytesWritten <= 0) throw new Error("The Antigravity download could not be written completely.");
+                offset += bytesWritten;
+              }
+              hash.update(chunk);
+              downloaded += chunk.length;
+            }
+          } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+          if (downloaded < asset.archiveBytes && (controller.signal.aborted || attempt === 2)) {
+            throw new Error("The Antigravity download was interrupted. Retry installation from Settings after checking this server's network access.");
+          }
         }
       } finally {
         await handle.close();
@@ -438,6 +464,7 @@ async function installOnce(options: AntigravityInstallOptions): Promise<Antigrav
         throw new Error("The Antigravity download failed its SHA-256 or size check. Nothing was installed.");
       }
     } finally {
+      controller.abort();
       clearTimeout(timeout);
     }
     await extractPinnedArchive(archivePath, runtimeDirectory, asset);

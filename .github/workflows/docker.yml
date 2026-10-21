@@ -57,6 +57,14 @@ jobs:
           # the renderer is served by the server itself (OMB_STATIC_DIR)
           docker exec omb curl -sf http://127.0.0.1:8799/ | grep -qi "<html" || { docker logs omb; echo "UI not served"; exit 1; }
           docker logs omb | tail -5
+      - name: Stop provider helpers in a container without a reaping init
+        run: |
+          set -euo pipefail
+          docker exec omb mkdir -p /tmp/provider-process/server /tmp/provider-process/scripts/testing
+          docker cp server/procs.ts omb:/tmp/provider-process/server/procs.ts
+          docker cp server/env-path.ts omb:/tmp/provider-process/server/env-path.ts
+          docker cp scripts/testing/verify-provider-process-stop.ts omb:/tmp/provider-process/scripts/testing/verify-provider-process-stop.ts
+          docker exec omb node --experimental-strip-types /tmp/provider-process/scripts/testing/verify-provider-process-stop.ts
       - name: Install every offered provider through the running server API
         run: |
           set -euo pipefail

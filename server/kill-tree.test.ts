@@ -4,6 +4,7 @@
 // survive the kill on either platform.
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
 import type { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 
@@ -25,6 +26,10 @@ function reportedPid(stdout: Readable): Promise<number> {
 function alive(pid: number): boolean {
   try {
     process.kill(pid, 0);
+    if (process.platform === "linux") {
+      const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+      if (/^[ZX]\s/.test(stat.slice(stat.lastIndexOf(")") + 2))) return false;
+    }
     return true;
   } catch {
     return false;
@@ -67,8 +72,8 @@ describe("killCliTree", () => {
       await expect(killCliTree(parent)).resolves.toBe(true);
 
       // Read the parent's death off the child object: a POSIX parent stays a
-      // live pid as a zombie until Node reaps it. The grandchild has no Child
-      // object here, so wait until its pid disappears as the observable proof.
+      // pid as a zombie until reaped. A zombie cannot execute; it also
+      // counts as stopped when a container's PID 1 does not reap orphans.
       const exited = () => parent.exitCode !== null || parent.signalCode !== null;
       const deadline = Date.now() + 10_000;
       while ((alive(grandchild) || !exited()) && Date.now() < deadline) {

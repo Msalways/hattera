@@ -498,7 +498,7 @@ describe("official Antigravity runtime", () => {
     })).rejects.toThrow(/redirected outside/u);
   });
 
-  it("coalesces, verifies, extracts, and reuses a pinned download without touching another install", async () => {
+  it.each(["complete", "resume", "restart"] as const)("coalesces, verifies, extracts and reuses a pinned download (%s)", async (mode) => {
     const baseDir = mkdtempSync(join(tmpdir(), "omb-antigravity-install-"));
     scratch.push(baseDir);
     const versions = join(baseDir, "tools", "antigravity-acp", `${process.platform}-${process.arch}`, "versions");
@@ -523,8 +523,19 @@ describe("official Antigravity runtime", () => {
     const options = {
       baseDir,
       asset,
-      fetchImpl: async () => {
+      fetchImpl: async (_url: string | URL | Request, init?: RequestInit) => {
         fetches += 1;
+        const cut = Math.floor(archive.length / 2);
+        if (mode !== "complete" && fetches === 1) {
+          let sent = false;
+          return new Response(new ReadableStream<Uint8Array>({ pull(controller) {
+            if (sent) controller.error(new TypeError("terminated"));
+            else { sent = true; controller.enqueue(archive.subarray(0, cut)); }
+          } }), { headers: { "content-length": String(archive.length) } });
+        }
+        if (mode !== "complete") expect(new Headers(init?.headers).get("range")).toBe(`bytes=${cut}-`);
+        if (mode === "resume") return new Response(archive.subarray(cut), { status: 206,
+          headers: { "content-length": String(archive.length - cut), "content-range": `bytes ${cut}-${archive.length - 1}/${archive.length}` } });
         return new Response(archive, { headers: { "content-length": String(archive.length) } });
       },
       validate: async () => { validations += 1; },
@@ -535,10 +546,26 @@ describe("official Antigravity runtime", () => {
     expect(readFileSync(installed.executablePath, "utf8")).toBe("#!/bin/sh\nexit 0\n");
     expect(readFileSync(installed.harnessPath, "utf8")).toBe("#!/bin/sh\nexit 0\n");
     await installAntigravityRuntime(options);
-    expect(fetches).toBe(1);
+    expect(fetches).toBe(mode === "complete" ? 1 : 2);
     expect(validations).toBe(2);
     expect(readFileSync(otherFile, "utf8")).toBe("another app process is still installing");
     expect(readdirSync(versions).filter((name) => name.startsWith(".install-"))).toEqual([".install-other-active"]);
+  });
+
+  it.each(["network", "wrong-range"] as const)("bounds failed downloads and refuses invalid resume metadata (%s)", async (mode) => {
+    const baseDir = mkdtempSync(join(tmpdir(), "omb-antigravity-download-failure-"));
+    scratch.push(baseDir);
+    const asset: AntigravityReleaseAsset = { version: "failed-download", url: "https://dl.google.com/fixture.zip",
+      sha256: "00".repeat(32), archiveBytes: 2, executable: { name: "agy_acp_server.par", bytes: 1 }, harness: { name: "localharness_external", bytes: 1 } };
+    let attempts = 0;
+    await expect(installAntigravityRuntime({ baseDir, asset, fetchImpl: async () => {
+      attempts++;
+      if (mode === "network") throw new TypeError("private network diagnostic");
+      return new Response(new Uint8Array([0]), { status: 206, headers: { "content-range": "bytes 1-1/2", "content-length": "1" } });
+    } })).rejects.toThrow(mode === "network" ? "download was interrupted" : "unexpected byte range");
+    expect(attempts).toBe(mode === "network" ? 3 : 1);
+    const versions = join(baseDir, "tools", "antigravity-acp", `${process.platform}-${process.arch}`, "versions");
+    expect(readdirSync(versions)).toEqual([]);
   });
 
   it("isolates profiles by instance and strips ambient Google credentials", async () => {

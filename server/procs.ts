@@ -18,7 +18,7 @@ import {
   type ExecFileOptions,
   type SpawnOptions,
 } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { Readable, Writable } from "node:stream";
 import { join } from "node:path";
 import { resolveCliSpawn, type ResolvedSpawn } from "./env-path.ts";
@@ -164,6 +164,25 @@ async function stopCliTree(child: ChildProcess, pid: number, timeoutMs: number):
       if (!group) return true;
       try {
         process.kill(-pid, 0);
+        // A container without a reaping init can retain dead helpers as
+        // zombies. They cannot run or write credentials, but kill(0) still
+        // sees their group. Confirm every member is dead before releasing it.
+        if (process.platform === "linux") {
+          try {
+            for (const entry of readdirSync("/proc")) {
+              if (!/^\d+$/.test(entry)) continue;
+              let stat: string;
+              try { stat = readFileSync(`/proc/${entry}/stat`, "utf8"); }
+              catch (error) {
+                if ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as NodeJS.ErrnoException).code === "ESRCH") continue;
+                return false;
+              }
+              const fields = stat.slice(stat.lastIndexOf(")") + 2).trim().split(/\s+/);
+              if (Number(fields[2]) === pid && fields[0] !== "Z" && fields[0] !== "X") return false;
+            }
+            return true;
+          } catch { return false; }
+        }
         return false;
       } catch (error) {
         // EPERM and other failures do not prove that the group is gone.

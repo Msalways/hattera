@@ -2,6 +2,14 @@
 
 Scope: every built-in provider driver and the browser Settings path. The evidence uses an isolated server and fake CLIs or local API substitutes. No live account or user data was imported.
 
+## 21 October verification results
+
+- 202 focused provider/setup tests passed; the built-app Edge smoke passed all 23 checks. Typechecks, lint, locale validation, web image build and public docs build passed.
+- In a separate Docker container with an empty credential home, real Cline 3.0.73, Claude Code 2.1.304 and Codex 0.163.0 obtained official authorization challenges. Cline, Claude, Codex browser sign-in and Codex device sign-in each stayed waiting, cancelled, and restarted successfully. No account was authorized. These CLIs came from the image; this is authentication evidence, not installation evidence.
+- The separate ENGINES-empty public installation attempt encountered sustained slow vendor downloads. Cursor timed out after 30 minutes; Antigravity's download terminated. No complete public installation matrix is claimed for that attempt. npm logs are retained locally under `output/provider-install-attempt-logs/`.
+- Cursor's timeout exposed zombie-only Linux process groups being mistaken for active installers. The shared process-stop check now confirms whether any group member can still execute. The Docker regression runs without a reaping init and proves both a live root and an already exited root can have their stubborn helpers stopped, with safe repeated stops. Windows process-stop regressions also passed.
+- Antigravity's pinned download now resumes interrupted transfers with validated HTTP byte ranges, retries at most three times within its existing deadline, restarts safely if the host ignores Range, and retains the pinned SHA-256 and size checks. Regressions cover complete, resumed and restarted extraction, invalid ranges and exhausted network retries. This is recovery evidence using a local substitute, not a claim that the public download succeeded on this network.
+
 ## Browser evidence
 
 1. Open **Settings → Model providers and accounts**. The isolated OpenCode card shows a runnable provider and its status; the fixture account and model are illustrative. The browser smoke also checks the model picker and an ACP reply.
