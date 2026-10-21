@@ -19,13 +19,18 @@ export interface BrandStatus {
   notice?: string;
 }
 
-export const DEFAULT_BRAND: Brand = { name: "OpenMausBot" };
+export const DEFAULT_BRAND: Brand = { name: "Hattera", logo: "/hattera-mark.svg", favicon: "/hattera-mark.svg" };
 
 let current: BrandStatus = { brand: DEFAULT_BRAND, source: "default", file: "" };
 
 /** The brand in effect. Stable after bootstrap; a changed brand.json needs a reload. */
 export function brand(): Brand {
   return current.brand;
+}
+
+/** Keep the desktop release identity while using the active server brand in a browser. */
+export function appDisplayName(): string {
+  return typeof window !== "undefined" && window.ogb?.platform ? "OpenMausBot" : brand().name;
 }
 
 export function brandStatus(): BrandStatus {

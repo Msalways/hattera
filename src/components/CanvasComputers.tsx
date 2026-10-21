@@ -4,6 +4,7 @@ import { Box, ExternalLink, Loader2, Monitor, Plus, RefreshCw, X } from "lucide-
 import { api, useStore } from "@/state/store";
 import type { TeamComputer } from "../../shared/team-computer";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { appDisplayName } from "@/lib/brand";
 
 const control = "rounded-lg px-3 py-2 text-[12px] text-ink-secondary hover:bg-control hover:text-ink disabled:opacity-40";
 const field = "w-full rounded-lg border border-hairline/60 bg-inset px-3 py-2 text-[12px] text-ink outline-none focus:border-accent";
@@ -267,7 +268,7 @@ export function CanvasComputers({ open, createRequest, drop, sections, onClose, 
     <ConfirmDialog open={assignment !== null} tone="neutral" title={assignment?.section === null ? `Unassign ${assignment?.computer.name ?? "computer"}?` : `Assign ${assignment?.computer.name ?? "computer"} to ${assignment?.section || "General"}?`}
       body={assignment?.section === null
         ? "This removes the team default. It does not stop or delete the machine, its files, or its logins. Review the bots' Auto routing before their next task."
-        : "Bots on Auto in this team will share this computer's files and signed-in accounts. Explicit bot computer settings stay unchanged. Only one bot can use the desktop at a time. This does not move the OpenMausBot server or enable 24/7 hosting."}
+        : `Bots on Auto in this team will share this computer's files and signed-in accounts. Explicit bot computer settings stay unchanged. Only one bot can use the desktop at a time. This does not move the ${appDisplayName()} server or enable 24/7 hosting.`}
       confirmLabel={assignment?.section === null ? "Unassign computer" : "Assign computer"} onCancel={cancelAssignment} onConfirm={() => {
         const target = assignment;
         if (!target) return;

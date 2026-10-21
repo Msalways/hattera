@@ -55,7 +55,7 @@ FROM node:24-bookworm-slim AS runtime
 # invokes sudo even as root, and this image deliberately does not ship sudo.
 # git + curl: agent CLIs shell out to git; curl backs the healthcheck
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl git \
+  && apt-get install -y --no-install-recommends ca-certificates curl git xz-utils \
     libxcb-shm0 libx11-xcb1 libx11-6 libxcb1 libxext6 libxrandr2 \
     libxcomposite1 libxcursor1 libxdamage1 libxfixes3 libxi6 libgtk-3-0 \
     libpangocairo-1.0-0 libpango-1.0-0 libatk1.0-0 libcairo-gobject2 \
@@ -75,8 +75,9 @@ ARG AGENT_BROWSER_VERSION=0.37.0
 ARG CHROME_CACHE_TAG=""
 # The global link must be the native binary for this platform (agent-browser's
 # postinstall points it there); the other platforms' binaries are never run.
-RUN echo "agent-browser ${AGENT_BROWSER_VERSION}, Chrome for Testing ${CHROME_CACHE_TAG:-Stable}" \
-  && npm install -g --cache /tmp/npm-cache agent-browser@${AGENT_BROWSER_VERSION} \
+RUN --mount=type=cache,target=/tmp/npm-cache \
+  echo "agent-browser ${AGENT_BROWSER_VERSION}, Chrome for Testing ${CHROME_CACHE_TAG:-Stable}" \
+  && npm install -g --cache /tmp/npm-cache --allow-scripts=agent-browser agent-browser@${AGENT_BROWSER_VERSION} \
   && mkdir -p /opt/openmausbot-browser \
   && if [ "$(dpkg --print-architecture)" = "arm64" ]; then \
        ln -s /usr/bin/chromium /opt/openmausbot-browser/chrome; \
@@ -89,7 +90,7 @@ RUN echo "agent-browser ${AGENT_BROWSER_VERSION}, Chrome for Testing ${CHROME_CA
   && [ "$(head -c 4 "$native")" = "$(printf '\177ELF')" ] \
   && for binary in "${native%/*}"/agent-browser-*; do [ "$binary" = "$native" ] || rm "$binary"; done \
   && agent-browser --version \
-  && rm -rf /tmp/npm-cache /tmp/node-compile-cache
+  && rm -rf /tmp/node-compile-cache
 # Keep the baked-in browser outside both root's private home and /data,
 # which may be an existing mounted volume. Session state still lives in HOME,
 # which each image sets after its last build step, so no build step writes
@@ -132,9 +133,13 @@ RUN if [ -n "$GROK_VERSION" ]; then \
 # not end up in the image or a customer's volume.
 ARG CLOUD_HOME_ENGINES="@anthropic-ai/claude-code @openai/codex"
 ARG ENGINES_CACHE_TAG=""
-RUN echo "engines: ${CLOUD_HOME_ENGINES:-none} ${ENGINES_CACHE_TAG}" \
-  && if [ -n "$CLOUD_HOME_ENGINES" ]; then HOME=/tmp/omb-build-home npm install -g $CLOUD_HOME_ENGINES; fi \
-  && rm -rf /tmp/omb-build-home /tmp/node-compile-cache
+RUN --mount=type=cache,target=/tmp/npm-cache \
+  set -eu; echo "engines: ${CLOUD_HOME_ENGINES:-none} ${ENGINES_CACHE_TAG}"; \
+  for pkg in $CLOUD_HOME_ENGINES; do \
+    script_pkg="${pkg%@*}"; [ -n "$script_pkg" ] || script_pkg="$pkg"; \
+    HOME=/tmp/omb-build-home npm install -g --cache /tmp/npm-cache --allow-scripts="$script_pkg" "$pkg"; \
+  done; \
+  rm -rf /tmp/omb-build-home /tmp/node-compile-cache
 COPY deploy/fly/Caddyfile /app/cloud/Caddyfile
 # The root supervisor runs /app's code and hands the server its secrets, so
 # no file there may be one `maus` can change: unlike the server image's, these
@@ -145,6 +150,7 @@ COPY --from=build /src/dist-native/duckdb ./duckdb-platforms
 RUN ln -s "duckdb-platforms/linux-$(node -p process.arch)" duckdb
 COPY --from=build /src/dist-server ./dist-server
 COPY --from=build /src/dist ./dist
+COPY --from=build /src/package.json ./package.json
 RUN export HOME=/tmp/omb-build-home \
  && chmod go-w /app/cloud /app/cloud/Caddyfile \
  && caddy version \
@@ -170,11 +176,17 @@ CMD ["node", "/app/dist-server/cloud-home-start.js"]
 FROM runtime AS server
 # Optional engine CLIs baked into the image (space-separated npm packages).
 ARG ENGINES=""
-RUN if [ -n "$ENGINES" ]; then HOME=/tmp/omb-build-home npm install -g $ENGINES && rm -rf /tmp/omb-build-home /tmp/node-compile-cache; fi
+RUN --mount=type=cache,target=/tmp/npm-cache \
+  set -eu; for pkg in $ENGINES; do \
+    script_pkg="${pkg%@*}"; [ -n "$script_pkg" ] || script_pkg="$pkg"; \
+    HOME=/tmp/omb-build-home npm install -g --cache /tmp/npm-cache --allow-scripts="$script_pkg" "$pkg"; \
+  done; \
+  rm -rf /tmp/omb-build-home /tmp/node-compile-cache
 COPY --from=build --chown=maus:maus /src/dist-native/duckdb ./duckdb-platforms
 RUN ln -s "duckdb-platforms/linux-$(node -p process.arch)" duckdb
 COPY --from=build --chown=maus:maus /src/dist-server ./dist-server
 COPY --from=build --chown=maus:maus /src/dist ./dist
+COPY --from=build --chown=maus:maus /src/package.json ./package.json
 # The default launcher starts Caddy on Render and only the server in local
 # Compose, which has its own Caddy service.
 COPY --from=edge /caddy /usr/local/bin/caddy

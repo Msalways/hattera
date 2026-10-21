@@ -152,6 +152,21 @@ describe("official ChatGPT plan OAuth", () => {
     await expect(fetch(url)).rejects.toThrow();
     expect(calls.filter((call) => call.path.endsWith("/token"))).toHaveLength(1);
   });
+  it("completes a remote browser callback only for the matching account flow", async () => {
+    const controller = create();
+    const flow = await begin(controller);
+    const callback = new URL(authorization.searchParams.get("redirect_uri")!);
+    callback.search = new URLSearchParams({ state: authorization.searchParams.get("state")!, code: "fixture-code", client_id: "oaiapp_fixture_account_1" }).toString();
+    for (const invalid of [
+      callback.href.replace("127.0.0.1", "foreign.invalid"),
+      callback.href.replace(authorization.searchParams.get("state")!, "wrong-state"),
+      callback.href + "&state=duplicate",
+    ]) await expect(controller.completeCallback(flow.flowId!, invalid)).rejects.toMatchObject({ status: 400 });
+    expect(calls).toHaveLength(0);
+    await expect(controller.completeCallback(flow.flowId!, callback.href)).resolves.toBeUndefined();
+    expect((await controller.snapshot()).authenticated).toBe(true);
+    expect(calls.filter((call) => call.path.endsWith("/token"))).toHaveLength(1);
+  });
   it("rejects malformed targets and foreign hosts without crashing or consuming the legitimate callback", async () => {
     const controller = create(); const flow = await begin(controller);
     const url = new URL(authorization.searchParams.get("redirect_uri")!);

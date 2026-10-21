@@ -389,6 +389,10 @@ export function verificationServerEnvironment(parentEnv: NodeJS.ProcessEnv, data
     childEnv.OMB_OPENAI_LIVE_URL = liveUrl;
     if (parentEnv.OMB_OPENAI_LIVE_KEY) childEnv.OMB_OPENAI_LIVE_KEY = parentEnv.OMB_OPENAI_LIVE_KEY;
   }
+  // An install fixture may point npm at an owned loopback registry. Never
+  // pass the launcher's normal registry or npm credentials into the child.
+  const npmRegistry = parentEnv.OMB_TEST_NPM_REGISTRY_URL?.trim() ?? "";
+  if (/^http:\/\/127\.0\.0\.1:\d{1,5}\/$/.test(npmRegistry)) childEnv.npm_config_registry = npmRegistry;
   // Voice-note e2e fault injection: arms the one-shot audio-append failure
   // prelude inside the fixture server (see fail-audio-append-once.mjs).
   if (parentEnv.OMB_TEST_FAIL_AUDIO_APPEND_ONCE) {
@@ -436,7 +440,7 @@ export async function launchVerificationServer(
   enterprise?: { dir: string; licenseKey: string },
   room?: { scripted: boolean },
   /** Optional repository-owned fake providers for multi-engine setup checks. */
-  extraProviders: Array<"codex" | "cline"> = [],
+  extraProviders: Array<"codex" | "cline" | "opencode" | "qwen" | "grok" | "kimi" | "droid" | "gemini"> = [],
   /** Programmatic tests only: an owned loopback Boat provider, never a live account. */
   boatFixtureApi?: string,
 ): Promise<VerificationServer> {
@@ -477,6 +481,23 @@ export async function launchVerificationServer(
         environment: { CLINE_PROVIDER: "openai-compatible", CLINE_MODEL: "fixture-model", CLINE_API_KEY: "fixture-only",
           FAKE_ACP_DUMP: join(dataDir, "cline-launch.json") },
       } } : {}),
+      ...(extraProviders.includes("opencode") ? { opencodeGo: {
+        driver: "opencodeGo", displayName: "OpenCode (test provider)",
+        config: { cli: fileURLToPath(new URL("../server/testing/fake-acp-cli.ts", import.meta.url)) },
+        environment: {
+          FAKE_ACP_MODELS: "fixture/opencode",
+          FAKE_ACP_TEXT_REPLY: "hello from fake OpenCode",
+          FAKE_ACP_DUMP: join(dataDir, "opencode-launch.json"),
+        },
+      } } : {}),
+      ...(extraProviders.includes("qwen") ? { qwen: {
+        driver: "qwenAgent", displayName: "Qwen (unconfigured test provider)",
+        config: { cli: fileURLToPath(new URL("../server/testing/fake-acp-cli.ts", import.meta.url)) },
+      } } : {}),
+      ...(extraProviders.includes("grok") ? { grok: { driver: "grokAgent", displayName: "Verification Grok" } } : {}),
+      ...(extraProviders.includes("kimi") ? { kimi: { driver: "kimiAgent", displayName: "Verification Kimi" } } : {}),
+      ...(extraProviders.includes("droid") ? { droid: { driver: "droidAgent", displayName: "Verification Droid" } } : {}),
+      ...(extraProviders.includes("gemini") ? { gemini: { driver: "geminiAgent", displayName: "Verification Gemini" } } : {}),
       claude: {
         driver: "claudeAgent",
         displayName: "Verification fixture",

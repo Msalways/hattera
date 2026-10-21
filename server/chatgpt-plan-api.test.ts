@@ -148,16 +148,20 @@ describe("ChatGPT plan accounts over isolated HTTP", () => {
     }
   });
 
-  it("refuses proxied OAuth starts even for an authenticated admin", async () => {
+  it("starts browser OAuth through a proxy and validates a pasted callback for its owner", async () => {
     const owner = await admin("Proxy browser");
     for (const [header, value] of [
       ["x-forwarded-for", "198.51.100.21"], ["x-forwarded-proto", "https"],
       ["x-forwarded-host", "workspace.example.test"], ["forwarded", "for=198.51.100.21;proto=https"],
     ] as const) {
-      const refused = await api("POST", "/api/instances/chatgpt/auth/start", {}, { ...owner, [header]: value });
-      expect(refused.status).toBe(403);
-      expect(refused.body.error).toContain("computer running OpenMausBot");
-      expect(refused.body).not.toHaveProperty("auth");
+      const proxied = await api("POST", "/api/instances/chatgpt/auth/start", {}, { ...owner, [header]: value });
+      expect(proxied.status).toBe(200);
+      const authorization = new URL(proxied.body.auth.authorizationUrl);
+      const callback = new URL(authorization.searchParams.get("redirect_uri")!);
+      callback.search = new URLSearchParams({ state: "wrong-state", code: "fixture-code" }).toString();
+      const completion = await api("POST", "/api/instances/chatgpt/auth/complete", { flowId: proxied.body.auth.flowId, callbackUrl: callback.href }, owner);
+      expect(completion.status).toBe(400);
+      expect((await api("POST", "/api/instances/chatgpt/auth/cancel", { flowId: proxied.body.auth.flowId }, owner)).status).toBe(200);
     }
   });
 });

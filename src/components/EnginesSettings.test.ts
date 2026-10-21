@@ -66,6 +66,52 @@ describe("Settings → Engines → Codex", () => {
   });
 });
 
+it("offers an app-owned install even when a CLI is already available", () => {
+  vi.stubGlobal("window", {});
+  vi.stubGlobal("navigator", { userAgent: "Linux" });
+  fixture.bots = [];
+  const opencode: InstanceInfo = {
+    instanceId: "opencodeGo", driverKind: "opencodeGo", displayName: "OpenCode", cliDefault: "opencode",
+    snapshot: { state: "available", authenticated: true, version: "1.0.0" },
+    models: { default: "fixture/model", options: [] },
+    install: { server: { package: "opencode-ai" }, signInCommand: "opencode auth login" },
+  };
+  fixture.instances = [opencode];
+  expect(renderToStaticMarkup(createElement(EnginesSettings))).toContain("Update OpenCode on this server");
+  fixture.instances = [{ ...opencode, cli: "/custom/opencode" }];
+  expect(renderToStaticMarkup(createElement(EnginesSettings))).not.toContain("Update OpenCode on this server");
+});
+
+it("offers Qwen's own account setup after the CLI is installed", () => {
+  vi.stubGlobal("window", {});
+  vi.stubGlobal("navigator", { userAgent: "Linux" });
+  fixture.instances = [{
+    instanceId: "qwen", driverKind: "qwenAgent", displayName: "Qwen", access: "custom", cliDefault: "qwen",
+    snapshot: { state: "available", authenticated: false, version: "1.0.0" },
+    models: { default: "", options: [] },
+    install: { signInCommand: "qwen", docsUrl: "https://qwenlm.github.io/qwen-code-docs/en/users/overview/" },
+  }];
+  const html = renderToStaticMarkup(createElement(EnginesSettings));
+  expect(html).toContain("Sign in to Qwen");
+  expect(html).toContain("qwen");
+  expect(html).not.toContain("Install Qwen on this server");
+});
+
+it("does not offer CLI path controls for a direct API provider", () => {
+  vi.stubGlobal("window", {});
+  vi.stubGlobal("navigator", { userAgent: "Linux" });
+  fixture.bots = [];
+  fixture.instances = [{
+    instanceId: "minimax", driverKind: "minimax", displayName: "MiniMax (API)", access: "api",
+    snapshot: { state: "unavailable", reason: "No MiniMax API key" },
+    models: { default: "MiniMax-M3", options: [] }, install: { settings: "connections" },
+  }];
+  const html = renderToStaticMarkup(createElement(EnginesSettings));
+  expect(html).toContain("Open API keys");
+  expect(html).not.toContain("CLI path and updates");
+  expect(html).not.toContain("Set CLI");
+});
+
 describe("Settings → Engines → Grok", () => {
   function renderGrok(authenticated: boolean): string {
     vi.stubGlobal("window", {});
@@ -247,7 +293,7 @@ describe("Settings → Engines → setup cards", () => {
     // A remote client cannot reach this server's key settings.
     vi.stubGlobal("window", { ogb: { remoteClient: { active: true } } });
     const remote = renderToStaticMarkup(createElement(EnginesSettings));
-    expect(remote).toContain("open Settings → API keys on the computer running OpenMausBot");
+    expect(remote).toContain("open Settings → API keys on the computer running Hattera");
     expect(remote).not.toContain("Change key");
 
     // A Company-managed key is not the person's to change.

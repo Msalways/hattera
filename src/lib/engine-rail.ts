@@ -11,11 +11,13 @@ import type { InstanceInfo } from "@/state/store";
  *   local models stay pickable;
  * - the engine the bot runs on now always stays, even when its CLI is
  *   missing, so its setup card explains why instead of the model vanishing;
- * - an engine that is not installed and not in use stays in Settings, as does
+ * - OpenCode stays visible with its setup action because it hosts multiple providers;
+ * - another engine that is not installed and not in use stays in Settings, as does
  *   an installed engine with nothing to list. */
 export function configuredModelInstances(instances: readonly InstanceInfo[], selectedInstanceId?: string): InstanceInfo[] {
   return instances.filter((instance) =>
     instance.instanceId === selectedInstanceId
+      || instance.driverKind === "opencodeGo"
       || (instance.snapshot.state === "available" && (instance.models.options.length > 0 || instance.snapshot.chatgptPlan === true)));
 }
 

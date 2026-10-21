@@ -37,6 +37,7 @@
     "storage:pg:migrate": "node --experimental-strip-types server/postgres-migrate.ts",
     "mcp": "node --experimental-strip-types scripts/mcp-server.ts",
     "control:omb": "node --experimental-strip-types scripts/control-omb.ts",
+    "verify:hattera": "node --experimental-strip-types scripts/verify-hattera-app.ts",
     "eval": "node --experimental-strip-types evals/runners/run-evals.ts",
     "dev:desktop": "node scripts/prepare-cloudflared.mjs --current && electron .",
     "build": "tsc -b && tsc -p tsconfig.server.json && vite build",

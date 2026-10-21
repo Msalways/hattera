@@ -19,6 +19,7 @@ import "./styles.css";
 // Simple vs Advanced is decided first: applySkin below writes omb-skin, which
 // would otherwise make every fresh install look like an existing one.
 settleAdvancedModeDefault();
+if (!window.ogb?.platform) document.documentElement.dataset.browserBrand = "hattera";
 applySkin(readSkin());
 applyFont(readFont());
 

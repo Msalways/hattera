@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { z } from "zod";
 
 import type { ModelCatalog, ProviderDriver } from "../contracts.ts";
+import { userHome } from "../env-path.ts";
 import { createOpenAIChatRuntime } from "./openai-chat.ts";
 
 const DRIVER_KIND = "minimax";
@@ -14,12 +15,10 @@ const DEFAULT_URL = "https://api.minimax.io/v1";
 const CN_URL = "https://api.minimaxi.com/v1";
 const MODELS: ModelCatalog = {
   default: "MiniMax-M3",
-  // `custom: true` because the driver is access "custom": the picker opens
-  // custom-access engines in the pane that lists only custom-flagged models.
   options: [
-    { id: "MiniMax-M3", label: "MiniMax M3", contextWindow: 1_000_000, custom: true },
-    { id: "MiniMax-M2.7", label: "MiniMax M2.7", contextWindow: 204_800, custom: true },
-    { id: "MiniMax-M2.7-highspeed", label: "MiniMax M2.7 Highspeed", contextWindow: 204_800, custom: true },
+    { id: "MiniMax-M3", label: "MiniMax M3", contextWindow: 1_000_000 },
+    { id: "MiniMax-M2.7", label: "MiniMax M2.7", contextWindow: 204_800 },
+    { id: "MiniMax-M2.7-highspeed", label: "MiniMax M2.7 Highspeed", contextWindow: 204_800 },
   ],
 };
 
@@ -76,23 +75,17 @@ export function decodeMinimaxConfig(raw: unknown): MinimaxConfig {
 
 export const MinimaxDriver: ProviderDriver<MinimaxConfig> = {
   driverKind: DRIVER_KIND,
-  metadata: { displayName: "MiniMax (API)", supportsMultipleInstances: true, access: "custom" },
+  metadata: { displayName: "MiniMax (API)", supportsMultipleInstances: true, access: "api" },
   models: MODELS,
   install: {
+    settings: "connections",
     docsUrl: "https://platform.minimax.io/docs/token-plan/minimax-cli",
-    command: {
-      darwin: "npm install -g mmx-cli",
-      linux: "npm install -g mmx-cli",
-      win32: "npm install -g mmx-cli",
-    },
-    signInCommand: "mmx auth login --api-key YOUR_MINIMAX_API_KEY",
-    needsNode: true,
   },
   decodeConfig: decodeMinimaxConfig,
   defaultConfig: () => decodeMinimaxConfig({}),
 
   async create(input) {
-    const local = loadLocalMiniMaxConfig();
+    const local = loadLocalMiniMaxConfig(userHome({ ...process.env, ...input.environment }));
     const apiKey =
       input.environment[API_KEY_ENV]?.trim() ||
       process.env[API_KEY_ENV]?.trim() ||
@@ -119,8 +112,8 @@ export const MinimaxDriver: ProviderDriver<MinimaxConfig> = {
         stream_options: stream ? { include_usage: true } : undefined,
       }),
       httpErrorLabel: "MiniMax",
-      missingKeyError: `no MiniMax key — set ${API_KEY_ENV} or run mmx auth login --api-key …`,
-      unavailableReason: `no MiniMax API key — run mmx auth login --api-key … or set ${API_KEY_ENV}`,
+      missingKeyError: `No MiniMax API key. Save one in Settings → API keys or set ${API_KEY_ENV} on the server.`,
+      unavailableReason: `No MiniMax API key — open Settings → API keys or set ${API_KEY_ENV} on the server.`,
       timeoutMs: 180_000,
       reasoning: true,
       billing: "metered",

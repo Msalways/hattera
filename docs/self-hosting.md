@@ -126,11 +126,14 @@ implicitly download a new release.
 ## Connect ChatGPT from the browser
 
 A browser paired with Full access can connect an installed Codex CLI without opening a
-terminal: **Settings → Engines → Codex → Connect ChatGPT**. OMB starts
-`codex login --device-auth` on the server and shows a one-time code. Choose
-**Open ChatGPT sign-in**, enter the code on OpenAI's page, and complete sign-in
-with your own account. OMB checks for completion and refreshes the model list.
-You can cancel or request a fresh code after it expires.
+terminal: **Settings → Engines → Codex → Connect ChatGPT**. Choose **Browser sign-in**
+to open OpenAI's page, or **One-time code** to enter a code there. Local Docker
+Compose forwards the browser callback to Codex in its container automatically.
+When visiting from another computer, copy the full address of the final
+localhost page into **Final browser address** in Hattera if that page cannot
+load. OMB checks that the callback belongs to the sign-in you started, then
+confirms the CLI login and refreshes the model list. You can cancel or start
+a new sign-in after the old one expires.
 
 The server still needs Codex installed and runs it as the same operating-system
 user as OMB. Your password never goes through OMB; Codex stores its credentials
@@ -293,13 +296,16 @@ rely on routines running unattended.
 ## Installing the engines without a terminal
 
 Engines whose installer is an npm package (Claude Code, Codex, OpenCode,
-MiniMax, pi) can be installed and updated from **Settings → Engines** when
-npm is on the server's PATH. OMB runs `npm install -g` as its own user into
-`<data dir>/tools/npm`, so nothing needs sudo and nothing touches a global
-prefix; that folder goes ahead of everything else on the engines' PATH, so
-the copy OMB installed is the one bots run. The package name comes from the
-engine's own install descriptor, never from the browser. Engines installed
-by a `curl | bash` script still need the command on the server.
+Cline, pi, Grok, Kimi, Droid, Qwen, and Gemini CLI) can be installed and updated from **Settings → Engines** when
+npm is on the server's PATH. Hattera runs `npm install -g` as its own user into
+`<data dir>/tools/engines/<cli>/`, so nothing needs sudo and nothing touches a global
+prefix. It checks the new CLI before selecting it; a failed update leaves the
+previous working version active. Existing installs under `<data dir>/tools/npm`
+remain available. The selected copy goes first on the engines' PATH, so
+the copy Hattera installed is the one bots run. The package name comes from the
+engine's own install descriptor, never from the browser. Cursor and Hermes
+use their official installers through the same Settings flow. Other engines
+without a Settings installer need their CLI installed on the server separately.
 
 ## Provider keys, billed per token
 

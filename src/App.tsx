@@ -309,11 +309,12 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
       {/* The one bottom-left card at a time: the card after the update, the
           free trial's notice (here and on My Cloud), the My Cloud card, the star. */}
       <AppNotices quiet={paletteOpen || drawerOpen || Boolean(localVmWorkspaceBotId)} viewer={viewer} />
-      <div className="relative flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1" data-hattera-settings-open={state.settingsOpen && Boolean(bot) && !remoteClient && document.documentElement.dataset.browserBrand === "hattera" ? "" : undefined}>
       {!calendarFocus && <button
         type="button"
         ref={menuButtonRef}
         aria-label="Open bot list"
+        data-mobile-menu
         aria-expanded={drawerOpen}
         onClick={() => setDrawerOpen(true)}
         className="absolute left-3 top-3 z-30 rounded-md p-1.5 text-ink-secondary hover:bg-raised hover:text-ink md:hidden"

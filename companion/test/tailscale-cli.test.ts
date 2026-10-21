@@ -126,9 +126,20 @@ describe("Tailscale from a shell-less standalone macOS app", () => {
     await tailscaleServeOff(result.status);
     expect(fixture.calls.map(({ args }) => args)).toEqual([
       ["status", "--json"],
+      ["serve", "status", "--json"],
       ["serve", "--bg", "--https=443", "http://127.0.0.1:8799"],
       ["serve", "--https=443", "off"],
     ]);
     expect(fixture.calls.every(({ options }) => options.env?.TAILSCALE_BE_CLI === "1" && !options.shell)).toBe(true);
+  });
+
+  it("leaves an existing HTTPS endpoint untouched", async () => {
+    fixture.output = "occupied";
+    const result = await tailscaleStatus();
+    if (!("status" in result)) throw new Error("fixture CLI not found");
+    expect(await tailscaleServe(result.status, 8799)).toEqual({ failure: "serve-occupied" });
+    expect(fixture.calls.map(({ args }) => args)).toEqual([
+      ["status", "--json"], ["serve", "status", "--json"],
+    ]);
   });
 });

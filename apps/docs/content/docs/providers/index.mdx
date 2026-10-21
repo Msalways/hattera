@@ -4,9 +4,9 @@ description: Use the agent subscriptions and CLIs you already have.
 icon: BrainCircuit
 ---
 
-OpenMausBot does not proxy every message through its own model account. It starts supported agent CLIs on your computer and normalizes their output through the local harness.
+Hattera starts supported agent CLIs on the computer running its server and presents their output in one app. Provider accounts and API keys determine access and billing.
 
-<ProductScreenshot name="docs-engine-detection" alt="OpenMausBot checking which agent engines are installed" caption="The official app checks installation and sign-in state without asking users to find executable paths first." />
+<ProductScreenshot name="docs-engine-detection" alt="Hattera checking which agent engines are installed" caption="Hattera checks installation and sign-in state before offering models." />
 
 ## Built-in engines
 
@@ -20,11 +20,11 @@ OpenMausBot does not proxy every message through its own model account. It start
 | Droid | Factory Droid CLI login | ACP integration |
 | Antigravity | Google account through the official ACP server | Managed install, isolated accounts, live models, and approval cards |
 | OpenCode | Existing OpenCode provider login or optional API key | Live Zen, Go, third-party, and local model discovery through ACP |
-| Qwen | Qwen CLI login | ACP integration |
+| Qwen | Run `qwen`, then `/auth` to configure a provider | ACP integration; [Qwen authentication guide](https://github.com/QwenLM/qwen-code/blob/main/docs/users/configuration/auth.md) |
 | Hermes | Hermes CLI login | ACP integration |
-| Pi | Pi CLI login | Native driver |
+| Pi | Run `pi`, then `/login` to connect a provider | Native driver; [pi provider guide](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/providers.md) |
 
-Additional driver instances can be declared in local configuration. Unavailable engines remain visible with a reason instead of crashing the provider fleet.
+Additional driver instances can be declared in local configuration. Gemini CLI is available for enterprise and paid API-key deployments; consumer Google AI Pro, Ultra, and free-tier requests moved to Antigravity. An installed CLI is not proof of account access, and models appear only after Hattera can discover a usable route. Unavailable engines remain visible with a reason.
 
 To use OpenRouter, Fireworks AI, DeepSeek, Cline, or your own OpenAI- or Anthropic-compatible service, see [Other model providers](./model-providers.mdx).
 
@@ -40,9 +40,9 @@ For a server deployment, set `MISTRAL_API_KEY` or save `mistral.key` in the serv
 
 ## Detection
 
-OpenMausBot checks common installation directories and the login shell in the background. Restart the app after installing or authenticating a CLI.
+Hattera checks common installation directories and the login shell in the background. After installing or authenticating a CLI, choose **Check again** in Model providers and accounts; no app restart is needed.
 
-If detection fails, use **Settings → Engines** to set an explicit executable path. This is supported for every engine and is the most reliable solution for version managers, wrappers, custom builds, and Windows installations outside the normal path.
+If detection fails, use **Settings → Model providers and accounts** to set an explicit executable path. This is supported for every engine and is the most reliable solution for version managers, wrappers, custom builds, and Windows installations outside the normal path.
 
 ## Model selection
 

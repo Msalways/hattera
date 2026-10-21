@@ -813,6 +813,19 @@ describe("default fleet", () => {
     stripWorkspaceCredentialEnv(env);
     expect(env).toEqual({ KEEP: "yes" });
   });
+  it("offers MiniMax in product fleets and keeps its key out of other engines", () => {
+    const map = instanceConfigs({ minimax: { key: "minimax-fixture" }, instances: { codex: { driver: "codex" } } });
+    expect(map.minimax).toEqual({ driver: "minimax", environment: { MINIMAX_API_KEY: "minimax-fixture" } });
+    expect(map.codex.environment).toEqual({});
+    expect(instanceConfigs({ instances: { standalone: { driver: "fake" } } })).not.toHaveProperty("minimax");
+    expect(parseConfigPatch({ minimax: { key: "" } })).toEqual({ minimax: { key: "" } });
+    const env = { MINIMAX_API_KEY: "minimax-fixture", KEEP: "yes" };
+    stripWorkspaceCredentialEnv(env);
+    expect(env).toEqual({ KEEP: "yes" });
+    expect(instanceConfigs({ minimax: { key: "workspace" }, instances: {
+      codex: { driver: "codex" }, privateMiniMax: { driver: "minimax", config: { url: "https://private.example.test/v1" } },
+    } }).privateMiniMax.environment).toEqual({});
+  });
 
   it("ships Qwen and Hermes as custom-only engines", () => {
     const map = instanceConfigs({});
@@ -998,12 +1011,13 @@ describe("default fleet", () => {
     expect(config.instances?.custom.config).toBeUndefined();
   });
 
-  it("adds missing custom-only engines onto an existing product fleet", () => {
+  it("adds OpenCode and missing custom-only engines onto an existing product fleet", () => {
     const map = instanceConfigs({ instances: { claude: { driver: "claudeAgent" } } });
     expect(map.claude.driver).toBe("claudeAgent");
     expect(map.qwen?.driver).toBe("qwenAgent");
     expect(map.hermes?.driver).toBe("hermesAgent");
     expect(map.cursor?.driver).toBe("cursorAgent");
+    expect(map.opencodeGo?.driver).toBe("opencodeGo");
     expect(map.openaiCompat?.driver).toBe("openai-compat");
   });
 

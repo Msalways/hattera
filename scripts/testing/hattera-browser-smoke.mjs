@@ -1,0 +1,364 @@
+// Real Chrome -> built Hattera UI -> isolated server -> native browser -> local test page.
+// Usage: node scripts/testing/hattera-browser-smoke.mjs PREVIEW_URL CHROME_PATH
+import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, rm, mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve, join, sep } from 'node:path';
+
+const [previewUrl, chromePath] = process.argv.slice(2);
+if (!previewUrl || !chromePath) throw new Error('Pass the printed preview URL and Chrome executable path');
+const base = new URL(previewUrl);
+if (base.hostname !== '127.0.0.1') throw new Error('Only an isolated loopback preview is allowed');
+const profile = await mkdtemp(join(tmpdir(), 'hattera-ui-smoke-'));
+const chrome = spawn(chromePath, [
+  '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run',
+  '--no-default-browser-check', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank',
+], { stdio: 'ignore', windowsHide: true });
+let socket;
+let sequence = 0;
+const pending = new Map();
+const browserRequests = [];
+const pause = (ms) => new Promise((done) => setTimeout(done, ms));
+try {
+  let port;
+  for (let i = 0; i < 100; i++) {
+    try { port = Number((await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]); break; }
+    catch { await pause(100); }
+  }
+  if (!port) throw new Error('Chrome did not start');
+  const tabs = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+  const tab = tabs.find((entry) => entry.type === 'page');
+  if (!tab) throw new Error('No Chrome page target');
+  socket = new WebSocket(tab.webSocketDebuggerUrl);
+  await new Promise((done, fail) => { socket.onopen = done; socket.onerror = fail; });
+  socket.onmessage = ({ data }) => {
+    const reply = JSON.parse(data);
+    if (reply.method === 'Network.requestWillBeSent' && reply.params?.request?.url?.includes('/browser/action')) {
+      browserRequests.push({ url: reply.params.request.url, method: reply.params.request.method, body: reply.params.request.postData });
+    }
+    if (!reply.id || !pending.has(reply.id)) return;
+    pending.get(reply.id)(reply);
+    pending.delete(reply.id);
+  };
+  const send = (method, params = {}) => new Promise((done, fail) => {
+    const id = ++sequence;
+    pending.set(id, (reply) => reply.error ? fail(new Error(JSON.stringify(reply.error))) : done(reply.result));
+    socket.send(JSON.stringify({ id, method, params }));
+  });
+  const evaluate = async (expression) => {
+    const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
+    return result.result.value;
+  };
+  const until = async (check, timeoutMs, label) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const result = await check();
+      if (result) return result;
+      await pause(500);
+    }
+    const body = await evaluate('document.body?.innerText?.slice(-1200)');
+    throw new Error(`${label} timed out. Visible UI: ${body}`);
+  };
+  await send('Page.enable');
+  await send('Network.enable');
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  await send('Page.navigate', { url: base.href });
+  await until(() => evaluate('document.title === "Hattera" && !!document.querySelector("button[data-tour=computer]")'), 20_000, 'Hattera chat');
+  // Welcome and the guided tour mount asynchronously after the chat shell.
+  // Dismiss each through its visible control before using the rest of the UI.
+  await pause(1_200);
+  for (let i = 0; i < 5; i++) {
+    await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.textContent?.trim() === "Skip tour" && button.getClientRects().length)?.click()');
+    await pause(800);
+  }
+  await until(() => evaluate('!document.querySelector("[data-tour-card]") && !document.querySelector(".welcome-card")'), 10_000, 'onboarding tour dismissal');
+  const botsUrl = new URL('/api/bots', base);
+  const replies = (bot) => bot.messages?.filter((message) => message.role === 'bot' && message.text === 'hello from fake claude') ?? [];
+  const beforeReplies = replies((await (await fetch(botsUrl)).json()).bots[0]).length;
+  await evaluate('document.querySelector("textarea[aria-label^=Message]").focus()');
+  await send('Input.insertText', { text: 'Hattera smoke chat' });
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify('button[aria-label="Send message"]')})`), 10_000, 'chat send action');
+  await evaluate(`document.querySelector(${JSON.stringify('button[aria-label="Send message"]')}).click()`);
+  const replyId = await until(async () => {
+    const bot = (await (await fetch(botsUrl)).json()).bots[0];
+    const matching = replies(bot);
+    return !bot.busy && matching.length > beforeReplies ? matching.at(-1).id : null;
+  }, 60_000, 'new fake engine reply');
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(`[data-mid="${replyId}"]`)})`), 10_000, 'rendered chat reply');
+  const instances = await (await fetch(new URL('/api/instances', base))).json();
+  const openCodeInstance = instances.instances?.find((instance) => instance.driverKind === 'opencodeGo');
+  if (!openCodeInstance || openCodeInstance.snapshot.state !== 'available') {
+    throw new Error(`The isolated OpenCode test provider is not ready: ${JSON.stringify(openCodeInstance?.snapshot)}`);
+  }
+  await evaluate('document.querySelector("button[data-tour=model]").click()');
+  await until(() => evaluate('!!document.querySelector("[data-simple-provider=opencodeGo]")'), 10_000, 'OpenCode model provider');
+  await evaluate('document.querySelector("[data-simple-provider=opencodeGo]").click()');
+  const openCodeModel = '[...document.querySelectorAll("[data-simple-models] button")].find(button => button.textContent?.includes("Fixture") && button.textContent?.includes("opencode"))';
+  await until(() => evaluate(`!!(${openCodeModel})`), 30_000, 'OpenCode test model');
+  if (await evaluate('!!document.querySelector("[data-simple-set-up]")')) throw new Error('Ready OpenCode provider still asks for setup');
+  const modelColors = await evaluate(`(() => { const button = (${openCodeModel}); return { text: getComputedStyle(button).color, background: getComputedStyle(button.closest('[data-model-picker-content]')).backgroundColor }; })()`);
+  const rgb = (value) => [...value.matchAll(/[\d.]+/g)].slice(0, 3).map((match) => Number(match[0]) / 255);
+  const luminance = (value) => rgb(value).map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+  const contrastOf = ({ text, background }) => {
+    const a = luminance(text), b = luminance(background);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  if (contrastOf(modelColors) < 4.5) throw new Error(`OpenCode model text is unreadable: ${JSON.stringify(modelColors)}`);
+  const providerColors = await evaluate('(() => { const button = document.querySelector("[data-simple-provider=opencodeGo]"); return { text: getComputedStyle(button).color, background: getComputedStyle(button).backgroundColor }; })()');
+  if (contrastOf(providerColors) < 4.5) throw new Error(`Selected OpenCode provider is unreadable: ${JSON.stringify(providerColors)}`);
+  await mkdir(resolve('output/playwright'), { recursive: true });
+  const pickerScreenshot = resolve('output/playwright/hattera-opencode-picker.png');
+  await pause(800);
+  const pickerShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(pickerScreenshot, Buffer.from(pickerShot.data, 'base64'));
+  await evaluate(`(${openCodeModel}).click()`);
+  await until(() => evaluate('!document.querySelector("[data-model-picker-content]")'), 10_000, 'model picker closure');
+  const beforeOpenCodeReplies = (await (await fetch(botsUrl)).json()).bots[0].messages.filter((message) => message.role === 'bot' && message.text === 'hello from fake OpenCode').length;
+  await evaluate('document.querySelector("textarea[aria-label^=Message]").focus()');
+  await send('Input.insertText', { text: 'Hattera OpenCode smoke chat' });
+  const sendButtonSelector = 'button[aria-label="Send message"]';
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(sendButtonSelector)})`), 10_000, 'OpenCode chat send action');
+  await evaluate(`document.querySelector(${JSON.stringify(sendButtonSelector)}).click()`);
+  const openCodeReplyId = await until(async () => {
+    const bot = (await (await fetch(botsUrl)).json()).bots[0];
+    const matching = bot.messages.filter((message) => message.role === 'bot' && message.text === 'hello from fake OpenCode');
+    return !bot.busy && matching.length > beforeOpenCodeReplies ? matching.at(-1).id : null;
+  }, 60_000, 'new OpenCode ACP test reply');
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(`[data-mid="${openCodeReplyId}"]`)})`), 10_000, 'rendered OpenCode test reply');
+  await evaluate('Array.from(document.querySelectorAll("[data-sidebar] button[aria-haspopup=menu]")).at(-1).click()');
+  await until(() => evaluate('!!document.querySelector("[data-menu-key=settings]")'), 10_000, 'Settings menu');
+  await evaluate('document.querySelector("[data-menu-key=settings]").click()');
+  await until(() => evaluate('!!document.querySelector("[role=dialog] [data-settings-page=ai]")'), 10_000, 'Settings pages');
+  await evaluate('document.querySelector("[data-settings-page=ai]").click()');
+  await until(() => evaluate('!!document.querySelector("[data-engine-card=opencodeGo]")'), 15_000, 'OpenCode provider card');
+  const openCodeCard = await evaluate('document.querySelector("[data-engine-card=opencodeGo]").innerText');
+  if (!openCodeCard.includes('OpenCode (test provider)') || openCodeCard.includes('Needs setup')) {
+    throw new Error(`OpenCode provider card has no clear status: ${openCodeCard}`);
+  }
+  await evaluate('document.querySelector("[data-engine-card=opencodeGo]").scrollIntoView({block:"center"})');
+  await pause(500);
+  await mkdir(resolve('output/playwright'), { recursive: true });
+  const providerScreenshot = resolve('output/playwright/hattera-opencode-provider.png');
+  const providerShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(providerScreenshot, Buffer.from(providerShot.data, 'base64'));
+  await evaluate('document.querySelector("[data-engine-card=minimax] summary").click()');
+  await until(() => evaluate('document.querySelector("[data-engine-card=minimax]")?.innerText.includes("Open API keys")'), 10_000, 'MiniMax saved-key setup card');
+  const miniMaxCard = await evaluate('document.querySelector("[data-engine-card=minimax]").innerText');
+  if (!miniMaxCard.includes('Needs setup') || miniMaxCard.includes('Install MiniMax') || miniMaxCard.includes('CLI path and updates')) {
+    throw new Error(`MiniMax has an incorrect setup path: ${miniMaxCard}`);
+  }
+  await evaluate('document.querySelector("[data-engine-card=minimax]").scrollIntoView({block:"center"})');
+  await pause(500);
+  const miniMaxScreenshot = resolve('output/playwright/hattera-minimax-setup.png');
+  const miniMaxShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(miniMaxScreenshot, Buffer.from(miniMaxShot.data, 'base64'));
+  await evaluate('document.querySelector("[data-engine-card=qwen] summary").click()');
+  await until(() => evaluate('document.querySelector("[data-engine-card=qwen]")?.innerText.includes("Sign in to Qwen")'), 10_000, 'Qwen setup card');
+  const qwenCard = await evaluate('document.querySelector("[data-engine-card=qwen]").innerText');
+  if (!qwenCard.includes('Sign-in required') || !qwenCard.includes('qwen') || qwenCard.includes('Install Qwen on this server')) {
+    throw new Error(`Unconfigured Qwen has an incorrect setup path: ${qwenCard}`);
+  }
+  await evaluate('document.querySelector("[data-engine-card=qwen]").scrollIntoView({block:"center"})');
+  await pause(500);
+  const qwenScreenshot = resolve('output/playwright/hattera-qwen-setup.png');
+  const qwenShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(qwenScreenshot, Buffer.from(qwenShot.data, 'base64'));
+  await evaluate('document.querySelector("[data-engine-card=codex] summary").click()');
+  await until(() => evaluate('!!document.querySelector("[data-engine-card=codex] [data-device-sign-in=codex]")'), 10_000, 'Codex sign-in card').catch(async (cause) => {
+    const card = await evaluate('document.querySelector("[data-engine-card=codex]")?.innerText');
+    const instances = await (await fetch(new URL('/api/instances', base))).json();
+    const codex = instances.instances?.find((instance) => instance.instanceId === 'codex');
+    throw new Error(`${cause.message}\nCodex card: ${card}\nCodex snapshot: ${JSON.stringify(codex)}`);
+  });
+  const codexChoices = await evaluate('Array.from(document.querySelectorAll("[data-engine-card=codex] button[aria-pressed]")).map(button => [button.textContent.trim(), button.getAttribute("aria-pressed")])');
+  if (!codexChoices.some(([label, pressed]) => label === 'Browser sign-in' && pressed === 'true') || !codexChoices.some(([label]) => label === 'One-time code')) {
+    throw new Error(`Codex did not offer both local sign-in methods: ${JSON.stringify(codexChoices)}`);
+  }
+  await evaluate('document.querySelector("[data-engine-card=codex]").scrollIntoView({block:"center"})');
+  await pause(500);
+  const codexScreenshot = resolve('output/playwright/hattera-codex-auth-options.png');
+  const codexShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(codexScreenshot, Buffer.from(codexShot.data, 'base64'));
+  await evaluate('Array.from(document.querySelectorAll("[data-engine-card=codex] button")).find(button => button.textContent.includes("One-time code")).click()');
+  await until(() => evaluate('!!Array.from(document.querySelectorAll("[data-engine-card=codex] button[aria-pressed=true]")).find(button => button.textContent.includes("One-time code"))'), 10_000, 'Codex device-code choice');
+  const codexCodeScreenshot = resolve('output/playwright/hattera-codex-auth-code.png');
+  const codexCodeShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(codexCodeScreenshot, Buffer.from(codexCodeShot.data, 'base64'));
+  await evaluate(`document.querySelector(${JSON.stringify('button[aria-label="Close settings"]')}).click()`);
+  await until(() => evaluate('!document.querySelector("[role=dialog] [data-settings-page=ai]")'), 10_000, 'Settings closure');
+  await evaluate('document.querySelector("button[data-tour=computer]").click()');
+  await until(() => evaluate('!!document.querySelector("input[aria-label^=Browser]") || document.body.innerText.includes("Browser engine not installed")'), 20_000, 'browser panel');
+  const installedError = await evaluate('document.body.innerText.includes("Browser engine not installed")');
+  if (installedError) throw new Error('Browser panel still reports that the engine is not installed');
+  await until(() => evaluate('!!document.querySelector("input[aria-label^=Browser]:not([readonly])") || document.body.innerText.includes("Browser disconnected")'), 90_000, 'live browser connection');
+  if (await evaluate('document.body.innerText.includes("Browser disconnected")')) throw new Error('Native browser disconnected');
+  const testPage = new URL('/__hattera-browser-test', base).href;
+  const statusUrl = new URL('/__hattera-browser-test/status', base);
+  const before = (await (await fetch(statusUrl)).json()).visits;
+  await evaluate('document.querySelector("input[aria-label^=Browser]").focus()');
+  await send('Input.insertText', { text: testPage });
+  await pause(300);
+  const entered = await evaluate('document.querySelector("input[aria-label^=Browser]").value');
+  if (entered !== testPage) throw new Error(`Browser address input did not accept text: ${JSON.stringify(entered)}`);
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await pause(500);
+  if (!browserRequests.some((entry) => entry.body?.includes('"navigate"'))) {
+    await evaluate('document.querySelector("input[aria-label^=Browser]").form.requestSubmit()');
+    await pause(500);
+  }
+  if (!browserRequests.some((entry) => entry.body?.includes('"navigate"'))) throw new Error('Browser panel did not submit a navigate action');
+  await until(async () => (await (await fetch(statusUrl)).json()).visits > before, 45_000, 'native browser navigation');
+  const output = resolve('output/playwright/hattera-browser-smoke.png');
+  await mkdir(resolve('output/playwright'), { recursive: true });
+  const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(output, Buffer.from(shot.data, 'base64'));
+  await evaluate('document.querySelector("button[data-tour=computer]").click()');
+  await until(() => evaluate('!document.querySelector("input[aria-label^=Browser]")'), 10_000, 'browser panel closure');
+  await until(() => browserRequests.some((entry) => entry.body?.includes('"release"')), 10_000, 'browser control release');
+  await evaluate('document.querySelector("[data-chathead-pill]").click()');
+  await until(() => evaluate('!!document.querySelector("[data-hattera-settings][role=dialog]")'), 10_000, 'bot settings');
+  for (const section of ['identity', 'skills', 'memory', 'access', 'model', 'permissions']) {
+    await evaluate(`Array.from(document.querySelectorAll('.hattera-settings-nav button')).find(button => button.textContent?.trim().toLowerCase().startsWith(${JSON.stringify(section === 'access' ? 'access' : section)}))?.click()`);
+    await until(() => evaluate(`!!document.querySelector('.hattera-settings-nav button[aria-current=page]') && !!document.querySelector('section[aria-labelledby="hattera-settings-${section}"]:not([hidden]) h2')`), 10_000, `${section} settings section`);
+  }
+  await evaluate('Array.from(document.querySelectorAll(".hattera-settings-nav button")).find(button => button.textContent?.trim() === "Access").click()');
+  const browserSwitch = 'button[aria-label="Give this bot a built-in browser"]';
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(`${browserSwitch}:not([disabled])`)})`), 10_000, 'bot browser setting');
+  await evaluate(`document.querySelector(${JSON.stringify(browserSwitch)}).click()`);
+  await until(async () => (await (await fetch(botsUrl)).json()).bots[0]?.browser === false, 15_000, 'browser permission off');
+  await evaluate(`document.querySelector(${JSON.stringify(browserSwitch)}).click()`);
+  await until(async () => (await (await fetch(botsUrl)).json()).bots[0]?.browser === true, 15_000, 'browser permission restored');
+  await evaluate('document.querySelector(".hattera-settings-back button").click()');
+  await until(() => evaluate('!document.querySelector("[data-hattera-settings][role=dialog]")'), 10_000, 'bot settings closure');
+  await evaluate(`document.querySelector(${JSON.stringify('[data-sidebar-top-buttons] button[aria-label="New or share"]')}).click()`);
+  await until(() => evaluate('Array.from(document.querySelectorAll("[data-sidebar-top-buttons] button")).some(button => button.textContent?.includes("New Bot"))'), 10_000, 'new bot menu');
+  await evaluate('Array.from(document.querySelectorAll("[data-sidebar-top-buttons] button")).find(button => button.textContent?.includes("New Bot")).click()');
+  const newBotDialog = '[role=dialog][aria-label="New Bot"]';
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(`${newBotDialog} input[id^=bot-name]`)})`), 20_000, 'new bot editor');
+  await evaluate(`document.querySelector(${JSON.stringify(`${newBotDialog} input[id^=bot-name]`)}).select()`);
+  await send('Input.insertText', { text: 'Hattera smoke bot' });
+  await until(() => evaluate(`!!Array.from(document.querySelectorAll(${JSON.stringify(`${newBotDialog} button`)})).find(button => button.textContent?.trim() === "Create bot" && !button.disabled)`), 10_000, 'create bot action');
+  await evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(`${newBotDialog} button`)})).find(button => button.textContent?.trim() === "Create bot").click()`);
+  const createdBot = await until(async () => (await (await fetch(botsUrl)).json()).bots.find((bot) => bot.name === 'Hattera smoke bot'), 30_000, 'saved bot');
+  await until(() => evaluate(`!document.querySelector(${JSON.stringify(newBotDialog)})`), 10_000, 'new bot dialog closure');
+  await evaluate('document.querySelector("[data-chathead-pill]").click()');
+  await until(() => evaluate('!!document.querySelector("[data-hattera-settings][role=dialog]")'), 10_000, 'created bot settings');
+  await evaluate('Array.from(document.querySelectorAll(".hattera-settings-nav button")).find(button => button.textContent?.trim() === "Identity").click()');
+  const identityName = 'section[aria-labelledby="hattera-settings-identity"]:not([hidden]) input[id^=bot-name]';
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(identityName)})`), 10_000, 'identity editor');
+  await evaluate(`document.querySelector(${JSON.stringify(identityName)}).select()`);
+  await send('Input.insertText', { text: 'Hattera reviewed bot' });
+  await evaluate(`document.querySelector(${JSON.stringify(identityName)}).blur()`);
+  await until(async () => (await (await fetch(botsUrl)).json()).bots.some((bot) => bot.name === 'Hattera reviewed bot'), 20_000, 'saved bot identity');
+  await evaluate('Array.from(document.querySelectorAll(".hattera-settings-nav button")).find(button => button.textContent?.trim() === "Memory").click()');
+  const memoryEditor = 'textarea[aria-label="Bot memory"]';
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(memoryEditor)})`), 20_000, 'memory editor');
+  await evaluate(`document.querySelector(${JSON.stringify(memoryEditor)}).select()`);
+  await send('Input.insertText', { text: 'The bot remembers this fixture note.' });
+  await evaluate(`Array.from(document.querySelectorAll(${JSON.stringify('section[aria-labelledby="hattera-settings-memory"] button')})).find(button => button.textContent?.trim() === "Save").click()`);
+  const memoryUrl = new URL(`/api/bots/${createdBot.id}/memory/file?path=MEMORY.md`, base);
+  await until(async () => (await (await fetch(memoryUrl)).json()).text === 'The bot remembers this fixture note.', 20_000, 'saved bot memory');
+  await evaluate('Array.from(document.querySelectorAll(".hattera-settings-nav button")).find(button => button.textContent?.trim() === "Access").click()');
+  const toolMode = 'section[aria-labelledby="hattera-settings-access"] select[aria-label="Tool selection"]';
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(toolMode)})`), 10_000, 'tool selection');
+  await evaluate(`(() => { const select = document.querySelector(${JSON.stringify(toolMode)}); select.value = 'custom'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  const excludeTool = 'textarea[aria-label="Exclude (one per line)"]';
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(excludeTool)})`), 10_000, 'custom tool editor');
+  await evaluate(`document.querySelector(${JSON.stringify('section[aria-labelledby="hattera-settings-access"] input[type=checkbox]')}).click()`);
+  await evaluate(`document.querySelector(${JSON.stringify(excludeTool)}).focus()`);
+  await send('Input.insertText', { text: 'mcp:fixture:blocked' });
+  await evaluate(`Array.from(document.querySelectorAll(${JSON.stringify('section[aria-labelledby="hattera-settings-access"] button')})).find(button => button.textContent?.trim() === "Save tool selection").click()`);
+  await until(async () => (await (await fetch(botsUrl)).json()).bots.find((bot) => bot.id === createdBot.id)?.toolScope?.deny?.includes('mcp:fixture:blocked'), 20_000, 'saved tool selection');
+  await evaluate('Array.from(document.querySelectorAll(".hattera-settings-nav button")).find(button => button.textContent?.trim() === "Skills").click()');
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify('input[aria-label="Command name"]')})`), 10_000, 'skill authoring');
+  for (const [selector, value] of [['input[aria-label="Command name"]', 'fixture-note'], ['input[aria-label="What it does"]', 'Remember a fixture note'], ['textarea[aria-label="Instructions"]', 'Repeat the fixture note.']]) {
+    await evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`);
+    await send('Input.insertText', { text: value });
+  }
+  await until(() => evaluate('!!Array.from(document.querySelectorAll("button")).find(button => button.textContent?.trim() === "Save command" && !button.disabled)'), 10_000, 'save skill action');
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.textContent?.trim() === "Save command").click()');
+  const skillsUrl = new URL(`/api/bots/${createdBot.id}/skills`, base);
+  await until(async () => (await (await fetch(skillsUrl)).json()).skills?.some((skill) => skill.name === 'fixture-note' && skill.enabled), 20_000, 'saved skill');
+  await evaluate('Array.from(document.querySelectorAll(".hattera-settings-nav button")).find(button => button.textContent?.trim() === "Permissions").click()');
+  const approvalTrigger = 'section[aria-labelledby="hattera-settings-permissions"] button[aria-haspopup=menu]';
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(approvalTrigger)})`), 10_000, 'approval level selector');
+  await evaluate(`document.querySelector(${JSON.stringify(approvalTrigger)}).click()`);
+  await until(() => evaluate('!!Array.from(document.querySelectorAll("[role=menuitemradio]")).find(button => button.textContent?.includes("Auto-accept edits"))'), 10_000, 'approval level options');
+  await evaluate('Array.from(document.querySelectorAll("[role=menuitemradio]")).find(button => button.textContent?.includes("Auto-accept edits")).click()');
+  await until(async () => (await (await fetch(botsUrl)).json()).bots.find((bot) => bot.id === createdBot.id)?.approvalMode === 'edits', 20_000, 'saved approval level');
+  await evaluate('document.querySelector(".hattera-settings-back button").click()');
+  await until(() => evaluate('!document.querySelector("[data-hattera-settings][role=dialog]")'), 10_000, 'created bot settings closure');
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await until(() => evaluate('innerWidth === 390 && !!document.querySelector("textarea[aria-label^=Message]")'), 10_000, 'mobile chat layout');
+  await pause(350); // The drawer has a 200 ms slide transition at this breakpoint.
+  const mobileLayout = await evaluate('({ overflow: document.documentElement.scrollWidth > innerWidth, sidebarRight: document.querySelector("[data-sidebar]").getBoundingClientRect().right, composerLeft: document.querySelector("textarea[aria-label^=Message]").getBoundingClientRect().left })');
+  if (mobileLayout.overflow || mobileLayout.sidebarRight > 1 || mobileLayout.composerLeft < 0) {
+    throw new Error(`Mobile chat is obscured or overflows: ${JSON.stringify(mobileLayout)}`);
+  }
+  const mobileScreenshot = resolve('output/playwright/hattera-mobile-smoke.png');
+  const mobileShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(mobileScreenshot, Buffer.from(mobileShot.data, 'base64'));
+  const pairing = await fetch(new URL('/api/auth/pairing', base), {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+  });
+  if (!pairing.ok) throw new Error(`Could not mint isolated pairing code: ${pairing.status}`);
+  const { code } = await pairing.json();
+  await send('Network.setExtraHTTPHeaders', { headers: { 'x-forwarded-for': '203.0.113.50' } });
+  await send('Page.navigate', { url: new URL(`/pair#code=${code}`, base).href });
+  await until(() => evaluate('!!document.querySelector("#pair-code") && !document.querySelector("#pair-code").disabled'), 20_000, 'remote pairing page');
+  if (await evaluate('document.querySelector("#pair-code").value') !== code) throw new Error('Pairing link did not populate its code');
+  for (const skin of ['hattera', 'midnight', 'atelier', 'foundry', 'lagoon', 'graphite', 'linen', 'dusk', 'daylight', 'meadow']) {
+    const colors = await evaluate(`(() => {
+      document.documentElement.dataset.skin = ${JSON.stringify(skin)};
+      const card = document.querySelector('.hattera-pair-card');
+      const field = card.querySelector('input');
+      return [card.querySelector('h2'), card.querySelector('p'), card.querySelector('label')].map(element => ({
+        text: getComputedStyle(element).color, background: getComputedStyle(document.querySelector('.hattera-pair-main')).backgroundColor,
+      })).concat({ text: getComputedStyle(field).color, background: getComputedStyle(field).backgroundColor });
+    })()`);
+    for (const colorsOnSurface of colors) {
+      if (contrastOf(colorsOnSurface) < 4.5) throw new Error(`${skin} pairing text is unreadable: ${JSON.stringify(colorsOnSurface)}`);
+    }
+  }
+  await evaluate("localStorage.setItem('omb-skin', 'midnight')");
+  await send('Page.reload');
+  await until(() => evaluate('document.documentElement.dataset.skin === "midnight" && !!document.querySelector("#pair-code")'), 20_000, 'saved dark pairing skin');
+  const darkPairScreenshot = resolve('output/playwright/hattera-pair-dark-smoke.png');
+  const darkPairShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(darkPairScreenshot, Buffer.from(darkPairShot.data, 'base64'));
+  await evaluate("localStorage.setItem('omb-skin', 'hattera')");
+  await send('Page.reload');
+  await until(() => evaluate('document.documentElement.dataset.skin === "hattera" && !!document.querySelector("#pair-code")'), 20_000, 'saved Hattera pairing skin');
+  await evaluate('document.querySelector("#pair-code").focus(); document.querySelector("#pair-code").select()');
+  await send('Input.insertText', { text: code });
+  await until(() => evaluate(`document.querySelector("#pair-code")?.value === ${JSON.stringify(code)}`), 10_000, 'pairing code entry');
+  const pairScreenshot = resolve('output/playwright/hattera-pair-smoke.png');
+  const pairShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(pairScreenshot, Buffer.from(pairShot.data, 'base64'));
+  await evaluate('Array.from(document.querySelectorAll("form button[type=submit]")).find(button => button.textContent?.trim() === "Connect").click()');
+  await until(() => evaluate('location.pathname === "/" && !!document.querySelector("textarea[aria-label^=Message]")'), 20_000, 'paired remote chat');
+  await evaluate('Array.from(document.querySelectorAll("[data-sidebar] button[aria-haspopup=menu]")).at(-1).click()');
+  await until(() => evaluate('!!document.querySelector("[data-menu-key=settings]")'), 10_000, 'paired Settings menu');
+  await evaluate('document.querySelector("[data-menu-key=settings]").click()');
+  await until(() => evaluate('!!document.querySelector("[role=dialog] [data-settings-page=ai]")'), 10_000, 'paired Settings pages');
+  await evaluate('document.querySelector("[data-settings-page=ai]").click()');
+  const clineCard = '[data-engine-card=cline]';
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(clineCard)})`), 10_000, 'Cline provider card');
+  await evaluate(`document.querySelector(${JSON.stringify(`${clineCard} summary`)}).click()`);
+  const clineInstall = `${clineCard} button`;
+  await until(() => evaluate(`!!Array.from(document.querySelectorAll(${JSON.stringify(clineInstall)})).find(button => button.textContent?.includes('Install Cline on this server'))`), 10_000, 'Cline server install action');
+  await evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(clineInstall)})).find(button => button.textContent?.includes('Install Cline on this server')).click()`);
+  await until(async () => {
+    const data = await (await fetch(new URL('/api/instances', base))).json();
+    return data.instances?.find((instance) => instance.instanceId === 'cline')?.snapshot.version?.includes('fake-acp 1.0.0');
+  }, 90_000, 'Cline installed by browser action');
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(`${clineCard} [role=status]`)}) || !document.querySelector(${JSON.stringify(`${clineCard} button`)})?.textContent?.includes('Installing')`), 10_000, 'Cline install feedback');
+  console.log(JSON.stringify({ ok: true, checks: ['chat-reply', 'opencode-model-picker', 'opencode-acp-reply', 'opencode-provider-card', 'minimax-setup-card', 'qwen-setup-card', 'codex-auth-choices', 'cline-browser-server-install', 'browser-navigation', 'browser-release', 'bot-settings-navigation', 'bot-browser-permission', 'bot-creation', 'bot-identity-edit', 'bot-memory-edit', 'bot-tool-selection', 'bot-skill-authoring', 'bot-approval-level', 'mobile-chat-layout', 'pairing-skin-contrast', 'remote-browser-pairing'], previewUrl: base.href, testPage, screenshots: [pickerScreenshot, providerScreenshot, miniMaxScreenshot, qwenScreenshot, codexScreenshot, codexCodeScreenshot, output, mobileScreenshot, darkPairScreenshot, pairScreenshot] }));
+} finally {
+  socket?.close();
+  chrome.kill();
+  if (resolve(profile).startsWith(resolve(tmpdir()) + sep)) await rm(profile, { recursive: true, force: true }).catch(() => {});
+}

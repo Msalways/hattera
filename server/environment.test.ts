@@ -136,6 +136,9 @@ describe("environment identity", () => {
     expect(environmentDescriptor({ environmentId: "abc", desktopManaged: false, cloudHome: true }).capabilities)
       .toEqual({ remoteSessions: true, cloudHome: true, selfUpdate: "operator", emailSignIn: false });
     expect(environmentDescriptor({ environmentId: "abc", desktopManaged: false, cloudHome: false }).capabilities).not.toHaveProperty("cloudHome");
+    const github = environmentDescriptor({ environmentId: "abc", desktopManaged: false, githubSignInOrigin: "http://127.0.0.1:8080" });
+    expect(github.githubSignInOrigin).toBe("http://127.0.0.1:8080");
+    expect(github.capabilities.githubSignIn).toBe(true);
   });
 
   it("falls back to the checkout's package.json version, then to unknown", () => {

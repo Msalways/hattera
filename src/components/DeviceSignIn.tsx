@@ -131,14 +131,20 @@ export function DeviceSignInProgress({ auth, browserPkce = false, provider = "co
   );
 }
 
-export function DeviceSignIn({ instanceId, browserPkce = false, provider = "codex" }: { instanceId: string; browserPkce?: boolean; provider?: DeviceSignInProvider }) {
+export function DeviceSignIn({ instanceId, browserPkce = false, provider = "codex", availableMethods }: { instanceId: string; browserPkce?: boolean; provider?: DeviceSignInProvider; availableMethods?: ("device-code" | "browser-pkce")[] }) {
   const { refreshInstances, refreshModels } = useStore();
+  const localBrowser = typeof window !== "undefined" && ["localhost", "127.0.0.1", "[::1]"].includes(window.location?.hostname ?? "") && !window.ogb?.remoteClient?.active;
+  const offersBoth = provider === "codex" && availableMethods?.includes("device-code") && availableMethods.includes("browser-pkce");
+  const [method, setMethod] = useState<"device-code" | "browser-pkce">(browserPkce || offersBoth ? "browser-pkce" : "device-code");
+  const browserFlow = method === "browser-pkce";
   const [auth, setAuth] = useState<DeviceSignInStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [callbackUrl, setCallbackUrl] = useState("");
+  const [callbackError, setCallbackError] = useState<string | null>(null);
   const base = `/api/instances/${encodeURIComponent(instanceId)}/auth`;
   const copy = DEVICE_SIGN_IN_COPY[provider];
-  const failed = t(browserPkce ? "engineSetup.chatgpt.failed" : copy.failed);
+  const failed = t(browserFlow ? "engineSetup.chatgpt.failed" : copy.failed);
 
   const refresh = async () => {
     await refreshInstances();
@@ -168,7 +174,7 @@ export function DeviceSignIn({ instanceId, browserPkce = false, provider = "code
         .catch((cause: unknown) => {
           if (controller.signal.aborted) return;
           if (deviceFlowUnavailable(cause)) {
-            setAuth(endedFlow("failed", browserPkce));
+            setAuth(endedFlow("failed", browserFlow));
             setError(null);
             return;
           }
@@ -182,21 +188,37 @@ export function DeviceSignIn({ instanceId, browserPkce = false, provider = "code
       if (expiryTimer !== null) window.clearTimeout(expiryTimer);
       controller.abort();
     };
-  }, [auth, base, browserPkce, busy, failed, instanceId, refreshInstances, refreshModels]);
+  }, [auth, base, browserFlow, busy, failed, instanceId, refreshInstances, refreshModels]);
 
   const start = async () => {
     setBusy(true);
     setError(null);
+    setCallbackError(null);
+    setCallbackUrl("");
     try {
-      const { auth: next }: { auth: DeviceSignInStatus } = await api(`${base}/start`, { method: "POST" });
+      const { auth: next }: { auth: DeviceSignInStatus } = await api(`${base}/start`, { method: "POST", ...(offersBoth ? { body: JSON.stringify({ method }) } : {}) });
       setAuth(next);
       if (next.phase === "succeeded") await refresh();
-      else if (browserPkce && next.phase === "waiting") {
+      else if (browserFlow && next.phase === "waiting") {
         const link = chatgptPlanLink(next.authorizationUrl);
         if (link) await openExternalLink(link);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : failed);
+    } finally { setBusy(false); }
+  };
+
+  const completeBrowser = async () => {
+    if (!auth?.flowId || !callbackUrl.trim()) return;
+    setBusy(true);
+    setCallbackError(null);
+    try {
+      await api(`${base}/complete`, { method: "POST", body: JSON.stringify({ flowId: auth.flowId, callbackUrl: callbackUrl.trim() }) });
+      setCallbackUrl("");
+      setAuth({ phase: "succeeded", flowId: null, authorizationUrl: null, expiresAt: null });
+      await refresh();
+    } catch (cause) {
+      setCallbackError(cause instanceof Error ? cause.message : failed);
     } finally { setBusy(false); }
   };
 
@@ -208,31 +230,46 @@ export function DeviceSignIn({ instanceId, browserPkce = false, provider = "code
       await api(`${base}/cancel`, { method: "POST", body: JSON.stringify({ flowId: auth.flowId }) });
       setAuth({ phase: "cancelled", flowId: null, authorizationUrl: null, expiresAt: null });
     } catch (cause) {
-      if (deviceFlowUnavailable(cause)) setAuth(endedFlow("failed", browserPkce));
+      if (deviceFlowUnavailable(cause)) setAuth(endedFlow("failed", browserFlow));
       else setError(cause instanceof Error ? cause.message : failed);
     } finally { setBusy(false); }
   };
 
   // A cancelled, expired or failed sign-in has one next step: a new code.
-  const startLabel = busy ? t(browserPkce ? "engineSetup.chatgpt.starting" : "engineSetup.device.starting")
+  const startLabel = busy ? t(browserFlow ? "engineSetup.chatgpt.starting" : "engineSetup.device.starting")
     : auth || error ? t("engineSetup.device.tryAgain")
-    : t(browserPkce ? "engineSetup.chatgpt.start" : copy.start);
+    : t(browserFlow ? "engineSetup.chatgpt.start" : offersBoth ? "engineSetup.device.getCode" : copy.start);
+  const callbackForm = <>
+    <p>{t(localBrowser && offersBoth ? "engineSetup.device.callbackLocalHint" : "engineSetup.device.callbackRemoteHint")}</p>
+    <label className="mt-2 block font-medium text-ink" htmlFor={`codex-callback-${instanceId}`}>{t("engineSetup.device.callbackLabel")}</label>
+    <input id={`codex-callback-${instanceId}`} type="url" autoComplete="off" spellCheck={false} value={callbackUrl} onChange={(event) => { setCallbackUrl(event.target.value); setCallbackError(null); }} placeholder="http://127.0.0.1:1455/auth/callback?code=…&state=…" className="mt-1 w-full rounded-md border border-hairline bg-inset px-2.5 py-2 text-[12px] text-ink outline-none focus:border-accent" />
+    <button type="button" disabled={busy || !callbackUrl.trim()} onClick={() => void completeBrowser()} className="mt-2 w-full rounded-md bg-control px-3 py-2 font-medium text-ink disabled:opacity-50">{t("engineSetup.device.finishBrowser")}</button>
+    {callbackError && <p role="alert" className="mt-2 text-danger">{callbackError}</p>}
+  </>;
 
   return (
     <div className="mt-3 space-y-2" data-device-sign-in={provider} data-chatgpt-plan-sign-in={browserPkce || undefined}>
-      {auth && <DeviceSignInProgress auth={auth} browserPkce={browserPkce} provider={provider} />}
+      {offersBoth && <div role="group" aria-label={t("engineSetup.device.methodLabel")} className="flex gap-1 rounded-lg bg-control p-1">
+        {(["browser-pkce", "device-code"] as const).map((choice) => <button key={choice} type="button" aria-pressed={method === choice} disabled={busy || auth?.phase === "waiting"} onClick={() => { setMethod(choice); setAuth(null); setError(null); }} className="flex-1 rounded-md px-2 py-1.5 text-[12px] font-medium text-ink-secondary aria-pressed:bg-panel aria-pressed:text-ink disabled:opacity-50">
+          {t(choice === "browser-pkce" ? "engineSetup.device.browserChoice" : "engineSetup.device.codeChoice")}
+        </button>)}
+      </div>}
+      {auth && <DeviceSignInProgress auth={auth} browserPkce={browserFlow} provider={provider} />}
+      {browserFlow && provider === "codex" && auth?.phase === "waiting" && (localBrowser && offersBoth
+        ? <details className="rounded-lg border border-hairline/50 bg-app p-3 text-[11.5px] text-ink-secondary"><summary className="cursor-pointer font-medium text-ink">{t("engineSetup.device.callbackHelp")}</summary><div className="mt-2">{callbackForm}</div></details>
+        : <div className="rounded-lg border border-hairline/50 bg-app p-3 text-[11.5px] text-ink-secondary">{callbackForm}</div>)}
       {auth?.phase === "waiting" ? (
         <button type="button" disabled={busy} onClick={() => void cancel()} className="w-full rounded-lg bg-control px-3 py-2 text-[12px] font-medium text-ink disabled:opacity-50">
           {busy ? t("engineSetup.device.cancelling") : t("engineSetup.device.cancel")}
         </button>
       ) : auth?.phase !== "succeeded" && (
-        <button type="button" disabled={busy} onClick={() => void start()} className={browserPkce ? chatgptButton : "flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2 text-[12.5px] font-semibold text-white hover:brightness-110 disabled:opacity-50"}>
-          {busy ? <Loader2 size={14} className="animate-spin" /> : browserPkce ? <CodexMark size={16} className="fill-current" /> : <LogIn size={14} />}
+        <button type="button" disabled={busy} onClick={() => void start()} className={browserFlow ? chatgptButton : "flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2 text-[12.5px] font-semibold text-white hover:brightness-110 disabled:opacity-50"}>
+          {busy ? <Loader2 size={14} className="animate-spin" /> : browserFlow ? <CodexMark size={16} className="fill-current" /> : <LogIn size={14} />}
           {startLabel}
         </button>
       )}
       {error && <p role="alert" className="text-[12px] text-danger">{error}</p>}
-      {!browserPkce && provider === "codex" && <p className="text-[11px] leading-relaxed text-ink-secondary">{t("engineSetup.device.enableHint")}</p>}
+      {!browserFlow && provider === "codex" && !error && (!auth || auth.phase === "waiting") && <p className="text-[11px] leading-relaxed text-ink-secondary">{t("engineSetup.device.enableHint")}</p>}
     </div>
   );
 }

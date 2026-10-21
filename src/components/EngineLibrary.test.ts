@@ -1,7 +1,7 @@
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { InstanceInfo } from "@/state/store";
+import { StoreProvider, type InstanceInfo } from "@/state/store";
 import { EngineCard, EngineSections, engineReady } from "./EngineLibrary";
 import { CursorMark, HermesMark, InstanceProviderMark } from "./ProviderIcons";
 
@@ -10,6 +10,7 @@ const instance = (overrides: Partial<InstanceInfo> = {}): InstanceInfo => ({
   snapshot: { state: "available", authenticated: true },
   models: { default: "test", options: [] }, ...overrides,
 });
+const renderWithStore = (child: ReactNode) => renderToStaticMarkup(createElement(StoreProvider, null, child));
 
 describe("engine library", () => {
   it("keeps monochrome provider logos legible in light and dark skins", () => {
@@ -39,12 +40,25 @@ describe("engine library", () => {
     const cline = instance({ driverKind: "clineAgent", displayName: "Cline", snapshot: { state: "available", authenticated: false } });
     expect(engineReady(cline)).toBe(false);
     expect(engineReady({ ...cline, snapshot: { state: "available" } })).toBe(false);
-    expect(renderToStaticMarkup(createElement(EngineCard, { instance: cline, children: null }))).toContain("Sign-in required");
+    expect(renderWithStore(createElement(EngineCard, { instance: cline, children: null }))).toContain("Sign-in required");
     expect(engineReady({ ...cline, snapshot: { state: "available", authenticated: true } })).toBe(true);
   });
 
+  it("keeps Qwen in setup until its own provider route is configured", () => {
+    const qwen = instance({ driverKind: "qwenAgent", access: "custom", snapshot: { state: "available", authenticated: false }, models: { default: "", options: [] } });
+    expect(engineReady(qwen)).toBe(false);
+    expect(renderWithStore(createElement(EngineCard, { instance: qwen, children: null }))).toContain("Sign-in required");
+    expect(engineReady({ ...qwen, snapshot: { state: "available", authenticated: true } })).toBe(true);
+  });
+
+  it("keeps pi in setup until its model catalog contains a configured route", () => {
+    const pi = instance({ driverKind: "piAgent", access: "custom", snapshot: { state: "available", authenticated: false }, models: { default: "", options: [] } });
+    expect(engineReady(pi)).toBe(false);
+    expect(engineReady({ ...pi, snapshot: { state: "available", authenticated: true }, models: { default: "local", options: [{ id: "local", label: "Local", custom: true }] } })).toBe(true);
+  });
+
   it("uses an accessible disclosure and keeps controls mounted while collapsed", () => {
-    const html = renderToStaticMarkup(createElement(EngineCard, { instance: instance(), children: createElement("input", { "aria-label": "Path draft" }) }));
+    const html = renderWithStore(createElement(EngineCard, { instance: instance(), children: createElement("input", { "aria-label": "Path draft" }) }));
     expect(html).toContain('<details data-engine-card="claude"');
     expect(html).toContain("<summary");
     expect(html).toContain('aria-label="Path draft"');
@@ -54,14 +68,14 @@ describe("engine library", () => {
 
   it("never displays a stale signed-out account identity", () => {
     const row = instance({ snapshot: { state: "available", authenticated: false, account: { email: "private@example.test" } } });
-    const render = (value: InstanceInfo) => renderToStaticMarkup(createElement(EngineCard, { instance: value, children: null }));
+    const render = (value: InstanceInfo) => renderWithStore(createElement(EngineCard, { instance: value, children: null }));
     expect(render(row)).not.toContain("private@example.test");
     expect(render(row)).toContain("Sign-in required");
     expect(render({ ...row, snapshot: { ...row.snapshot, authenticated: true } })).toContain("private@example.test");
   });
 
   it("does not present executable names as versions", () => {
-    const render = (version: string) => renderToStaticMarkup(createElement(EngineCard, { instance: instance({ snapshot: { state: "available", version } }), children: null }));
+    const render = (version: string) => renderWithStore(createElement(EngineCard, { instance: instance({ snapshot: { state: "available", version } }), children: null }));
     expect(render("claude")).not.toContain("vclaude");
     expect(render("Claude Code 2.1.8")).toContain("v2.1.8");
   });
@@ -78,7 +92,7 @@ describe("engine library", () => {
       const card = tree.props.children[0].find((node: { key: string }) => node.key === "claude");
       expect(card.type).toBe("div");
       expect(card.props.children.type).toBe(EngineCard);
-      const html = renderToStaticMarkup(tree);
+      const html = renderWithStore(tree);
       expect(html.match(/data-engine-card=/g)).toHaveLength(2);
     }
   });

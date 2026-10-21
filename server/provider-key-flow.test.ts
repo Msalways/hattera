@@ -6,6 +6,31 @@ import { launchVerificationServer } from "../scripts/control-omb.ts";
 import { fixtureApi } from "../scripts/testing/preview-fixture.ts";
 import { openSse } from "./testing/sse.ts";
 
+it("saves MiniMax's key through Settings and exposes only its configured state", async () => {
+  const fixture = await launchVerificationServer();
+  const api = fixtureApi(fixture.info.url);
+  try {
+    const before = await api("GET", "/api/instances");
+    expect(before.instances.find((item: { instanceId: string }) => item.instanceId === "minimax")?.snapshot.state).toBe("unavailable");
+    const status = await api("PUT", "/api/config", { minimax: { key: "minimax-fixture-secret" } });
+    expect(status.minimax.configured).toBe(true);
+    expect(JSON.stringify(status)).not.toContain("minimax-fixture-secret");
+    const { instances } = await api("GET", "/api/instances");
+    const minimax = instances.find((item: { instanceId: string }) => item.instanceId === "minimax");
+    expect(minimax).toMatchObject({ driverKind: "minimax", access: "api", snapshot: { state: "available" } });
+    expect(JSON.stringify(instances)).not.toContain("minimax-fixture-secret");
+    expect((await api("GET", "/api/config")).minimax.configured).toBe(true);
+    const disk = JSON.parse(readFileSync(join(fixture.info.dataDir, "config.json"), "utf8"));
+    expect(disk.minimax.key).toBe("minimax-fixture-secret");
+    const cleared = await api("PUT", "/api/config", { minimax: { key: "" } });
+    expect(cleared.minimax.configured).toBe(false);
+    const refreshed = await api("GET", "/api/instances");
+    expect(refreshed.instances.find((item: { instanceId: string }) => item.instanceId === "minimax")?.snapshot.state).toBe("unavailable");
+  } finally {
+    await fixture.close();
+  }
+});
+
 it("saving and replacing a workspace key reaches an existing bot's next request without leaking keys", async () => {
   const received: string[] = [];
   let reply = 0;

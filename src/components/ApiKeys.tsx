@@ -7,9 +7,10 @@ import { api, useStore, type ConfigStatus } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
 import { t } from "@/lib/i18n";
+import { repositoryGuide } from "@/lib/app-links";
 import type { LocaleKey } from "@/locales";
 
-export type ConfigSection = "composio" | "box" | "opencodeGo" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "xai" | "mistral" | "cerebras" | "groq";
+export type ConfigSection = "composio" | "box" | "opencodeGo" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "xai" | "mistral" | "minimax" | "cerebras" | "groq";
 /** Sections whose key can be tried against the provider from the server. */
 export type TestableProvider = "anthropic" | "openai" | "openrouter" | "openaiCompat" | "xai" | "mistral" | "cerebras" | "groq";
 
@@ -44,6 +45,7 @@ const SECTIONS: Record<
   openrouter: { body: (v) => ({ openrouter: { key: v } }), flag: (c) => c.openrouter?.configured ?? false },
   openaiCompat: { body: (v) => ({ openaiCompat: { key: v } }), flag: (c) => c.openaiCompat?.configured ?? false },
   mistral: { body: (v) => ({ mistral: { key: v } }), flag: (c) => c.mistral?.configured ?? false },
+  minimax: { body: (v) => ({ minimax: { key: v } }), flag: (c) => c.minimax?.configured ?? false },
   cerebras: { body: (v) => ({ cerebras: { key: v } }), flag: (c) => c.cerebras?.configured ?? false },
   groq: { body: (v) => ({ groq: { key: v } }), flag: (c) => c.groq?.configured ?? false },
   xai: { body: (v) => ({ xai: { key: v } }), flag: (c) => c.xai?.configured ?? false },
@@ -139,6 +141,14 @@ const CREDENTIALS: Record<
     descriptionKey: "keys.mistral.desc",
     href: "https://console.mistral.ai/api-keys",
     linkLabelKey: "keys.mistral.link",
+    optional: true,
+  },
+  minimax: {
+    labelKey: "keys.minimax.label",
+    placeholderKey: "keys.minimax.placeholder",
+    descriptionKey: "keys.minimax.desc",
+    href: "https://platform.minimax.io/",
+    linkLabelKey: "keys.minimax.link",
     optional: true,
   },
   cerebras: {
@@ -593,7 +603,7 @@ export function VpsConnection() {
       <div className="mb-1.5 text-[12px] leading-relaxed text-ink-secondary">
         {t("keys.vps.descBefore")}
         <a
-          href="https://github.com/milind-soni/OpenMausBot/blob/main/docs/byo-vps.md"
+          href={repositoryGuide("byo-vps.md")}
           target="_blank"
           rel="noopener noreferrer"
           className="text-accent hover:underline"

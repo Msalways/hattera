@@ -24,7 +24,7 @@ function stages(text: string): Stage[] {
     const [, op, args] = /^\s*(\S+)\s*([\s\S]*)$/.exec(pending)!;
     pending = "";
     if (op.toUpperCase() === "FROM") {
-      const [, from, name] = /^(\S+)(?:\s+AS\s+(\S+))?$/i.exec(args.trim())!;
+      const [, from, name] = /^(?:--platform=\S+\s+)?(\S+)(?:\s+AS\s+(\S+))?$/i.exec(args.trim())!;
       all.push({ name: name ?? `#${all.length}`, from, steps: [] });
     } else all.at(-1)?.steps.push({ op: op.toUpperCase(), args: args.trim() });
   }
@@ -71,20 +71,27 @@ describe("container images", () => {
       expect(Math.max(...heavy), target).toBeLessThan(Math.min(...app));
       // The Data engine's native tree (DuckDB, resvg) changes on a version bump,
       // not per commit, so it is copied before the per-commit app files.
-      const native = steps.findIndex(step => step.op === "COPY" && step.args.includes("/dist-native/duckdb/"));
+      const native = steps.findIndex(step => step.op === "COPY" && step.args.includes("/dist-native/duckdb "));
       expect(native, target).toBeGreaterThan(-1);
       expect(native, target).toBeLessThan(Math.min(...fromBuild.filter(i => i !== native)));
     }
   });
 
-  it("leaves no npm or compile cache in a layer: each install removes its own in the same step", () => {
+  it("keeps npm and compile caches out of shipped layers", () => {
     const installs = shipped().filter(npmInstall);
     expect(installs.length).toBeGreaterThanOrEqual(3);
     for (const { args } of installs) {
       const cache = /--cache (\S+)/.exec(args)?.[1] ?? /\bHOME=(\S+) npm install\b/.exec(args)?.[1];
       expect(cache, args).toMatch(/^\/tmp\//);
       const removed = /\brm -rf ([^;&|]+)/.exec(args)?.[1].split(/\s+/) ?? [];
-      expect(removed, args).toEqual(expect.arrayContaining([cache, "/tmp/node-compile-cache"]));
+      expect(removed, args).toContain("/tmp/node-compile-cache");
+      if (!args.includes(`--mount=type=cache,target=${cache}`)) expect(removed, args).toContain(cache);
+    }
+    expect(browserRun().args).toContain("--allow-scripts=agent-browser");
+    for (const target of ["server", "cloud-home"]) {
+      const engines = chain(target).find(step => step.op === "RUN" && step.args.includes("for pkg in $"))!;
+      expect(engines.args).toContain('script_pkg="${pkg%@*}"; [ -n "$script_pkg" ] || script_pkg="$pkg"');
+      expect(engines.args).toContain('--allow-scripts="$script_pkg" "$pkg"');
     }
   });
 
@@ -103,7 +110,7 @@ describe("container images", () => {
     expect(home.findIndex(step => step.args.startsWith("--from=edge "))).toBeLessThan(home.findLastIndex(npmInstall));
     expect(home.filter(step => step.op === "RUN" && /\b(cp|mv)\b[^&]*caddy/.test(step.args))).toEqual([]);
     expect(home.filter(step => step.args.includes("--from=build")).map(step => step.args)).toEqual([
-      "/src/dist-native/duckdb/linux-x64 ./duckdb", "/src/dist-server ./dist-server", "/src/dist ./dist",
+      "/src/dist-native/duckdb ./duckdb-platforms", "/src/dist-server ./dist-server", "/src/dist ./dist",
     ].map(path => `--from=build ${path}`));
     expect(chain("server").filter(step => step.args.includes("--from=build")).every(step => step.args.startsWith("--from=build --chown=maus:maus "))).toBe(true);
   });
@@ -132,7 +139,8 @@ describe("container images", () => {
     const cache = new RegExp(/cache = re\.compile\(r"(.*)"\)/.exec(scan)![1]);
     const removed = shipped().flatMap(step => [...step.args.matchAll(/\brm -rf ([^;&|]+)/g)].flatMap(match => match[1].trim().split(/\s+/)));
     const throwaway = [...new Set(removed.filter(path => path.startsWith("/tmp/")))].sort();
-    expect(throwaway).toEqual(["/tmp/grok-install", "/tmp/node-compile-cache", "/tmp/npm-cache", "/tmp/omb-build-home"]);
+    expect(throwaway).toEqual(["/tmp/grok-install", "/tmp/node-compile-cache", "/tmp/omb-build-home"]);
+    expect(cache.test("tmp/npm-cache/leftover")).toBe(true);
     for (const path of throwaway) expect(cache.test(`${path.slice(1)}/leftover`), path).toBe(true);
     expect(scan).toContain('grok = files["usr/local/bin/grok"]');
   });
@@ -142,7 +150,7 @@ describe("container images", () => {
     const server = chain("server");
     expect(last(server, "USER")).toBe("maus");
     expect(last(server, "VOLUME")).toBe('["/data"]');
-    expect(last(server, "CMD")).toBe('["node", "dist-server/server-launcher.js"]');
+    expect(last(server, "CMD")).toBe('["node", "/app/render/start.mjs"]');
     expect(last(server, "HEALTHCHECK")).toContain("http://127.0.0.1:8799/api/health");
     const home = chain("cloud-home");
     expect(last(home, "USER")).toBe("root");

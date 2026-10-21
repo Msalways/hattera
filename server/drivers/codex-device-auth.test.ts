@@ -31,6 +31,7 @@ if (args.join(' ') === 'login status') {
   writeFileSync(join(home, 'pid'), String(process.pid));
   if (mode === 'old') { console.error("error: unexpected argument '--device-auth' found secret-token"); process.exit(2); }
   if (mode === 'disabled') { console.error('Device code authentication is not enabled secret-token'); process.exit(1); }
+  if (mode === 'network') { console.error('Error logging in with device code: error sending request for url (https://auth.openai.com/api/accounts/deviceauth/usercode): secret-token'); process.exit(1); }
   if (mode === 'overflow') { console.error('secret-token'.repeat(4000)); setInterval(() => {}, 1000); }
   else {
     if (mode !== 'no-prompt') {
@@ -295,6 +296,12 @@ describe("Codex server-owned device authentication", () => {
     await expect(controller.start()).rejects.toThrow(message);
     await controller.cancel();
     expect(alive(Number(readFileSync(join(home, "pid"), "utf8")))).toBe(false);
+  });
+
+  it("names a server network failure without exposing CLI output or blaming account settings", async () => {
+    const error = await create("network").start().then(() => null, (cause: Error) => cause);
+    expect(error?.message).toContain("could not reach auth.openai.com from this server");
+    expect(error?.message).not.toContain("secret-token");
   });
 
   it("fails safely when the configured executable is missing", async () => {

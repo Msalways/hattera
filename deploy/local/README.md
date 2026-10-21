@@ -11,8 +11,12 @@ The `.env` file is ignored by Git. Shell environment variables take precedence.
 `OMB_HTTP_PORT` changes the host port and the default public URL.
 Internal service ports remain fixed inside the shared network namespace.
 Compose builds this checkout's `Dockerfile` server target. `ENGINES` selects
-space-separated npm packages; the default includes OpenCode, Claude Code, and
-Codex. An empty value skips CLI installation.
+space-separated npm packages; the default includes OpenCode, Claude Code,
+Codex, and Cline. An empty value skips CLI installation. These default CLIs
+are baked into the image, so the running container does not need npm registry
+access to start them. Provider sign-in still happens after the container starts.
+An existing `.env` with `ENGINES=` overrides this default; add `cline` to that
+list and rebuild if you want Cline baked into an existing local deployment.
 
 For Tailscale Serve, set `OMB_PUBLIC_URL` to your HTTPS URL and
 `OMB_HTTPS_HOST` to its hostname without scheme or path. Configure Tailscale
@@ -38,7 +42,22 @@ and `OMB_HTTPS_HOST` empty. GitHub's OAuth app Homepage URL can be
 `http://127.0.0.1:8080`. These values are passed to the server; its identity
 database lives on the persistent `/data` volume.
 
-Sign in and pair a browser:
+Open Hattera on the server computer at `http://127.0.0.1:8080`. In
+**Settings → AI → Model providers and accounts**, expand a provider to install
+its CLI and complete the sign-in it supports. For another device, use
+**Settings → Remote access → Create pairing code** and open the pairing link on
+that device. Provider authorization still requires your account.
+
+Codex browser sign-in starts in the web app. Compose publishes its fixed
+`127.0.0.1:1455` callback on the Docker host's loopback address and Caddy
+forwards that callback to the CLI inside the container. Local browser sign-in
+then finishes automatically. On another computer, the final localhost page
+may fail to load; copy its full address from the browser and paste it into
+**Final browser address** in Hattera. This forwards only the callback for the
+sign-in you started. Keep the address private. The one-time-code option remains
+available when your ChatGPT account permits it.
+
+For terminal-based setup or recovery, the equivalent commands are:
 
 ```sh
 docker compose exec omb codex login --device-auth

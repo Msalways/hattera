@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
+import { repositoryGuide } from "@/lib/app-links";
 import type { Bot } from "@/state/store";
 import { narrowsNativeTools, parseToolScope } from "../../../shared/tool-scope";
 import { TOOL_SCOPE_SUPPORT } from "../../../shared/tool-scope-support";
@@ -94,7 +95,7 @@ export function ToolSelectionCard({ bot, engineKind }: { bot: Bot; engineKind?: 
         className="rounded-lg bg-control px-3 py-2 text-[13px] text-ink hover:bg-raised-hover disabled:opacity-50">
         {t(saving ? "botAccess.tools.saving" : "botAccess.tools.save")}
       </button>
-      <a href="https://github.com/milind-soni/OpenMausBot/blob/main/docs/tool-selection.md" target="_blank" rel="noreferrer" className="text-[12px] text-ink-secondary underline">{t("botAccess.tools.examples")}</a>
+      <a href={repositoryGuide("tool-selection.md")} target="_blank" rel="noreferrer" className="text-[12px] text-ink-secondary underline">{t("botAccess.tools.examples")}</a>
     </div>
   </div>;
 }

@@ -1,7 +1,8 @@
 import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { fileURLToPath } from "node:url";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { codexBrowserSignInLink, codexBrowserSignInPrompt } from "../../shared/device-sign-in.ts";
 import { removeTempDir } from "../testing/cleanup.ts";
 import { CodexBrowserAuthController } from "./codex-device-auth.ts";
@@ -52,7 +53,7 @@ if (args === 'login') {
       startupTimeoutMs: 10_000, lifetimeMs: 15_000,
     });
   });
-  afterEach(async () => { await controller.dispose(); await removeTempDir(home); });
+  afterEach(async () => { vi.unstubAllGlobals(); await controller.dispose(); await removeTempDir(home); });
 
   it("runs plain codex login and confirms the stored sign-in", async () => {
     const started = await controller.start();
@@ -62,5 +63,28 @@ if (args === 'login') {
       .toEqual({ phase: "succeeded", flowId: started.flowId, authorizationUrl: null, expiresAt: null });
     expect(readFileSync(join(home, "calls"), "utf8").trim().split("\n"))
       .toEqual(["login status", "login", "login status"]);
+  });
+
+  it("hands only this flow's callback to the CLI and waits for confirmed login", async () => {
+    const browser = new CodexBrowserAuthController({
+      cli: fileURLToPath(new globalThis.URL("../testing/fake-codex-login-cli.ts", import.meta.url)),
+      environment: () => ({ ...process.env, HOME: home, CODEX_HOME: home, OMB_DEVICE_AUTH_FIXTURE: "1" }),
+    });
+    try {
+      const started = await browser.start();
+      const callback = "http://127.0.0.1:1455/auth/callback?code=fixture-code&state=fixture_123";
+      for (const invalid of [callback.replace("fixture_123", "other-state"), callback.replace("127.0.0.1", "foreign.invalid"), callback + "&state=duplicate"]) {
+        await expect(browser.complete(started.flowId!, invalid)).rejects.toMatchObject({ status: 400 });
+      }
+      const forwarded = vi.fn(async (_url: string) => {
+        writeFileSync(join(home, ".omb-fake-codex-login-approved"), "Offline approval fixture.\n");
+        return new Response("Callback received", { status: 200 });
+      });
+      vi.stubGlobal("fetch", forwarded);
+      await expect(browser.complete(started.flowId!, callback)).resolves.toBeUndefined();
+      expect(forwarded).toHaveBeenCalledOnce();
+      expect(forwarded.mock.calls[0]?.[0]).toBe(callback);
+      expect((await browser.get(started.flowId!)).phase).toBe("succeeded");
+    } finally { await browser.dispose(); }
   });
 });

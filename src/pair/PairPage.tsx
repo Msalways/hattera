@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Github, Server } from "lucide-react";
 import { DesktopWorkspaceSwitcher } from "../components/DesktopWorkspaceSwitcher";
 
 import {
@@ -14,10 +15,15 @@ import {
   type SessionState,
 } from "../lib/session";
 import { pairedDestination } from "../lib/phone-pairing";
+import { brand } from "../lib/brand";
 
 const input = "mt-1 w-full rounded-md border border-hairline/40 bg-inset px-3 py-2 text-[14px] text-ink outline-none focus:border-accent-border";
 const button = "mt-5 w-full rounded-md bg-accent px-4 py-2 text-[14px] font-medium text-accent-ink disabled:opacity-50";
 const fieldLabel = "mt-4 block text-[12px] font-medium text-ink-secondary";
+
+export function githubSignInTarget(currentOrigin: string, configuredOrigin?: string): string | null {
+  return configuredOrigin && configuredOrigin !== currentOrigin ? `${configuredOrigin}/pair?githubStart=1` : null;
+}
 
 /** In the desktop app, a code in the link came from the app itself (Connect
  * to my Cloud, or a pairing link the person pasted to connect): it is used at
@@ -31,7 +37,7 @@ export function pairsAutomatically(initialCode: string | null, desktop = typeof 
  * read a code from: it says where its connection starts instead. */
 export function pairIntro({ mode, sent, email, cloudHome }: { mode: "email" | "code" | null; sent: boolean; email: string; cloudHome: boolean }): string {
   if (mode === "email") return sent ? `We emailed an 8-digit code to ${email}. It works once and expires in ten minutes.` : "Enter your email and we will send you a one-time code.";
-  if (cloudHome) return "To open My Cloud, choose Open My Cloud in the OpenMausBot app on your computer (Settings → MausBot Cloud), or Use in your browser on your Plan page. Have a pairing code? Enter it below.";
+  if (cloudHome) return "To open My Cloud, choose Open My Cloud in the desktop app (Settings → MausBot Cloud), or Use in your browser on your Plan page. Have a pairing code? Enter it below.";
   return "Enter the pairing code shown on the server. Codes work once and expire after five minutes.";
 }
 
@@ -53,6 +59,7 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
   const [otp, setOtp] = useState("");
   const [sent, setSent] = useState(false);
   const [opening, setOpening] = useState(() => pairsAutomatically(initialCode));
+  const githubAutoStart = useRef(false);
 
   useEffect(() => {
     if (!opening || !initialCode) return;
@@ -85,7 +92,7 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
   const connected = isConnected(session);
   const emailOffered = environment?.capabilities.emailSignIn === true;
   const cloudHome = environment?.capabilities.cloudHome === true;
-  const githubFailure = new URLSearchParams(location.search).has("github");
+  const githubFailure = new URLSearchParams(location.search).get("github");
 
   async function submitCode(e: React.FormEvent) {
     e.preventDefault();
@@ -117,23 +124,20 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
     setSent(true);
   }
 
-  async function submitGithub() {
+  function submitGithub() {
     setBusy(true);
     setError(null);
-    try {
-      const response = await fetch("/identity/sign-in/social", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ provider: "github", callbackURL: `${location.origin}/identity/finish`, errorCallbackURL: `${location.origin}/pair?github=1`, disableRedirect: true }),
-      });
-      const answer = await response.json() as { url?: string };
-      if (!response.ok || !answer.url) throw new Error("GitHub sign-in could not start. Try again.");
-      location.assign(answer.url);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "GitHub sign-in could not start. Try again.");
-      setBusy(false);
-    }
+    location.assign(githubSignInTarget(location.origin, environment?.githubSignInOrigin) ?? "/identity/start/github");
   }
+
+  useEffect(() => {
+    if (!environment?.githubSignInOrigin || !new URLSearchParams(location.search).has("githubStart") || githubAutoStart.current) return;
+    githubAutoStart.current = true;
+    history.replaceState(null, "", "/pair");
+    submitGithub();
+    // The configured origin arrives once from the public server descriptor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [environment?.githubSignInOrigin]);
 
   function switchMode(next: "email" | "code") {
     setMode(next);
@@ -141,22 +145,31 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-app px-6 text-ink">
-      <div className="absolute left-3 top-12 max-w-[280px]"><DesktopWorkspaceSwitcher /></div>
-      <div className="w-full max-w-[420px]">
+    <main className="hattera-pair min-h-screen bg-app text-ink">
+      <aside className="hattera-pair-hero">
+        <div className="hattera-pair-logo"><img src={brand().logo ?? "/hattera-mark.svg"} alt="" /><span>{brand().name}</span></div>
+        <DesktopWorkspaceSwitcher />
+      </aside>
+      <section className="hattera-pair-main">
+      <div className="hattera-pair-content">
         {opening ? (
-          <p role="status" className="text-[20px] font-semibold">{cloudHome ? "Opening My Cloud…" : `Connecting to ${environment?.label ?? "this OpenMausBot"}…`}</p>
+          <p role="status" className="text-[20px] font-semibold">{cloudHome ? "Opening My Cloud…" : `Connecting to ${environment?.label ?? "this Hattera server"}…`}</p>
         ) : <>
-        <h1 className="text-[20px] font-semibold">{cloudHome ? "My Cloud" : `${mode === "email" ? "Sign in to" : "Connect to"} ${environment?.label ?? "this OpenMausBot"}`}</h1>
-        <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-secondary">
-          {environment && !cloudHome ? `Version ${environment.version} on ${environment.platform}. ` : ""}
-          {pairIntro({ mode, sent, email, cloudHome })}
-        </p>
+        <h1 className="hattera-pair-title">{cloudHome ? "My Cloud" : `Connect to your ${brand().name} server`}</h1>
+        {environment?.label && !cloudHome ? <div className="hattera-pair-server"><Server size={17} aria-hidden="true" /><span>{environment.label}</span></div> : null}
+        <p className="hattera-pair-intro text-ink-secondary">{cloudHome || mode === "email" ? pairIntro({ mode, sent, email, cloudHome }) : environment?.capabilities.githubSignIn ? "Sign in with GitHub or use a pairing code to connect this device to your server." : pairIntro({ mode, sent, email, cloudHome })}</p>
         {reasonWorthShowing(reason) && !connected ? <p className="mt-3 text-[13px] text-ink-secondary">{reasonWorthShowing(reason)}</p> : null}
-        {githubFailure && !connected ? <p role="alert" className="mt-3 text-[13px] text-danger">GitHub sign-in was refused. Use the configured owner account and try again.</p> : null}
+        {githubFailure && !connected ? <p role="alert" className="mt-3 text-[13px] text-danger">{githubFailure === "state" ? "GitHub sign-in lost its browser session. Start again from this page." : githubFailure === "start" ? "GitHub sign-in could not start. Try again or check the server log." : "GitHub sign-in did not finish. Use the configured owner account and try again."}</p> : null}
         {/* An expired or used code on a Cloud: the app starts a fresh one. */}
-        {error && cloudHome && initialCode ? <p className="mt-3 text-[13px] text-ink-secondary">This link has expired or was already used. In the OpenMausBot app on your computer, open Settings → MausBot Cloud and choose Open My Cloud.</p> : null}
+        {error && cloudHome && initialCode ? <p className="mt-3 text-[13px] text-ink-secondary">This link has expired or was already used. In the desktop app, open Settings → MausBot Cloud and choose Open My Cloud.</p> : null}
         </>}
+        <div className="hattera-pair-options">
+        {!opening && !connected && environment?.capabilities.githubSignIn ? (
+          <div className="hattera-pair-card hattera-pair-github">
+            <button type="button" onClick={submitGithub} disabled={busy} className={button}><Github size={20} aria-hidden="true" />Sign in with GitHub</button>
+          </div>
+        ) : null}
+        {!opening && !connected && environment?.capabilities.githubSignIn ? <div className="hattera-pair-divider" aria-hidden="true"><span>or</span></div> : null}
         {opening ? null : connected ? (
           <p className="mt-4 text-[13.5px]">
             This browser is already connected.{" "}
@@ -165,7 +178,8 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
             </a>
           </p>
         ) : mode === "email" ? (
-          <form onSubmit={submitEmail}>
+          <form onSubmit={submitEmail} className="hattera-pair-card">
+            <h2 className="sr-only">Sign in with email</h2>
             <label className={fieldLabel} htmlFor="signin-email">
               Email
             </label>
@@ -218,7 +232,8 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
             </button>
           </form>
         ) : (
-          <form onSubmit={submitCode}>
+          <form onSubmit={submitCode} className="hattera-pair-card">
+            <h2 className="sr-only">Connect with a pairing code</h2>
             <label className={fieldLabel} htmlFor="pair-code">
               Pairing code
             </label>
@@ -235,6 +250,7 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
               spellCheck={false}
               className={`${input} font-mono text-[15px] tracking-[0.12em]`}
             />
+            <p className="hattera-pair-hint text-ink-secondary">Codes work once and expire after five minutes.</p>
             <label className={fieldLabel} htmlFor="pair-label">
               This device
             </label>
@@ -250,12 +266,9 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
             ) : null}
           </form>
         )}
-        {!opening && !connected && environment?.capabilities.githubSignIn ? (
-          <button type="button" onClick={() => void submitGithub()} disabled={busy} className="mt-3 w-full rounded-md border border-hairline/40 px-4 py-2 text-[14px] font-medium">
-            Sign in with GitHub
-          </button>
-        ) : null}
+        </div>
       </div>
+      </section>
     </main>
   );
 }

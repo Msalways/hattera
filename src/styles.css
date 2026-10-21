@@ -1,5 +1,115 @@
 @import "tailwindcss";
 
+.hattera-pair {
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 50% 76%, color-mix(in srgb, #ef6354 8%, transparent), transparent 60%), var(--color-app);
+}
+.hattera-pair-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 0 clamp(20px, 4vw, 54px);
+  border-bottom: 1px solid var(--color-hairline);
+}
+.hattera-pair-logo { display: flex; align-items: center; gap: 11px; font-size: 23px; font-weight: 660; letter-spacing: -.035em; }
+.hattera-pair-logo img { width: 34px; height: 34px; }
+.hattera-pair-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  width: min(1240px, calc(100% - 64px));
+  min-height: 690px;
+  margin: clamp(24px, 5vh, 56px) auto 40px;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: 18px;
+  background: var(--color-panel);
+  box-shadow: 0 26px 80px #07111a18;
+}
+.hattera-pair-main::before {
+  content: "";
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 690px;
+  border-right: 1px solid color-mix(in srgb, var(--color-hairline) 40%, transparent);
+  background: url("/hattera-fold.svg") center / min(95%, 530px) auto no-repeat,
+    radial-gradient(ellipse at 45% 70%, #8f3b4233, transparent 62%),
+    linear-gradient(150deg, #0d1420, #18202c 60%, #101722);
+}
+.hattera-pair-content {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  width: min(100%, 540px);
+  margin: auto;
+  padding: 40px clamp(28px, 4vw, 58px);
+}
+.hattera-pair-title {
+  max-width: 480px;
+  font-family: Georgia, Cambria, "Times New Roman", serif;
+  font-size: clamp(31px, 3vw, 42px);
+  font-weight: 500;
+  line-height: 1.11;
+  letter-spacing: -.04em;
+}
+.hattera-pair-server {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 40px;
+  margin-top: 21px;
+  font-size: 14px;
+  font-weight: 550;
+}
+.hattera-pair-server svg { flex: none; color: #ef6354; }
+.hattera-pair-intro { margin-top: 11px; font-size: 14px; line-height: 1.55; }
+.hattera-pair-options { margin-top: 27px; }
+.hattera-pair-card { width: 100%; min-width: 0; }
+.hattera-pair-card label { font-size: 12px; }
+.hattera-pair-card input {
+  min-height: 46px;
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+  background: var(--color-inset);
+}
+.hattera-pair-card input:focus { border-color: #ef6354; outline: 2px solid color-mix(in srgb, #ef6354 24%, transparent); outline-offset: 1px; }
+.hattera-pair-card button[type="submit"], .hattera-pair-github > button { min-height: 48px; }
+.hattera-pair-github > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  background: #f27062;
+  color: #211923;
+  font-size: 14px;
+  font-weight: 700;
+}
+.hattera-pair-github > button:hover { background: #ff8170; }
+.hattera-pair-github > button:focus-visible, .hattera-pair-card button[type="submit"]:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.hattera-pair-divider { display: flex; align-items: center; gap: 14px; margin: 22px 0 19px; color: var(--color-ink-secondary); font-size: 12px; text-transform: uppercase; }
+.hattera-pair-divider::before, .hattera-pair-divider::after { content: ""; height: 1px; flex: 1; background: var(--color-hairline); }
+.hattera-pair-hint { margin-top: 6px; font-size: 11px; line-height: 1.3; }
+.hattera-pair-card button[type="submit"] { margin-top: 19px; }
+@media (max-width: 900px) {
+  .hattera-pair-main { grid-template-columns: 42% 58%; width: min(calc(100% - 32px), 780px); min-height: 640px; }
+  .hattera-pair-main::before { min-height: 640px; background-size: min(108%, 390px) auto, auto, auto; }
+  .hattera-pair-content { padding: 34px 28px; }
+}
+@media (max-width: 680px) {
+  .hattera-pair-hero { min-height: 62px; }
+  .hattera-pair-logo { font-size: 21px; }
+  .hattera-pair-logo img { width: 30px; height: 30px; }
+  .hattera-pair-main { display: block; width: min(calc(100% - 24px), 520px); min-height: 0; margin: 16px auto 28px; border-radius: 14px; }
+  .hattera-pair-main::before { display: block; min-height: 100px; border-right: 0; background-size: 128px auto, auto, auto; }
+  .hattera-pair-content { width: 100%; padding: 17px 24px 26px; }
+  .hattera-pair-title { font-size: clamp(29px, 8vw, 36px); }
+  .hattera-pair-server { margin-top: 14px; }
+  .hattera-pair-intro { margin-top: 6px; }
+  .hattera-pair-options { margin-top: 22px; }
+}
+@media (max-width: 380px) { .hattera-pair-content { padding-inline: 18px; } }
+
 /* Phones and tablets have no hover, and Tailwind only applies `hover:` and
    `group-hover:` under `@media (hover: hover)`. A control revealed on hover
    (`opacity-0 group-hover:opacity-100`) is therefore invisible there. Pair
@@ -183,6 +293,119 @@
    white on the danger fill 3.32:1, both short of AA for the 13–15px labels
    they carry. Atelier and Foundry fix this via --color-accent-ink.
    ───────────────────────────────────────────────────────────────────────── */
+[data-skin="hattera"] {
+  --code-color-scheme: light;
+  --color-app: #ffffff;
+  --color-panel: #f8f9fb;
+  --color-raised: #f0f2f5;
+  --color-raised-hover: #e9edf2;
+  --color-composer: #ffffff;
+  --color-composer-ring: #d8dee7;
+  --color-card: #f6f7fa;
+  --color-menu: #ffffff;
+  --color-inset: #e8edf2;
+  --color-control: #dfe4eb;
+  --color-hairline: #c4ccd8;
+  --color-ink: #111e32;
+  --color-ink-secondary: #53647d;
+  --color-ink-tertiary: #596982;
+  --color-accent: #bd332d;
+  --color-accent-border: #ee584b;
+  --color-accent-text: #ad2e29;
+  --color-focus: #bd332d;
+  --color-accent-ink: #ffffff;
+  --color-bubble-user: #fbe0db;
+  --color-bubble-user-ink: #111e32;
+  --color-success: #087d62;
+  --color-danger: #bd332d;
+  --color-danger-ink: #ffffff;
+  --color-success-ink: #ffffff;
+  --color-warning: #8a5a00;
+  --color-scrollbar: #b3bdca;
+  --color-maus-line: #53647d;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --radius-lg: 10px;
+  --radius-xl: 16px;
+}
+
+/* The dark navigation rail is local to Hattera; dialogs and settings retain
+   the light page tokens. Saved upstream skins keep their original palettes. */
+[data-skin="hattera"] [data-sidebar] {
+  --color-panel: #152633;
+  --color-raised: #33434f;
+  --color-raised-hover: #40515c;
+  --color-card: #223440;
+  --color-menu: #223440;
+  --color-inset: #263945;
+  --color-control: #33434f;
+  --color-hairline: #52636f;
+  --color-ink: #f8fafc;
+  --color-ink-secondary: #c1cdd7;
+  --color-ink-tertiary: #b8c6d1;
+  --color-accent-text: #ff8c80;
+  --color-bubble-user: #4d3337;
+  --color-bubble-user-ink: #ffffff;
+  --color-scrollbar: #52636f;
+}
+
+[data-skin="hattera"] [data-sidebar] [aria-current="page"],
+[data-skin="hattera"] [data-sidebar] [aria-selected="true"] {
+  background: #563a40;
+}
+
+.hattera-mobile-brand { display: none; }
+[data-skin="hattera"] [data-chathead-row] { display: flex; min-height: 48px; }
+[data-skin="hattera"] [data-hattera-chat-header] [data-model-picker-content] {
+  --color-ink: #111e32;
+  --color-ink-secondary: #53647d;
+  --color-ink-tertiary: #596982;
+  --color-control: #dfe4eb;
+  --color-raised-hover: #e9edf2;
+  --color-hairline: #c4ccd8;
+}
+[data-skin="hattera"] [data-chathead-identity] { justify-self: auto; }
+[data-skin="hattera"] [data-chathead-controls] { margin-left: auto; }
+[data-skin="hattera"] [data-chathead-pill] { border-color: transparent; background: transparent; }
+[data-skin="hattera"] [data-chat-bubble].bg-card { border: 1px solid #dce3eb; background: #fff; box-shadow: 0 6px 24px #1526330b; }
+[data-skin="hattera"] [data-tour="composer"] { max-width: 940px; margin-inline: auto; border: 1px solid #dce3eb; box-shadow: 0 8px 30px #15263315; }
+[data-hattera-settings-open] > [data-chat-main] { display: none; }
+.hattera-settings-back { flex: none; border-bottom: 1px solid var(--color-hairline); padding: 13px 25px; }
+.hattera-settings-back button { display: inline-flex; align-items: center; gap: 5px; color: var(--color-ink-secondary); font-size: 14px; }
+.hattera-settings-back button:hover { color: var(--color-accent-text); }
+.hattera-settings-heading { display: flex; flex: none; align-items: center; gap: 17px; min-height: 77px; border-bottom: 1px solid var(--color-hairline); padding: 13px 27px; }
+.hattera-settings-heading p { font-size: 13px; }
+.hattera-settings-test { border: 1px solid var(--color-accent-border); border-radius: 9px; padding: 10px 17px; color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 5%, var(--color-panel)); font-size: 13px; font-weight: 600; }
+.hattera-settings-test:hover { background: color-mix(in srgb, var(--color-accent) 12%, var(--color-panel)); }
+.hattera-settings-layout { display: grid; grid-template-columns: 230px minmax(0,1fr); min-height: 0; flex: 1; }
+.hattera-settings-nav { overflow-y: auto; border-right: 1px solid var(--color-hairline); padding: 17px 12px; }
+.hattera-settings-nav button { display: flex; width: 100%; align-items: center; gap: 13px; border-radius: 9px; padding: 10px 13px; color: var(--color-ink-secondary); text-align: left; font-size: 14px; }
+.hattera-settings-nav button:hover { background: var(--color-raised); color: var(--color-ink); }
+.hattera-settings-nav button[aria-current="page"] { color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 9%, var(--color-panel)); font-weight: 600; }
+.hattera-settings-content { min-width: 0; overflow-y: auto; padding: 28px clamp(24px,4vw,62px) 60px; }
+.hattera-settings-content > section { max-width: 940px; }
+.hattera-settings-section-header { display: flex; align-items: center; gap: 18px; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--color-hairline); }
+.hattera-settings-section-header h2 { font-size: 23px; font-weight: 650; letter-spacing: -.025em; }
+.hattera-settings-section-icon { display: grid; width: 50px; height: 50px; flex: none; place-items: center; border-radius: 13px; color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 9%, var(--color-panel)); }
+@media (max-width: 800px) { .hattera-settings-layout { grid-template-columns: 180px minmax(0,1fr); } .hattera-settings-content { padding: 24px; } }
+@media (max-width: 580px) { .hattera-settings-back { padding: 14px 20px; } .hattera-settings-heading { padding: 13px 20px; } .hattera-settings-layout { display: flex; flex-direction: column; } .hattera-settings-nav { display: flex; flex: none; gap: 5px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--color-hairline); padding: 8px 12px; } .hattera-settings-nav button { width: auto; flex: none; gap: 6px; padding: 8px 10px; white-space: nowrap; font-size: 12px; } .hattera-settings-nav button svg { width: 14px; } .hattera-settings-content { padding: 22px 20px 40px; } .hattera-settings-test { padding: 8px 10px; font-size: 12px; } }
+@media (max-width: 767px) {
+  [data-skin="hattera"] [data-hattera-chat-header] {
+    --color-ink: #fff; --color-ink-secondary: #d6e0e8; --color-control: #263945;
+    --color-hairline: #52636f; --color-raised-hover: #33434f;
+    min-height: 70px; background: #152633;
+  }
+  [data-skin="hattera"] [data-chathead-row] { flex-wrap: nowrap; gap: 6px; min-height: 42px; }
+  [data-skin="hattera"] [data-chathead-identity] { display: none; }
+  [data-skin="hattera"] [data-chathead-controls] { flex-wrap: nowrap; gap: 4px; }
+  [data-skin="hattera"] [data-mobile-menu] { color: #fff; }
+  [data-skin="hattera"] .hattera-mobile-brand { display: flex; align-items: center; gap: 7px; min-width: 0; color: #fff; font-size: 18px; font-weight: 680; }
+  [data-skin="hattera"] .hattera-mobile-brand img { width: 27px; height: 27px; }
+  [data-skin="hattera"] [data-tour="model"] { width: auto; max-width: 112px; padding: 4px 6px; gap: 4px; border-radius: 10px; }
+  [data-skin="hattera"] [data-tour="model"] [data-model-label] { display: flex; font-size: 11px; }
+  [data-skin="hattera"] [data-tour="model"] [data-model-label] > span { max-width: 67px; }
+  [data-skin="hattera"] [data-tour="composer"] { margin-inline: 0; }
+}
+
 [data-skin="midnight"] {
   --code-color-scheme: dark;
   --color-app: #070707;

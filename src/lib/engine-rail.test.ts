@@ -47,6 +47,12 @@ describe("configuredModelInstances", () => {
     expect(configuredModelInstances([unavailable, empty, ready, unavailableLocal, emptyLocal], "codex")).toEqual([ready]);
   });
 
+  it("keeps an unavailable OpenCode provider visible for setup without listing its models as available", () => {
+    const opencode = instance({ instanceId: "opencodeGo", driverKind: "opencodeGo", displayName: "OpenCode",
+      snapshot: { state: "unavailable", reason: "opencode CLI not found" }, models: { default: "", options: [] } });
+    expect(configuredModelInstances([opencode])).toEqual([opencode]);
+  });
+
   it.each([true, false, undefined])("keeps cloud and custom models when authentication is %s", (authenticated) => {
     const explicitSubscription = instance({ snapshot: { state: "available", authenticated } });
     const legacy = instance({ instanceId: "legacy", access: undefined, snapshot: { state: "available", authenticated } });

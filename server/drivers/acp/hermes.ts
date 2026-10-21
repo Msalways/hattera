@@ -12,6 +12,7 @@ import { parse as parseYaml } from "yaml";
 
 import type { ModelCatalog } from "../../contracts.ts";
 import { harnessHome } from "../../env-path.ts";
+import { managedHermesHome } from "../../official-engine-install.ts";
 import { resolveCli } from "../../procs.ts";
 import { decodeInjectId, hostApiKey, INJECT_SEP, localHost, mergeLocalInject } from "../local-inject.ts";
 import { createAcpDriver, type AcpSupport } from "./core.ts";
@@ -443,6 +444,10 @@ const support: AcpSupport = {
   },
   spawnArgs: () => ["acp"],
   transformEnv: (env) => {
+    if (!env.HERMES_HOME) {
+      const managed = managedHermesHome();
+      if (managed) env.HERMES_HOME = managed;
+    }
     // A leftover OPENAI_API_KEY makes Hermes auto-resolve to OpenRouter and
     // send no Authorization header. ACP also reloads ~/.hermes/.env, so the
     // named custom provider + session/set_model is the real route.

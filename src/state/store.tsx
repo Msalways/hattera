@@ -665,6 +665,7 @@ export function visibleMessages(bot: Pick<Bot, "messages" | "activeLeafId">): Me
 export interface ConfigStatus {
   xai?: { configured: boolean };
   mistral?: { configured: boolean };
+  minimax?: { configured: boolean };
   cerebras?: { configured: boolean };
   groq?: { configured: boolean };
   /** `everyClaudeBot`: the key runs every Claude bot, not only "Claude (API key)". */
@@ -795,13 +796,14 @@ export interface BrowserProfile {
 // Settings shows (a saved key's Test button used to vanish that way).
 export type ConfigStatusFrame = Pick<
   ConfigStatus,
-  "xai" | "mistral" | "cerebras" | "groq" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "vps" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "localVm" | "opencodeGo" | "tts" | "decider" | "imageGen" | "live" | "profile" | "language" | "features" | "onboarding" | "browserEngine" | "browserProfiles" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
+  "xai" | "mistral" | "minimax" | "cerebras" | "groq" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "vps" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "localVm" | "opencodeGo" | "tts" | "decider" | "imageGen" | "live" | "profile" | "language" | "features" | "onboarding" | "browserEngine" | "browserProfiles" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
 >;
 
 export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
   return {
     xai: frame.xai,
     mistral: frame.mistral,
+    minimax: frame.minimax,
     cerebras: frame.cerebras,
     groq: frame.groq,
     anthropic: frame.anthropic,
@@ -848,7 +850,7 @@ export interface EngineInstall {
   needsNode?: boolean;
   managed?: { label: string; downloadBytes: number };
   /** the server can install or update this engine itself, no terminal */
-  server?: { package: string };
+  server?: { package: string } | { vendor: "cursor" | "hermes" };
   /** configured with a key in Settings → API keys, not in a terminal */
   settings?: "connections";
 }
@@ -912,7 +914,7 @@ export interface InstanceInfo {
   /** `custom` agents sit below the rail divider — no subscription catalog. */
   access?: "subscription" | "custom" | "api";
   /** `signOut`: the browser may remove the stored sign-in to switch accounts. */
-  authentication?: { method: "device-code" | "paste-code" | "browser" | "browser-pkce"; signOut?: boolean };
+  authentication?: { method: "device-code" | "paste-code" | "browser" | "browser-pkce"; methods?: ("device-code" | "browser-pkce")[]; signOut?: boolean };
   install?: EngineInstall;
   /** Configured CLI path override — set ONLY when the user overrode it;
    * absent means the driver default is in effect. */

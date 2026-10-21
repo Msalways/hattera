@@ -43,6 +43,8 @@ export interface DeviceSignIn {
   product: string;
   /** What the person signs in to, as messages name it: "ChatGPT". */
   account: string;
+  /** Public sign-in host used only in a safe network error message. */
+  authHost?: string;
   /** Where the CLI keeps its sign-in: `$homeEnv`, else `~/homeDir`. One
    * sign-in at a time runs per home. */
   homeEnv: string;
@@ -62,6 +64,16 @@ export interface DeviceSignIn {
   signedIn?(env: Env): boolean;
   /** With a status command: removes the stored sign-in (Settings' sign-out). */
   logoutArgs?: readonly string[];
+}
+
+/** CLI output may contain codes or tokens. Classify transport failures here
+ * and return only fixed copy; never send the process output to the browser. */
+function loginFailure(spec: DeviceSignIn, output: string): string {
+  if (/(?:error sending request for url|failed to (?:send|connect|resolve)|connection (?:refused|reset|timed out)|network (?:is )?unreachable|dns error|tls handshake|certificate verify|proxy connect)/i.test(output)) {
+    const destination = spec.authHost ?? `${spec.account}'s sign-in service`;
+    return `${spec.product} sign-in could not reach ${destination} from this server. Check outbound HTTPS, DNS, proxy, and trusted CA settings on the server, then try again.`;
+  }
+  return spec.failure(output);
 }
 
 type Flow = {
@@ -144,7 +156,7 @@ export class DeviceAuthController {
       this.flow = flow;
       const login = () => this.run(flow, [...this.spec.loginArgs], env, home, (loginCode, loginOutput) => {
         if (loginCode !== 0 || !flow.ready) {
-          this.finish(flow, "failed", this.spec.failure(loginOutput));
+          this.finish(flow, "failed", loginFailure(this.spec, loginOutput));
           return;
         }
         // A successful command is not enough: confirm the sign-in the way

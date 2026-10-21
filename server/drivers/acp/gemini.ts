@@ -97,6 +97,17 @@ const support: AcpSupport = {
   loginNote:
     "Gemini CLI needs a GEMINI_API_KEY, a Vertex AI setup, or an enterprise Code Assist login — consumer Google logins stopped working on 2026-06-18 (use the Antigravity engine for those accounts)",
 
+  install: {
+    command: {
+      darwin: "npm install -g @google/gemini-cli",
+      linux: "npm install -g @google/gemini-cli",
+      win32: "npm install -g @google/gemini-cli",
+    },
+    docsUrl: "https://geminicli.com/docs/get-started/installation/",
+    needsNode: true,
+    signInCommand: "gemini",
+  },
+
   // --acp is the stable Gemini CLI surface. --experimental-acp remains an
   // alias for older releases, but using it now emits a deprecation warning.
   spawnArgs: (config, turn) => ["--acp", ...geminiApprovalArgs(config.fullAuto, turn.approvalMode), ...(turn.model ? ["-m", turn.model] : [])],

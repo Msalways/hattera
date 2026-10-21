@@ -14,3 +14,18 @@
 		}
 	}
 }
+
+# The Codex CLI binds 127.0.0.1:1455 inside the container. Listen only on
+# its Docker-network address so the CLI can keep that loopback socket. Compose
+# publishes this listener only on the host's 127.0.0.1.
+:1455 {
+	bind {$OMB_CODEX_CALLBACK_BIND}
+	@callback {
+		path /auth/callback
+		method GET
+	}
+	handle @callback {
+		reverse_proxy 127.0.0.1:1455
+	}
+	respond 404
+}

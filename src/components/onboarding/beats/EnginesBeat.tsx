@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, RefreshCw } from "lucide-react";
 import { EngineSetup } from "@/components/EngineSetup";
-import { engineReady } from "@/components/EngineLibrary";
+import { engineReady, needsConfiguredRoute } from "@/components/EngineLibrary";
 import { InstanceProviderMark } from "@/components/ProviderIcons";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
@@ -208,7 +208,7 @@ export function EnginesBeat({
                   {!ok && expanded === instance.instanceId && (
                     <EngineSetup
                       instance={instance}
-                      intent={instance.access === "custom" ? "inject" : "cloud"}
+                      intent={needsConfiguredRoute(instance) ? "cloud" : instance.access === "custom" ? "inject" : "cloud"}
                       className="mx-3.5 mb-3.5 border-0 bg-inset"
                     />
                   )}

@@ -1,31 +1,28 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import { Provider } from '@/components/provider';
 import './global.css';
 
-const inter = Inter({ subsets: ['latin'] });
-
 export const metadata: Metadata = {
-  metadataBase: new URL('https://docs.openmausbot.com'),
+  metadataBase: new URL('https://github.com/Msalways/hattera'),
   title: {
-    default: 'OpenMausBot Docs',
-    template: '%s · OpenMausBot Docs',
+    default: 'Hattera Docs',
+    template: '%s · Hattera Docs',
   },
-  description: 'Install, configure, and extend your local-first team of AI agents.',
+  description: 'Set up and use your self-hosted Hattera server.',
   openGraph: {
-    title: 'OpenMausBot Docs',
-    description: 'Your own team of AI agents, in a chat app.',
+    title: 'Hattera Docs',
+    description: 'Your own self-hosted AI agent chat workspace.',
     type: 'website',
   },
   icons: {
-    icon: '/app-icon.svg',
-    apple: '/app-icon.svg',
+    icon: '/hattera-mark.svg',
+    apple: '/hattera-mark.svg',
   },
 };
 
 export default function Layout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={inter.className} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
         <Provider>{children}</Provider>
       </body>

@@ -6,6 +6,7 @@
 // touching its siblings.
 import { findCliCandidates } from "../env-path.ts";
 import { installNpmEngine, npmAvailable, serverInstallFor } from "../engine-install.ts";
+import { installOfficialEngine, officialEngineFor } from "../official-engine-install.ts";
 import type {
   AnyProviderDriver,
   EngineAccess,
@@ -32,9 +33,11 @@ export type RegistryEntry =
   | { instanceId: InstanceId; live?: undefined; shadow: ShadowInstance };
 
 /** The driver's install descriptor plus what this machine can do about it. */
-function withServerInstall(install: AnyProviderDriver["install"], npmPresent: boolean): AnyProviderDriver["install"] {
+function withServerInstall(driver: AnyProviderDriver | undefined, npmPresent: boolean): AnyProviderDriver["install"] {
+  const install = driver?.install;
   if (!install) return undefined;
-  const server = serverInstallFor(install, npmPresent);
+  const server = serverInstallFor(install, cliDefaultOf(driver), npmPresent)
+    ?? (driver && cliDefaultOf(driver) && !install.managed ? officialEngineFor(driver.driverKind) : null);
   const platform = process.platform === "darwin" || process.platform === "linux" || process.platform === "win32" ? process.platform : undefined;
   return { ...install, platform, ...(server ? { server } : {}) };
 }
@@ -63,6 +66,7 @@ export class ProviderRegistry {
   /** decoded per-instance `cli` overrides, for describe() — drivers spawn
    * from their own config; this map only reports what was configured */
   private cliByInstance = new Map<InstanceId, string>();
+  private accessByInstance = new Map<InstanceId, EngineAccess>();
   /** What describe() last read of each live instance. A turn's start checks
    * a thread's own engine against it without waiting on that engine's CLI. */
   private lastSnapshots = new Map<InstanceId, ProviderSnapshot>();
@@ -89,6 +93,8 @@ export class ProviderRegistry {
     const loaded = await Promise.all(
       Object.entries(configs).map(async ([instanceId, entry]) => {
         const ready = await this.createEntry(instanceId, entry, decorate);
+        if (entry.access) this.accessByInstance.set(instanceId, entry.access);
+        else this.accessByInstance.delete(instanceId);
         // Usable as soon as it is ready, not after the slowest CLI.
         this.byId.set(instanceId, ready);
         return ready;
@@ -171,7 +177,7 @@ export class ProviderRegistry {
   /** How the instance's driver is presented and paid for (EngineAccess). */
   access(instanceId: InstanceId): EngineAccess | undefined {
     const entry = this.byId.get(instanceId);
-    return entry ? this.driversByKind.get(entry.shadow?.driverKind ?? entry.live!.driverKind)?.metadata.access ?? "subscription" : undefined;
+    return entry ? this.accessByInstance.get(instanceId) ?? this.driversByKind.get(entry.shadow?.driverKind ?? entry.live!.driverKind)?.metadata.access ?? "subscription" : undefined;
   }
 
   /** The configured executable for instance-scoped maintenance actions.
@@ -203,7 +209,7 @@ export class ProviderRegistry {
   }
 
   /** A driver's own installer (a managed download) first; otherwise the
-   * app's npm prefix, when the driver's install one-liner is an npm package
+   * app's verified npm copy, when the driver's install one-liner is an npm package
    * and npm is on PATH. False means Settings has nothing to offer here. */
   async installRuntime(instanceId: InstanceId): Promise<boolean> {
     const entry = this.byId.get(instanceId);
@@ -213,9 +219,14 @@ export class ProviderRegistry {
       return true;
     }
     const driver = this.driversByKind.get(entry.shadow?.driverKind ?? entry.live!.driverKind);
-    const server = serverInstallFor(driver?.install, this.npmPresent());
-    if (!server) return false;
-    await installNpmEngine(server.package, { baseDir: this.enginesBaseDir, cli: cliDefaultOf(driver) });
+    const cli = cliDefaultOf(driver);
+    const server = serverInstallFor(driver?.install, cli, this.npmPresent());
+    if (server) await installNpmEngine(server.package, { baseDir: this.enginesBaseDir, cli });
+    else {
+      const official = driver?.install && cli && !driver.install.managed ? officialEngineFor(driver.driverKind) : null;
+      if (!official) return false;
+      await installOfficialEngine(official.vendor, this.enginesBaseDir);
+    }
     return true;
   }
 
@@ -270,8 +281,8 @@ export class ProviderRegistry {
             models: { default: "", options: [] },
             capabilities: { computerMcp: false, agentsMcp: false, localComputerMcp: false },
             // an unknown driver has no driver record, hence no install path
-            access: driver?.metadata.access ?? "subscription",
-            install: withServerInstall(driver?.install, npmPresent),
+            access: this.access(entry.instanceId) ?? "subscription",
+            install: withServerInstall(driver, npmPresent),
             cli: entry.shadow.cli,
             cliDefault: cliDefaultOf(driver),
             // a shadow is exactly the "your CLI is broken, pick another"
@@ -308,8 +319,8 @@ export class ProviderRegistry {
             localComputerMcp: inst.adapter.capabilities.localComputerMcp === true,
             approvalReview: inst.reviewPermission !== undefined,
           },
-          access: driver?.metadata.access ?? "subscription",
-          install: withServerInstall(driver?.install, npmPresent),
+          access: this.access(entry.instanceId) ?? "subscription",
+          install: withServerInstall(driver, npmPresent),
           authentication: inst.startAuthentication
             ? {
                 method: inst.authenticationMethod ?? (inst.getAuthentication && inst.completeAuthentication
@@ -317,6 +328,7 @@ export class ProviderRegistry {
                   : inst.getAuthentication
                     ? "device-code" as const // a code to enter at the provider's page (Codex)
                     : "browser" as const), // a link and a callback URL (managed engines)
+                ...(inst.authenticationMethods ? { methods: inst.authenticationMethods } : {}),
                 // the browser may remove the stored sign-in to switch accounts
                 signOut: inst.signOut !== undefined,
               }
@@ -343,6 +355,7 @@ export class ProviderRegistry {
     const entry = this.byId.get(instanceId);
     this.byId.delete(instanceId);
     this.cliByInstance.delete(instanceId);
+    this.accessByInstance.delete(instanceId);
     this.lastSnapshots.delete(instanceId);
     await entry?.live?.dispose();
   }

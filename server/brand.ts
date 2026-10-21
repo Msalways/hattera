@@ -41,7 +41,7 @@ export const brandSchema = z
 
 export type Brand = z.infer<typeof brandSchema>;
 
-export const DEFAULT_BRAND: Brand = { name: "OpenMausBot" };
+export const DEFAULT_BRAND: Brand = { name: "Hattera", logo: "/hattera-mark.svg", favicon: "/hattera-mark.svg" };
 
 export interface BrandStatus {
   brand: Brand;

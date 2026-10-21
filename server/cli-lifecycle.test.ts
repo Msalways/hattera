@@ -128,6 +128,17 @@ describe("CLI startup lifecycle", () => {
     expect(mocks.tailscaleServeOff).toHaveBeenCalledWith(expect.objectContaining({ dnsName: "fixture.tail.test" }));
   });
 
+  it("reports a Tailscale endpoint that could not be removed on shutdown", async () => {
+    let healthRequests = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => (++healthRequests === 1
+      ? Response.json({}, { status: 503 })
+      : Response.json({ app: "openmausbot", pid: childPid }))));
+    mocks.tailscaleServeOff.mockRejectedValue(new Error("fixture Serve failure"));
+    const log = vi.fn((line: string) => { if (line.includes("Keep this terminal open")) interrupt(); });
+    expect(await runServe({ ...options, tailscale: true }, log)).toBe(0);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("could not turn off Serve"));
+  });
+
   it.each([
     { outcome: "success", result: { origin: "https://fixture.tail.test" } },
     { outcome: "failure", result: { failure: "unknown" } },

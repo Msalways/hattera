@@ -3,6 +3,7 @@ import { Check, Loader2, Sparkles } from "lucide-react";
 
 import { api, useStore, type ConfigStatus } from "@/state/store";
 import { normalizeImageGenerationUrl, type AvatarImageProvider } from "../../shared/image-generation";
+import { appDisplayName } from "@/lib/brand";
 
 const PROVIDERS = {
   openai: { label: "OpenAI", keyLabel: "OpenAI image API key", credential: "openaiImageApiKey" },
@@ -175,7 +176,7 @@ export function AvatarImageGenerator({
             />
           </label>
           <p className="text-[11px] leading-relaxed text-ink-secondary">
-            OpenAI-compatible Images API. localhost refers to the OpenMausBot server, including when you open this page remotely.
+            OpenAI-compatible Images API. localhost refers to the {appDisplayName()} server, including when you open this page remotely.
           </p>
         </>
       )}

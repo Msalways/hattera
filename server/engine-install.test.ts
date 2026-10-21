@@ -1,11 +1,13 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { enginesBinDir, enginesPrefix, installNpmEngine, npmPackageOf, serverInstallFor } from "./engine-install.ts";
-import { augmentedPath, findCliCandidates, registerPathDir, resetPathCacheForTests } from "./env-path.ts";
+import { activeEngineBinDir, enginesBinDir, enginesPrefix, installNpmEngine, npmPackageOf, registerEnginesBinDir, serverInstallFor } from "./engine-install.ts";
+import { BUILT_IN_DRIVERS } from "./drivers/builtIn.ts";
+import { augmentedPath, findCliCandidates, resetPathCacheForTests } from "./env-path.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 import * as procs from "./procs.ts";
+import { officialEngineFor } from "./official-engine-install.ts";
 
 // A stand-in npm: records its arguments, honours --prefix, and behaves per
 // FAKE_NPM_MODE. Nothing reaches a registry or the network.
@@ -20,6 +22,8 @@ const args = process.argv.slice(2);
 const mode = process.env.FAKE_NPM_MODE || 'ok';
 appendFileSync(process.env.FAKE_NPM_LOG, JSON.stringify({ args, cwd: process.cwd(), secret: process.env.XAI_API_KEY ?? null }) + '\\n');
 if (mode === 'fail') { console.error('npm ERR! code E404\\nnpm ERR! 404 Not Found - registry-token-fixture'); process.exit(1); }
+if (mode === 'permission') { console.error('npm ERR! code EPERM\\nnpm ERR! Operation was rejected by your operating system.\\nnpm ERR! C:\\private\\npm-cache\\secret.log'); process.exit(1); }
+if (mode === 'registry-blocked') { console.error('npm error request to https://registry.npmjs.org/opencode-ai failed, reason: EACCES'); process.exit(1); }
 if (mode === 'hang' || mode === 'stubborn') { setInterval(() => {}, 1000); }
 else {
   const prefix = args[args.indexOf('--prefix') + 1];
@@ -81,12 +85,51 @@ function useFakeNpm() {
 
 describe("npm package detection", () => {
   it("reads only a plain npm one-liner", () => {
-    expect(npmPackageOf({ command: { linux: "npm install -g @anthropic-ai/claude-code" } })).toBe("@anthropic-ai/claude-code");
-    expect(npmPackageOf({ command: { darwin: "npm install -g mmx-cli" } })).toBe("mmx-cli");
-    expect(npmPackageOf({ command: { linux: "curl -fsSL https://x.ai/cli/install.sh | bash" } })).toBeNull();
-    expect(npmPackageOf({ command: { linux: "npm install -g codex; rm -rf /" } })).toBeNull();
-    expect(npmPackageOf({ command: { linux: "npm install -g ../evil" } })).toBeNull();
+    expect(npmPackageOf({ command: { linux: "npm install -g @anthropic-ai/claude-code" } }, "linux")).toBe("@anthropic-ai/claude-code");
+    expect(npmPackageOf({ command: { darwin: "npm install -g mmx-cli" } }, "darwin")).toBe("mmx-cli");
+    expect(npmPackageOf({ command: { linux: "curl -fsSL https://x.ai/cli/install.sh | bash" } }, "linux")).toBeNull();
+    expect(npmPackageOf({ command: { linux: "npm install -g codex; rm -rf /" } }, "linux")).toBeNull();
+    expect(npmPackageOf({ command: { linux: "npm install -g ../evil" } }, "linux")).toBeNull();
     expect(npmPackageOf(undefined)).toBeNull();
+  });
+
+  it("offers a server install only with a command for this platform and a CLI to verify", () => {
+    const install = { command: { linux: "npm install -g fake-engine" } };
+    expect(npmPackageOf(install, "win32")).toBeNull();
+    expect(serverInstallFor(install, "fakebin", true)).toEqual(process.platform === "linux" ? { package: "fake-engine" } : null);
+    expect(serverInstallFor(install, undefined, true)).toBeNull();
+  });
+
+  it("accounts for every built-in provider offered a server npm install", () => {
+    const offered = BUILT_IN_DRIVERS.flatMap((driver) => {
+      const raw = (driver.defaultConfig() as { cli?: unknown }).cli;
+      const cli = typeof raw === "string" ? raw : undefined;
+      const install = serverInstallFor(driver.install, cli, true);
+      return install ? [{ driver: driver.driverKind, package: install.package, cli }] : [];
+    }).sort((a, b) => a.driver.localeCompare(b.driver));
+    expect(offered).toEqual([
+      { driver: "claudeAgent", package: "@anthropic-ai/claude-code", cli: "claude" },
+      { driver: "clineAgent", package: "cline", cli: "cline" },
+      { driver: "codex", package: "@openai/codex", cli: "codex" },
+      { driver: "droidAgent", package: "droid", cli: "droid" },
+      { driver: "geminiAgent", package: "@google/gemini-cli", cli: "gemini" },
+      { driver: "grokAgent", package: "@xai-official/grok", cli: "grok" },
+      { driver: "kimiAgent", package: "@moonshot-ai/kimi-code", cli: "kimi" },
+      { driver: "opencodeGo", package: "opencode-ai", cli: "opencode" },
+      { driver: "piAgent", package: "@earendil-works/pi-coding-agent", cli: "pi" },
+      { driver: "qwenAgent", package: "@qwen-code/qwen-code", cli: "qwen" },
+    ]);
+  });
+
+  it("has a server installer for every built-in CLI provider", () => {
+    const missing = BUILT_IN_DRIVERS.filter((driver) => {
+      const cli = (driver.defaultConfig() as { cli?: unknown }).cli;
+      if (typeof cli !== "string" || !cli) return false;
+      return !driver.install?.managed
+        && !serverInstallFor(driver.install, cli, true)
+        && !officialEngineFor(driver.driverKind);
+    }).map((driver) => driver.driverKind);
+    expect(missing).toEqual([]);
   });
 
   it("lays the prefix out per platform", () => {
@@ -97,6 +140,54 @@ describe("npm package detection", () => {
 
 describe("checking the installed command starts", () => {
   const { ctx, calls } = useFakeNpm();
+
+  it("prefers the app-owned CLI over an already detected external copy", async () => {
+    const external = join(ctx.binDir, process.platform === "win32" ? "fakebin.cmd" : "fakebin");
+    writeFileSync(external, process.platform === "win32" ? "@echo off\r\necho old\r\n" : "#!/bin/sh\necho old\n", { mode: 0o755 });
+    expect(findCliCandidates("fakebin")[0]?.toLowerCase()).toBe(external.toLowerCase());
+    await installNpmEngine("fake-engine", { baseDir: ctx.base, cli: "fakebin" });
+    expect(findCliCandidates("fakebin")[0]?.toLowerCase()).toBe(join(activeEngineBinDir(ctx.base, "fakebin")!, process.platform === "win32" ? "fakebin.cmd" : "fakebin").toLowerCase());
+    expect(calls()).toHaveLength(1);
+  });
+
+  it("keeps the last working CLI active when an update fails, including after boot registration", async () => {
+    await installNpmEngine("fake-engine", { baseDir: ctx.base, cli: "fakebin" });
+    const workingBin = activeEngineBinDir(ctx.base, "fakebin");
+    const workingCli = findCliCandidates("fakebin")[0];
+    process.env.FAKE_NPM_MODE = "broken";
+    await expect(installNpmEngine("fake-engine", { baseDir: ctx.base, cli: "fakebin" })).rejects.toThrow("does not start");
+    expect(activeEngineBinDir(ctx.base, "fakebin")).toBe(workingBin);
+    expect(findCliCandidates("fakebin")[0]).toBe(workingCli);
+    resetPathCacheForTests();
+    registerEnginesBinDir(ctx.base);
+    expect(findCliCandidates("fakebin")[0]).toBe(workingCli);
+  });
+
+  it("switches to a verified new copy after a successful update", async () => {
+    await installNpmEngine("fake-engine", { baseDir: ctx.base, cli: "fakebin" });
+    const first = activeEngineBinDir(ctx.base, "fakebin");
+    await installNpmEngine("fake-engine", { baseDir: ctx.base, cli: "fakebin" });
+    const second = activeEngineBinDir(ctx.base, "fakebin");
+    expect(second).not.toBe(first);
+    expect(findCliCandidates("fakebin")[0]?.toLowerCase()).toBe(join(second!, process.platform === "win32" ? "fakebin.cmd" : "fakebin").toLowerCase());
+    expect(calls()).toHaveLength(2);
+  });
+
+  it("gives a useful permission error without dumping npm paths into Settings", async () => {
+    process.env.FAKE_NPM_MODE = "permission";
+    const failure = await installNpmEngine("fake-engine", { baseDir: ctx.base }).catch((error: Error) => error.message);
+    expect(failure).toContain("server blocked access");
+    expect(failure).toContain("Hattera's tools folder");
+    expect(failure).not.toContain("secret.log");
+    expect(calls()).toHaveLength(1);
+  });
+
+  it("identifies a blocked registry request as network access, not a folder permission", async () => {
+    process.env.FAKE_NPM_MODE = "registry-blocked";
+    const failure = await installNpmEngine("opencode-ai", { baseDir: ctx.base }).catch((error: Error) => error.message);
+    expect(failure).toContain("could not reach the npm registry");
+    expect(failure).not.toContain("file or folder");
+  });
 
   it("installs again when npm left a command that does not start", async () => {
     process.env.FAKE_NPM_MODE = "broken-once";
@@ -112,23 +203,28 @@ describe("checking the installed command starts", () => {
     expect(failure).toContain("install again from Settings");
     expect(calls()).toHaveLength(2);
   });
+
+  it.skipIf(process.platform !== "win32")("does not claim Node is missing when a detected npm shim cannot launch", async () => {
+    writeFileSync(join(ctx.binDir, "npm.cmd"), "@echo off\r\nunsupported-wrapper %*\r\n");
+    await expect(installNpmEngine("fake-engine", { baseDir: ctx.base, cli: "fakebin" })).rejects.toThrow("npm was found but its launcher could not start");
+  });
 });
 
 describe.skipIf(process.platform === "win32")("installing with npm", () => {
   const { ctx, calls } = useFakeNpm();
 
-  it("installs into the app's prefix with a fixed argument list and no workspace credentials", async () => {
-    expect(serverInstallFor({ command: { linux: "npm install -g fake-engine" } })).toEqual({ package: "fake-engine" });
-    registerPathDir(enginesBinDir(ctx.base));
+  it("installs into a verified app-owned prefix with a fixed argument list and no workspace credentials", async () => {
+    expect(serverInstallFor({ command: { linux: "npm install -g fake-engine" } }, "fakebin")).toEqual({ package: "fake-engine" });
     await installNpmEngine("fake-engine", { baseDir: ctx.base, cli: "fakebin", env: { ...process.env, XAI_API_KEY: "workspace-secret" } });
     expect(calls()).toHaveLength(1);
-    expect(calls()[0]!.args).toEqual(["install", "-g", "--prefix", enginesPrefix(ctx.base), "--loglevel=error", "--include=optional", "--allow-scripts=fake-engine", "fake-engine@latest"]);
+    const prefix = dirname(activeEngineBinDir(ctx.base, "fakebin")!);
+    expect(calls()[0]!.args).toEqual(["install", "-g", "--prefix", prefix, "--loglevel=error", "--include=optional", "--allow-scripts=fake-engine", "fake-engine@latest"]);
     // The child reports its cwd resolved; macOS puts the temp dir under /private.
-    expect(realpathSync(calls()[0]!.cwd)).toBe(realpathSync(enginesPrefix(ctx.base)));
+    expect(realpathSync(calls()[0]!.cwd)).toBe(realpathSync(prefix));
     expect(calls()[0]!.secret).toBeNull();
     // The freshly installed binary is what a bare name now resolves to.
-    expect(realpathSync(findCliCandidates("fakebin")[0]!)).toBe(realpathSync(join(enginesBinDir(ctx.base), "fakebin")));
-    expect(augmentedPath().split(delimiter)[0]).toBe(enginesBinDir(ctx.base));
+    expect(realpathSync(findCliCandidates("fakebin")[0]!)).toBe(realpathSync(join(activeEngineBinDir(ctx.base, "fakebin")!, "fakebin")));
+    expect(augmentedPath().split(delimiter)[0]).toBe(activeEngineBinDir(ctx.base, "fakebin"));
   });
 
   it("coalesces concurrent clicks into one npm run", async () => {
@@ -182,7 +278,7 @@ describe.skipIf(process.platform === "win32")("installing with npm", () => {
   it("says plainly when npm is missing", async () => {
     // The PATH scan also looks in standard install locations, which a test
     // cannot empty, so absence is injected at both call sites.
-    expect(serverInstallFor({ command: { linux: "npm install -g fake-engine" } }, false)).toBeNull();
+    expect(serverInstallFor({ command: { linux: "npm install -g fake-engine" } }, "fakebin", false)).toBeNull();
     mkdirSync(join(ctx.scratch, "empty"));
     await expect(installNpmEngine("fake-engine", { baseDir: ctx.base, path: join(ctx.scratch, "empty") })).rejects.toThrow("npm is not installed");
   });

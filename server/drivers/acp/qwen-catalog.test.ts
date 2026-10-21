@@ -103,6 +103,18 @@ describe("readQwenModelCatalog", () => {
 });
 
 describe("QwenAgentDriver catalog", () => {
+  it("does not call an installed CLI signed in before a provider route exists", async () => {
+    const home = scratchSettings({});
+    const instance = await QwenAgentDriver.create({
+      instanceId: "qwen-unconfigured", displayName: "Qwen", environment: homeEnv(home), enabled: true,
+      config: { ...QwenAgentDriver.defaultConfig(), cli: FAKE_CLI },
+    });
+    try {
+      expect((await instance.snapshot()).authenticated).toBe(false);
+    } finally {
+      await instance.dispose();
+    }
+  });
   it("loads configured Qwen models when the instance is created", async () => {
     const home = scratchSettings({ modelProviders: { openai: [{ id: "configured-qwen", name: "Configured Qwen" }] } });
     const instance = await QwenAgentDriver.create({

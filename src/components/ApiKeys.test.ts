@@ -55,6 +55,11 @@ describe("provider key rows", () => {
     expect(groq).toContain('value=""');
     expect(groq).not.toContain("Connected");
     expect(groq).not.toContain(">Test<");
+    const minimax = render(createElement(ApiKeyRow, { section: "minimax" }));
+    expect(minimax).toContain("MiniMax API key");
+    expect(minimax).toContain('type="password"');
+    expect(minimax).toContain('value=""');
+    expect(minimax).not.toContain(">Test<");
   });
 
   it("saves on paste instead of a Save button, and keeps key effects in view", () => {

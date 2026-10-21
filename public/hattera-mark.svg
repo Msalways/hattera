@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Hattera</title>
+  <path fill="#ef6354" d="M6 5 24 11v17l8 4-8 4v17L6 59zM58 5 40 11v17l-8 4 8 4v17l18 6z"/>
+  <path fill="#c83832" d="m24 28 8-4 8 4-8 4zM24 36l8 4 8-4-8-4z"/>
+  <path fill="#ff8b76" d="m6 5 18 6v10L6 15zM40 11 58 5v10l-18 6z"/>
+</svg>

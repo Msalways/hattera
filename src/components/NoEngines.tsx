@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useStore } from "@/state/store";
 import { EngineGroupLabel } from "@/components/EngineGroupLabel";
 import { EngineSetup, installCommandFor } from "@/components/EngineSetup";
+import { needsConfiguredRoute } from "@/components/EngineLibrary";
 import { InstanceProviderMark } from "@/components/ProviderIcons";
 import { WindowDragStrip } from "@/components/DesktopCapabilities";
 import { splitEngineRail } from "@/lib/engine-rail";
@@ -80,7 +81,7 @@ export function NoEngines() {
                 </div>
                 <EngineSetup
                   instance={instance}
-                  intent={instance.access === "custom" ? "inject" : "cloud"}
+                  intent={needsConfiguredRoute(instance) ? "cloud" : instance.access === "custom" ? "inject" : "cloud"}
                   className="mt-0.5"
                 />
               </div>

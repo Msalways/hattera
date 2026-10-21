@@ -15,7 +15,10 @@ function copyKey(id: string, part: "title" | "body"): LocaleKey {
 }
 
 export function FeatureReel({ onNext, setMascot }: BeatProps) {
-  const ids = REEL;
+  // The CLI install scene depicts the upstream release, which Hattera does not publish.
+  const ids = typeof window !== "undefined" && !window.ogb?.platform
+    ? REEL.filter((id) => id !== "terminal")
+    : REEL;
   const [index, setIndex] = useState(0);
   const [round, setRound] = useState(0);
   const id = ids[index] ?? ids[0];

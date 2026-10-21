@@ -32,7 +32,7 @@ describe("skins", () => {
       const body = css.match(new RegExp(`\\[data-skin="${id}"\\]\\s*\\{([^}]*)\\}`))?.[1] ?? "";
       return new Set([...body.matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name));
     };
-    const reference = tokensOf(DEFAULT_SKIN);
+    const reference = tokensOf("midnight");
     expect(reference.size).toBeGreaterThan(15);
     expect(reference).toContain("--color-composer-ring");
     for (const id of SKIN_IDS) {
@@ -43,7 +43,7 @@ describe("skins", () => {
   it("selects a code-only light or dark palette in every nearest skin", () => {
     for (const id of SKIN_IDS) {
       const body = css.match(new RegExp(`\\[data-skin="${id}"\\]\\s*\\{([^}]*)\\}`))?.[1] ?? "";
-      const scheme = ["atelier", "lagoon", "linen", "daylight", "meadow"].includes(id) ? "light" : "dark";
+      const scheme = ["hattera", "atelier", "lagoon", "linen", "daylight", "meadow"].includes(id) ? "light" : "dark";
       expect(body).toContain(`--code-color-scheme: ${scheme};`);
     }
     expect(css).toMatch(/\.chat-md \.shiki\s*\{\s*color-scheme:\s*var\(--code-color-scheme\);\s*\}/);
@@ -51,10 +51,10 @@ describe("skins", () => {
 
   it("adds Meadow without moving or replacing the original eight", () => {
     expect(SKIN_IDS).toContain("meadow");
-    expect(SKIN_IDS.slice(0, 8)).toEqual([
+    expect(SKIN_IDS.slice(1, 9)).toEqual([
       "midnight", "atelier", "foundry", "lagoon", "graphite", "linen", "dusk", "daylight",
     ]);
-    expect(DEFAULT_SKIN).toBe("midnight");
+    expect(DEFAULT_SKIN).toBe("hattera");
   });
 
   it("gives Meadow's dark bubble its own inverted context", () => {

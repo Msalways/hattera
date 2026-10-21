@@ -6,18 +6,24 @@ import { t } from "@/lib/i18n";
 import { InstanceProviderMark } from "./ProviderIcons";
 
 export function engineReady(instance: InstanceInfo): boolean {
-  if (instance.driverKind === "clineAgent") {
+  if (instance.driverKind === "clineAgent" || needsConfiguredRoute(instance)) {
     return instance.snapshot.state === "available" && instance.snapshot.authenticated === true;
   }
   return instance.snapshot.state === "available" &&
     (instance.access === "custom" || instance.snapshot.authenticated !== false);
 }
 
+/** These runtimes report installed separately from whether they have any
+ * configured provider/model route. A local route counts too. */
+export function needsConfiguredRoute(instance: InstanceInfo): boolean {
+  return instance.driverKind === "qwenAgent" || instance.driverKind === "piAgent";
+}
+
 const providers: Record<string, string> = {
   claudeAgent: "Anthropic", codex: "OpenAI", grok: "xAI", grokAgent: "xAI",
   kimiAgent: "Moonshot AI", droidAgent: "Factory", cursorAgent: "Cursor",
   antigravityAgent: "Google", opencodeGo: "OpenCode", qwenAgent: "Qwen",
-  hermesAgent: "Nous Research", clineAgent: "Cline", piAgent: "pi.dev", mistral: "Mistral AI", cerebras: "Cerebras", groq: "Groq",
+  hermesAgent: "Nous Research", clineAgent: "Cline", piAgent: "pi.dev", mistral: "Mistral AI", minimax: "MiniMax", cerebras: "Cerebras", groq: "Groq",
 };
 
 /** One disclosure, not a second settings dialog. Keep its children mounted so

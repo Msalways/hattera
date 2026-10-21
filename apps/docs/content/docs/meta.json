@@ -1,18 +1,10 @@
 {
-  "title": "OpenMausBot",
+  "title": "Hattera",
   "root": true,
   "pages": [
     "index",
-    "getting-started",
-    "features",
-    "providers",
-    "computers",
-    "connected-apps",
-    "mobile",
-    "self-hosting",
-    "security",
-    "troubleshooting",
-    "changelog",
-    "contributing"
+    "setup",
+    "capabilities",
+    "hosting"
   ]
 }

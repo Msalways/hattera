@@ -8,8 +8,8 @@
   --omb-ink: #0a0a0b;
   --omb-muted: #5f6570;
   --omb-line: #e5e7ea;
-  --omb-accent: #009957;
-  --omb-accent-soft: #eaf8f1;
+  --omb-accent: #bd332d;
+  --omb-accent-soft: #fbe7e2;
 
   --color-fd-background: var(--omb-bg);
   --color-fd-foreground: var(--omb-ink);
@@ -23,7 +23,7 @@
   --color-fd-secondary: var(--omb-raised);
   --color-fd-secondary-foreground: var(--omb-ink);
   --color-fd-accent: var(--omb-accent-soft);
-  --color-fd-accent-foreground: #006b3d;
+  --color-fd-accent-foreground: #a52c28;
 }
 
 .dark {
@@ -32,11 +32,11 @@
   --omb-ink: #f4f4f5;
   --omb-muted: #9a9aa4;
   --omb-line: #232327;
-  --omb-accent: #3fae6e;
-  --omb-accent-soft: #10271a;
+  --omb-accent: #ff8778;
+  --omb-accent-soft: #492d32;
 
-  --color-fd-primary-foreground: #07130c;
-  --color-fd-accent-foreground: #7bd69e;
+  --color-fd-primary-foreground: #17212d;
+  --color-fd-accent-foreground: #ffaaa0;
 }
 
 html {
@@ -50,6 +50,7 @@ html > body[data-scroll-locked] {
 }
 
 body {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   background:
     radial-gradient(circle at 75% -20%, color-mix(in srgb, var(--omb-accent) 8%, transparent), transparent 32rem),
     var(--omb-bg);

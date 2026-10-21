@@ -1,0 +1,46 @@
+---
+title: Set up Hattera
+description: Run this fork in Docker Compose and connect a browser.
+icon: Rocket
+---
+
+## Start the server
+
+Install Docker with Linux containers. From the repository root, run:
+
+```sh
+docker compose up -d --build
+```
+
+Open `http://127.0.0.1:8080/pair`. The Compose deployment builds this checkout and stores app data and engine sign-ins in the existing named volume. The Compose project and volume names remain `openmausbot` so existing installations keep their data.
+
+## Enable GitHub sign-in
+
+Copy `.env.example` to `.env`. Set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `BETTER_AUTH_SECRET`, and the numeric `GITHUB_OWNER_ID` of the only allowed GitHub account. Set `OMB_PUBLIC_URL=http://127.0.0.1:8080` and `GITHUB_REDIRECT_URI=http://127.0.0.1:8080/identity/callback/github`. Register that exact callback URL in your GitHub OAuth app.
+
+The browser sign-in page offers GitHub only when the server reports that GitHub sign-in is configured. A pairing code remains available; generate it on the server and enter it at `/pair`. Existing auth URLs and pairing links keep working.
+
+## Configure an agent engine
+
+If Hattera finds a CLI installed outside its own tools folder, expand **CLI path and updates** on that provider's card to install a managed copy. An explicit **Set CLI** path takes precedence; reset that path first to use the managed copy. Signing in to an account is still a separate step.
+
+Hattera needs a configured agent engine before a bot can reply. Open **Settings → AI → Model providers and accounts** in the browser app and select **Install on this server** for a CLI provider. Hattera installs the software on the server and checks that its command starts. You then sign in to your provider account or add its API key; Hattera cannot authorize that account for you. Model availability follows the installed and authenticated state. An engine shown as unconfigured cannot be used just by selecting its model name.
+
+The server needs outbound HTTPS to download CLIs and complete provider sign-in. If Codex reports that it cannot reach `auth.openai.com`, check the server's DNS, proxy, and trusted CA configuration. The fresh local launcher reports connectivity to that host and the npm registry, but account authorization still requires a real sign-in.
+
+For Codex, choose **Browser sign-in** or **One-time code** in the web app. Browser sign-in opens OpenAI's page. On a local Docker deployment, Compose forwards the CLI's `127.0.0.1:1455` callback automatically. When you open Hattera from another computer, the final localhost page may fail to load there; copy its complete address into **Final browser address** in Hattera to finish on the server. The server accepts only the callback for the sign-in you started. The one-time-code method may need enabling in ChatGPT security or workspace settings. Both methods require outbound HTTPS from the server. See [OpenAI's authentication guide](https://learn.chatgpt.com/docs/auth) for provider requirements.
+
+Other providers use the method they expose: Claude offers a code to paste back into Hattera, Grok offers a one-time code, and Antigravity starts Google's browser flow. OpenCode, Cursor, Kimi, Droid, Cline, Hermes, Qwen, and pi use their own interactive account setup on the computer hosting Hattera. After installing Qwen, run `qwen` and choose `/auth`; after installing pi, run `pi` and choose `/login`. The card in **Model providers and accounts** shows the command and a setup guide. API providers such as OpenAI, xAI, OpenRouter, Mistral, MiniMax, Cerebras, and Groq use **Settings → API keys**. MiniMax checks the saved key when a model request runs; it has no separate non-billing key test in Hattera. For Qwen and pi, Hattera keeps an installed CLI in setup until it can see a configured model route. Installing a command does not grant access to a provider account.
+
+See [local deployment](https://github.com/Msalways/hattera/blob/main/deploy/local/README.md) for port changes, CLI login, pairing, and optional Tailscale Serve. Never commit `.env`.
+
+## Open a fresh local run on your tailnet
+
+To test this checkout without using your Compose volume, build the browser app and start an isolated server. Add `--tailscale` to make it available over tailnet HTTPS:
+
+```sh
+npm run build
+node --experimental-strip-types scripts/start-hattera-local.ts --tailscale
+```
+
+The launcher prints the local URL, tailnet URL, and pairing code. It needs Tailscale installed and signed in on the host, with HTTPS certificates enabled for the tailnet. It refuses to replace another Serve endpoint using HTTPS port 443 and removes its own endpoint on normal shutdown. If the process crashes, check `tailscale serve status` before removing a stale Hattera endpoint with `tailscale serve --https=443 off`. Without the flag, the same launcher stays local only. See [Tailscale Serve](https://tailscale.com/docs/reference/tailscale-cli/serve) for the host requirements.

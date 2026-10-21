@@ -1,4 +1,4 @@
-import { createServer, type Server } from "node:http";
+import { createServer, request as httpRequest, type Server } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -95,6 +95,34 @@ it.each([{ mode: "HTTPS", config }, { mode: "loopback", config: localConfig }])(
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("missing test port");
   const base = `http://127.0.0.1:${address.port}`;
+  const browserStart = await new Promise<import("node:http").IncomingMessage>((resolve, reject) => {
+    const request = httpRequest(`${base}/identity/start/github`, {
+      headers: { host: new URL(config.OMB_PUBLIC_URL).host, origin: "http://127.0.0.1", cookie: "better-auth.state=fixture" },
+    }, (response) => { response.resume(); response.on("end", () => resolve(response)); });
+    request.on("error", reject);
+    request.end();
+  });
+  expect(browserStart.statusCode).toBe(303);
+  expect(browserStart.headers.location).toMatch(/^https:\/\/github\.com\/login\/oauth\/authorize\?/);
+  expect(browserStart.headers["set-cookie"]?.length).toBeGreaterThan(0);
+  const wrongHost = await fetch(`${base}/identity/start/github`, { redirect: "manual" });
+  expect(wrongHost.status).toBe(400);
+  const wrongOrigin = config.OMB_PUBLIC_URL.startsWith("http:") ? config.OMB_PUBLIC_URL.replace("127.0.0.1", "localhost") : "https://other.example";
+  const wrongStart = await fetch(`${base}/identity/sign-in/social`, {
+    method: "POST", headers: { "content-type": "application/json", origin: wrongOrigin },
+    body: JSON.stringify({ provider: "github", callbackURL: `${wrongOrigin}/identity/finish`, disableRedirect: true }),
+  });
+  expect(wrongStart.status).toBe(200);
+  const wrongUrl = (await wrongStart.json() as { url: string }).url;
+  // The browser stores this state cookie on localhost, but GitHub returns to
+  // the configured 127.0.0.1 callback, which cannot read that cookie.
+  const wrongState = new URL(wrongUrl).searchParams.get("state");
+  const unmatchedCallback = await fetch(`${base}/identity/callback/github?state=${encodeURIComponent(wrongState!)}&code=fixture-code`, { redirect: "manual" });
+  expect(unmatchedCallback.status).not.toBe(200);
+  const errorPage = await fetch(`${base}/identity/error?error=state_mismatch`, { redirect: "manual" });
+  expect(errorPage.status).toBe(303);
+  expect(errorPage.headers.get("location")).toBe("/pair?github=state");
+  expect(sessions.list()).toHaveLength(0);
   const nativeFetch = globalThis.fetch;
   let githubId = 54321;
   vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {

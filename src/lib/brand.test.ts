@@ -1,8 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { accentInk, applyBrand, bootstrapBrand, brand, brandVars, DEFAULT_BRAND, iconType, luminance } from "./brand";
+import { accentInk, appDisplayName, applyBrand, bootstrapBrand, brand, brandVars, DEFAULT_BRAND, iconType, luminance } from "./brand";
 
 describe("brand", () => {
+  it("uses the served name in a browser and retains the desktop release name", () => {
+    applyBrand({ brand: { name: "Custom Hattera" }, source: "file", file: "" });
+    try {
+      vi.stubGlobal("window", { ogb: undefined });
+      expect(appDisplayName()).toBe("Custom Hattera");
+      vi.stubGlobal("window", { ogb: { platform: "win32" } });
+      expect(appDisplayName()).toBe("OpenMausBot");
+    } finally {
+      vi.unstubAllGlobals();
+      applyBrand({ brand: DEFAULT_BRAND, source: "default", file: "" });
+    }
+  });
+
   it("derives readable ink for light and dark accents", () => {
     expect(accentInk("#1D4ED8")).toBe("#ffffff");
     expect(accentInk("#C2510A")).toBe("#ffffff");

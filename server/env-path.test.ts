@@ -36,6 +36,13 @@ describe("augmentedPath", () => {
     expect(path.split(delimiter)[0]).toBe(firstExisting);
   });
 
+  it.skipIf(process.platform !== "win32")("launches the same npm shim that Settings detects", () => {
+    resetPathCacheForTests();
+    const detected = findCliCandidates("npm")[0];
+    expect(detected).toBeDefined();
+    expect(resolveCli("npm", ["--version"])).toEqual(resolveCli(detected!, ["--version"]));
+  });
+
   it("prepends OMB_EXTRA_PATH and dedupes", () => {
     process.env.OMB_EXTRA_PATH = ["/tmp/omb-extra", "/tmp/omb-extra"].join(delimiter);
     resetPathCacheForTests();
@@ -387,6 +394,18 @@ winOnly("resolveCli (Windows)", () => {
     expect(resolveCli("ombfake", ["-p", "hi"])).toEqual({
       command: join(dir, "node_modules", "pkg", "bin", "ombfake.exe"),
       args: ["-p", "hi"],
+    });
+  });
+
+  it("resolves Hermes' generated Python fallback without running cmd.exe", () => {
+    const python = join(dir, "python.exe");
+    writeFileSync(python, "MZ-not-really");
+    const code = "import base64; exec(base64.b64decode('cHJpbnQoMSk='))";
+    writeFileSync(join(dir, "hermes.cmd"), `@echo off\r\n"${python}" -I -c "${code}" %*\r\n`);
+    onPath();
+    expect(resolveCli("hermes", ["acp", "--model", "a&b"])).toEqual({
+      command: python,
+      args: ["-I", "-c", code, "acp", "--model", "a&b"],
     });
   });
 

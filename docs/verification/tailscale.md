@@ -26,6 +26,12 @@ Assertions cover:
 - Candidate fallback, clearing stale names, and distinct diagnostics for GUI
   startup, malformed JSON, and a status with no DNS name. Raw output is not logged.
 - Explicit CLI mode for self-hosted status, HTTPS Serve, and Serve off.
+- Refusal to replace an existing HTTPS port 443 endpoint before starting Serve.
+
+The checkout's clean local launcher accepts `--tailscale` and uses the same
+server CLI path. It prints the local URL, the tailnet HTTPS URL, and a pairing
+code. The flag fails with an actionable message when Tailscale is absent or
+not signed in; it does not silently start an inaccessible remote link.
 
 This proves the discovery/control contract, not a particular customer's
 Tailscale installation, iOS transport behavior, or reachability over cellular.

@@ -7,6 +7,7 @@ export interface EnvironmentDescriptor {
   label: string;
   platform: string;
   version: string;
+  githubSignInOrigin?: string;
   capabilities: { remoteSessions: true; selfUpdate: "desktop-managed" | "operator"; emailSignIn?: boolean; githubSignIn?: true; sharedComputers?: true; cloudHome?: true };
 }
 

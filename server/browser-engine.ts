@@ -20,7 +20,6 @@ import { browserBundlePaths } from "./browser-bundle-release.ts";
 import { BROWSER_VIEWPORT_ARGS, browserRuntimeEnv, ownsBrowserViewport } from "./browser-runtime.ts";
 import { SIGN_IN_PROMPT } from "./system-prompt.ts";
 import {
-  AGENT_BROWSER_VERSION,
   agentBrowserReleaseUrl,
   agentBrowserReleaseVersion,
   resolveAgentBrowserReleaseAsset,
@@ -274,14 +273,15 @@ const runVersion: AgentBrowserVersionRunner = (binaryPath) => new Promise((resol
 const probedVersions = new Map<string, { mtimeMs: number; version?: string | null; pending?: Promise<string | null> }>();
 const warnedBrowserVersions = new Set<string>();
 
-function versionWarning(version: string): string | undefined {
-  return version === AGENT_BROWSER_VERSION ? undefined : `installed agent-browser ${version} is not the pinned ${AGENT_BROWSER_VERSION}`;
+function versionWarning(version: string, platform: NodeJS.Platform = process.platform, arch: string = process.arch): string | undefined {
+  const pinned = agentBrowserReleaseVersion(resolveAgentBrowserReleaseAsset(platform, arch));
+  return version === pinned ? undefined : `installed agent-browser ${version} is not the pinned ${pinned}`;
 }
 
 function warnVersionOnce(binaryPath: string, version: string, warning: string | undefined): void {
   if (!warning || warnedBrowserVersions.has(`${binaryPath}\0${version}`)) return;
   warnedBrowserVersions.add(`${binaryPath}\0${version}`);
-  console.warn(`browser engine: ${warning} at ${binaryPath}. A different build can stall browser tools; install ${AGENT_BROWSER_VERSION}.`);
+  console.warn(`browser engine: ${warning} at ${binaryPath}. A different build can stall browser tools; install the pinned version.`);
 }
 
 /** The installed version of an unmanaged binary: a string once read, null
@@ -538,7 +538,7 @@ export function browserEngineStatus(options: BrowserLookupOptions = {}): Browser
     // Still probing: say so, and warn once the answer is in.
     if (actual === undefined) return { kind: "ready", binaryPath, version: "unknown" };
     const version = actual ?? "unknown";
-    const warning = versionWarning(version);
+    const warning = versionWarning(version, options.platform, options.arch);
     warnVersionOnce(binaryPath, version, warning);
     return { kind: "ready", binaryPath, version, ...(warning ? { warning } : {}) };
   }

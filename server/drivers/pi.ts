@@ -632,6 +632,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
     },
     needsNode: true,
     docsUrl: "https://pi.dev",
+    signInCommand: "pi",
   },
   models: EMPTY,
   decodeConfig,
@@ -1336,9 +1337,9 @@ export const PiDriver: ProviderDriver<PiConfig> = {
         });
       });
       if (!version) return { state: "unavailable", reason: `\`${config.cli}\` CLI not found` };
-      // pi manages its own credentials (~/.pi/agent/auth.json); there is no
-      // separate sign-in step the harness can probe, so treat it as authed.
-      return { state: "available", version, authenticated: true };
+      // Pi's RPC catalog contains configured routes. A runnable executable
+      // with no routes still needs its /login or local-model setup.
+      return { state: "available", version, authenticated: models.options.length > 0 };
     };
 
     return {

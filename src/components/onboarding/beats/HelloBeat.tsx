@@ -58,6 +58,13 @@ export function HelloBeat({ onNext, onSkip, hosted = false }: BeatProps & { host
     );
   }
 
+  if (typeof window !== "undefined" && !window.ogb?.platform) {
+    return <div className="stagger flex flex-col items-center">
+      <p className="animate-rise mt-1.5 text-center text-[14px] leading-relaxed text-ink-secondary" style={staggerIndex(0)}>{t("onboarding.browser.intro")}</p>
+      <PrimaryButton onClick={onNext} className="animate-rise mt-5" style={staggerIndex(1)}>{t("onboarding.continue")}</PrimaryButton>
+    </div>;
+  }
+
   return (
     <div className="stagger flex flex-col items-center">
       <p className="animate-rise mt-1.5 text-center text-[14px] leading-relaxed text-ink-secondary" style={staggerIndex(0)}>

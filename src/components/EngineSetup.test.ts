@@ -87,6 +87,30 @@ describe("managed engine setup errors", () => {
 });
 
 describe("engines set up with a key in Settings", () => {
+  it("routes an xAI API instance to saved-key setup", () => {
+    vi.stubGlobal("window", { ogb: { platform: "win32" } });
+    const engine: InstanceInfo = {
+      ...instance({ state: "unavailable", reason: "No xAI API key" }),
+      instanceId: "xaiApi", driverKind: "grok", displayName: "xAI", access: "api",
+      models: { default: "grok-4.7", options: [{ id: "grok-4.7", label: "Grok 4.7" }] },
+    };
+    const markup = renderToStaticMarkup(createElement(StoreProvider, null, createElement(EngineSetup, { instance: engine })));
+    expect(markup).toContain("xAI needs an API key");
+    expect(markup).toContain("Open API keys");
+    expect(markup).not.toContain("installer");
+  });
+  it("routes the default MiniMax API instance to saved-key setup", () => {
+    vi.stubGlobal("window", { ogb: { platform: "win32" } });
+    const engine: InstanceInfo = {
+      ...instance({ state: "unavailable", reason: "No MiniMax API key" }),
+      instanceId: "minimax", driverKind: "minimax", displayName: "MiniMax (API)", access: "api",
+      install: { settings: "connections" },
+    };
+    const markup = renderToStaticMarkup(createElement(StoreProvider, null, createElement(EngineSetup, { instance: engine })));
+    expect(markup).toContain("MiniMax (API) needs an API key");
+    expect(markup).toContain("Open API keys");
+    expect(markup).not.toContain("Install MiniMax");
+  });
   it("opens Settings → API keys instead of offering a terminal command", () => {
     vi.stubGlobal("window", { ogb: { platform: "darwin" } });
     const engine: InstanceInfo = {
@@ -121,12 +145,11 @@ describe("install from Settings on the server", () => {
     return renderToStaticMarkup(createElement(StoreProvider, null, createElement(EngineSetup, { instance: engine })));
   }
 
-  it("offers one click on the server and keeps the terminal command behind a disclosure", () => {
+  it("offers one click on the server without requiring a terminal install", () => {
     const markup = render(npmEngine({ state: "unavailable", reason: "`kimi` CLI not found" }));
     expect(markup).toContain("Install Kimi on this server");
-    expect(markup).toContain("as its own user");
-    expect(markup).toContain("Prefer a terminal?");
-    expect(markup).toContain("npm install -g kimi-fixture");
+    expect(markup).toContain("Hattera installs");
+    expect(markup).not.toContain("npm install -g kimi-fixture");
     expect(markup).not.toContain("needs");
   });
 
@@ -147,7 +170,7 @@ describe("install from Settings on the server", () => {
     vi.stubGlobal("window", { ogb: { platform: "linux" } });
     const withServer = renderToStaticMarkup(createElement(StoreProvider, null, createElement(EngineUpdateNotice, { update, instance: npmEngine({ state: "available", authenticated: true }) })));
     expect(withServer).toContain("Update Kimi on this server");
-    expect(withServer).toContain("Prefer a terminal?");
+    expect(withServer).not.toContain("npm install -g kimi-fixture@latest");
     const without = renderToStaticMarkup(createElement(StoreProvider, null, createElement(EngineUpdateNotice, { update, instance: npmEngine({ state: "available", authenticated: true }, false) })));
     expect(without).not.toContain("on this server");
     expect(without).toContain("npm install -g kimi-fixture@latest");
@@ -240,7 +263,7 @@ describe("API-key engine setup", () => {
 
   it("has no button on a remote client, whose settings hide the keys", () => {
     const html = render(keyEngine("openai-compat", { state: "unavailable" }), { platform: "darwin", remoteClient: { active: true } });
-    expect(html).toContain("on the computer running OpenMausBot");
+    expect(html).toContain("on the computer running Hattera");
     expect(html).not.toContain("Open API keys");
   });
 

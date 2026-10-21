@@ -763,13 +763,16 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
     const loginRefused = () => { const mark = loginMark(); if (mark) noteKeyRejected(...mark); };
     const loginAccepted = (mark = loginMark()) => { if (mark) noteKeyAccepted(...mark); };
     const loginRejected = () => { const mark = loginMark(); return mark !== null && keyRejected(...mark); };
-    const AuthController = config.authMode === "browser-cli" ? CodexBrowserAuthController : CodexDeviceAuthController;
-    const authentication = new AuthController({
+    const authenticationOptions = {
       cli: config.cli,
       environment: childEnv,
       signInRejected: loginRejected,
       onAuthenticated: async () => { loginAccepted(); await refreshModels(); },
-    });
+    };
+    const deviceAuthentication = new CodexDeviceAuthController(authenticationOptions);
+    const browserAuthentication = new CodexBrowserAuthController(authenticationOptions);
+    const defaultAuthentication = config.authMode === "browser-cli" ? browserAuthentication : deviceAuthentication;
+    let activeAuthentication = defaultAuthentication;
     const listeners = new Set<RuntimeEventListener>();
     interface Turn {
       stop: () => Promise<boolean>;
@@ -2119,23 +2122,30 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
     },
     refreshModels,
     ...(startupModelRefresh ? { startupModelRefresh } : {}),
-    ...(plan || config.authMode === "browser-cli" ? { authenticationMethod: "browser-pkce" as const } : {}),
-    startAuthentication: async () => {
+    authenticationMethod: "browser-pkce" as const,
+    ...(!plan ? { authenticationMethods: ["device-code", "browser-pkce"] as const } : {}),
+    startAuthentication: async (method) => {
       if (planUnavailable) throw new Error(planUnavailable);
       if (planSigningOut || disposed) throw new Error("This account is being disconnected. Wait before signing in again.");
-      return (planAuth ?? authentication).start();
+      if (planAuth) return planAuth.start();
+      const selected = method === "browser-pkce" ? browserAuthentication : method === "device-code" ? deviceAuthentication : defaultAuthentication;
+      const started = await selected.start();
+      activeAuthentication = selected;
+      return started;
     },
     getAuthentication: async (flowId) => {
-      const result = await (planAuth ?? authentication).get(flowId);
+      const result = await (planAuth ?? activeAuthentication).get(flowId);
       if (planAuth && result.phase === "succeeded") planWarning = undefined;
       if (planAuth && result.phase === "succeeded" && !models.options.length) await refreshModels();
       return result;
     },
-    cancelAuthentication: () => (planAuth ?? authentication).cancel(),
+    completeAuthentication: (flowId: string, callbackUrl: string) => planAuth
+      ? planAuth.completeCallback(flowId, callbackUrl) : browserAuthentication.complete(flowId, callbackUrl),
+    cancelAuthentication: () => (planAuth ?? activeAuthentication).cancel(),
     signOut: async () => {
       if (!planAuth) {
         const mark = loginMark();
-        await authentication.signOut();
+        await activeAuthentication.signOut();
         loginAccepted(mark);
         return;
       }
@@ -2200,7 +2210,8 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
     dispose: async () => {
       disposed = true;
       planGeneration++;
-      await authentication.dispose();
+      await deviceAuthentication.dispose();
+      await browserAuthentication.dispose();
       await planAuth?.dispose();
       await Promise.all([...active.values()].map(({ stop }) => stop()));
       listeners.clear();

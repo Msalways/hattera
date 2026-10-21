@@ -5,6 +5,7 @@
 // one CSS block plus one line in SKINS.
 
 export const SKIN_IDS = [
+  "hattera",
   "midnight",
   "atelier",
   "foundry",
@@ -25,6 +26,7 @@ export type Skin = {
 };
 
 export const SKINS: readonly Skin[] = [
+  { id: "hattera", name: "Hattera", tagline: "Bright workspace, dark navigation, coral actions." },
   { id: "midnight", name: "Midnight", tagline: "The original. Cool and dark." },
   { id: "atelier", name: "Atelier", tagline: "Daylight on paper, warm and quiet." },
   { id: "foundry", name: "Foundry", tagline: "Night shift. Dark, warm, lit in brass." },
@@ -36,7 +38,7 @@ export const SKINS: readonly Skin[] = [
   { id: "meadow", name: "Meadow", tagline: "Fresh white with a calm green. The MausBot look." },
 ];
 
-export const DEFAULT_SKIN: SkinId = "midnight";
+export const DEFAULT_SKIN: SkinId = "hattera";
 
 const KEY = "omb-skin";
 
@@ -62,11 +64,12 @@ function getStore(): Storage | undefined {
 }
 
 export function readSkin(): SkinId {
+  const fallback = typeof window !== "undefined" && window.ogb?.platform ? "midnight" : DEFAULT_SKIN;
   try {
     const stored = getStore()?.getItem(KEY);
-    return isSkinId(stored) ? stored : DEFAULT_SKIN;
+    return isSkinId(stored) ? stored : fallback;
   } catch {
-    return DEFAULT_SKIN;
+    return fallback;
   }
 }
 

@@ -101,6 +101,17 @@ describe("provider login ownership", () => {
     expect(instance.cancelAuthentication).toHaveBeenCalledOnce();
   });
 
+  it("does not switch sign-in methods while a code is still active", async () => {
+    const { sessions, instance, auth } = fixture();
+    await sessions.start(instance, "owner", "device-code");
+    await expect(sessions.start(instance, "owner", "browser-pkce")).rejects.toMatchObject({ status: 409 });
+    expect(instance.startAuthentication).toHaveBeenCalledOnce();
+    expect(await sessions.status("codex", "owner", auth.flowId!)).toEqual(auth);
+    await sessions.cancel("codex", "owner", auth.flowId!);
+    await sessions.start(instance, "owner", "browser-pkce");
+    expect(instance.startAuthentication).toHaveBeenLastCalledWith("browser-pkce");
+  });
+
   it("releases another admin immediately after confirmed cancellation", async () => {
     const { sessions, instance } = fixture();
     await sessions.start(instance, "owner");

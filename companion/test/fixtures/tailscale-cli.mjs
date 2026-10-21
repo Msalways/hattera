@@ -15,7 +15,7 @@ if (mode === "gui" || process.env.TAILSCALE_BE_CLI !== "1") {
     },
   }));
 } else if (process.argv[2] === "serve") {
-  console.log("Serve configuration updated");
+  console.log(process.argv[3] === "status" ? JSON.stringify(mode === "occupied" ? { TCP: { "443": { HTTPS: true } } } : {}) : "Serve configuration updated");
 } else {
   process.exit(2);
 }

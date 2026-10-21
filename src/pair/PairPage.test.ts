@@ -6,7 +6,7 @@ const f = vi.hoisted(() => ({ effects: [] as EffectCallback[], pair: vi.fn() }))
 vi.mock("react", async original => ({ ...await original<typeof import("react")>(), useEffect: (effect: EffectCallback) => { f.effects.push(effect); } }));
 vi.mock("../lib/session", async original => ({ ...await original<typeof import("../lib/session")>(), pairWithCode: f.pair, readSessionState: vi.fn().mockResolvedValue({ kind: "unauthenticated", error: "" }) }));
 vi.mock("../components/DesktopWorkspaceSwitcher", () => ({ DesktopWorkspaceSwitcher: () => null }));
-import { PairPage, pairIntro, pairsAutomatically } from "./PairPage";
+import { PairPage, githubSignInTarget, pairIntro, pairsAutomatically } from "./PairPage";
 import en from "../locales/en.json";
 
 const code = "ABCD-EFGH-JK23";
@@ -26,11 +26,22 @@ it("in the desktop app, a code the link carried connects at once; a browser stil
   expect(pairsAutomatically(null, true)).toBe(false);
 });
 
+it("moves GitHub sign-in to the callback origin before starting OAuth", () => {
+  expect(githubSignInTarget("http://localhost:8080", "http://127.0.0.1:8080"))
+    .toBe("http://127.0.0.1:8080/pair?githubStart=1");
+  expect(githubSignInTarget("http://127.0.0.1:8080", "http://127.0.0.1:8080")).toBeNull();
+});
+
+it("explains a GitHub callback that lost its browser session", () => {
+  vi.stubGlobal("location", { search: "?github=state", replace: (url: string) => replaced.push(url) });
+  expect(render(null)).toContain("GitHub sign-in lost its browser session. Start again from this page.");
+});
+
 it("opening My Cloud from the app needs no click and no code to type", async () => {
   vi.stubGlobal("window", { ogb: { workspaces: {} } });
   f.pair.mockResolvedValue({ ok: true });
   const html = render(code);
-  expect(html).toContain("Connecting to this OpenMausBot…");
+  expect(html).toContain("Connecting to this Hattera server…");
   expect(html).not.toContain("Pairing code"); expect(html).not.toContain("<form");
   f.effects[0](); await flush();
   expect(f.pair).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ code }));
@@ -54,7 +65,7 @@ it("a browser keeps the code in the form for the person to confirm", () => {
 it("My Cloud says where its connection starts, never 'the code shown on the server'", () => {
   const cloud = pairIntro({ mode: "code", sent: false, email: "", cloudHome: true });
   // It names the app's own button and Settings section, as they are labelled.
-  expect(cloud).toContain(`choose ${en["cloudHome.connect"]} in the OpenMausBot app`);
+  expect(cloud).toContain(`choose ${en["cloudHome.connect"]} in the desktop app`);
   expect(cloud).toContain(`Settings → ${en["settings.section.cloudAccount"]}`);
   expect(cloud).toContain("on your Plan page");
   expect(cloud).not.toContain("shown on the server");

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, ExternalLink, Globe, Loader2 } from "lucide-react";
 import { api } from "@/state/store";
 import { t } from "@/lib/i18n";
+import { repositoryGuide } from "@/lib/app-links";
 import { Card, CommandLine } from "./SettingsPrimitives";
 
 export interface CustomDomainStatus {
@@ -88,7 +89,7 @@ export function CustomDomainGuide({ status }: { status: CustomDomainStatus }) {
       <p className="mt-3 text-warning">{t("settings.domain.loopbackWarning")}</p>
       {!status.serverIpv4 && <p className="mt-3">{t("settings.domain.ipAdminHint")}</p>}
       <p className="mt-3">{t("settings.domain.scope")}</p>
-      <a className="mt-3 inline-flex items-center gap-1.5 text-accent hover:underline" href="https://github.com/milind-soni/OpenMausBot/blob/main/docs/self-hosting.md#connect-a-custom-domain-in-settings" target="_blank" rel="noopener noreferrer">
+      <a className="mt-3 inline-flex items-center gap-1.5 text-accent hover:underline" href={repositoryGuide("self-hosting.md#connect-a-custom-domain-in-settings")} target="_blank" rel="noopener noreferrer">
         {t("settings.domain.fullGuide")} <ExternalLink size={12} />
       </a>
     </details>

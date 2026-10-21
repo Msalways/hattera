@@ -7,6 +7,7 @@ type Flow = {
   instance: LoginInstance;
   owner: string;
   flowId: string | null;
+  method?: "device-code" | "browser-pkce";
   expiresAt: number;
   busy: boolean;
   starting: boolean;
@@ -22,7 +23,7 @@ export class ProviderAuthSessions {
     return [...this.flows.values()].some((flow) => flow.busy || (!flow.revoked && flow.expiresAt > Date.now()));
   }
 
-  async start(instance: LoginInstance, owner: string): Promise<ProviderAuthenticationStart> {
+  async start(instance: LoginInstance, owner: string, method?: "device-code" | "browser-pkce"): Promise<ProviderAuthenticationStart> {
     if (!instance.startAuthentication) throw failure("Account setup is unavailable for this provider.", 404);
     const existing = this.flows.get(instance.instanceId);
     if (existing && (existing.busy || (existing.owner !== owner && existing.expiresAt > Date.now()))) {
@@ -31,12 +32,13 @@ export class ProviderAuthSessions {
     // Reopening Settings may resume the same owner's flow. Keep its ownership
     // if the driver's retry fails, rather than orphaning a still-running CLI.
     const resuming = existing && existing.owner === owner && existing.expiresAt > Date.now() && !existing.revoked;
-    const flow: Flow = resuming ? existing : { instance, owner, flowId: null, expiresAt: Date.now() + 15 * 60_000, busy: false, starting: false, revoked: false };
+    if (resuming && existing.method !== method) throw failure("Cancel the current sign-in before choosing another method.", 409);
+    const flow: Flow = resuming ? existing : { instance, owner, method, flowId: null, expiresAt: Date.now() + 15 * 60_000, busy: false, starting: false, revoked: false };
     flow.busy = true;
     flow.starting = true;
     this.flows.set(instance.instanceId, flow);
     try {
-      const result = await instance.startAuthentication();
+      const result = await instance.startAuthentication(method);
       if (flow.revoked || this.flows.get(instance.instanceId) !== flow) {
         await instance.cancelAuthentication?.();
         throw failure("Sign-in cancelled because the session or provider changed.", 409);

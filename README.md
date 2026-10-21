@@ -2,7 +2,7 @@
 
 Hattera is a self-hosted AI agent chat prototype based on [OpenMausBot](https://github.com/milind-soni/OpenMausBot). This fork adds owner-only GitHub sign-in, a Docker Compose setup built from this repository, an OpenCode-enabled server image, and a Render Free preview configuration.
 
-The prototype still contains upstream names in package IDs, commands, data paths, and parts of the UI. This README describes the fork's server deployment; upstream desktop release downloads are not Hattera releases.
+The browser app and public docs use the Hattera identity. Package IDs, CLI commands, protocol identifiers, `OMB_*` settings, stored paths, and Compose volumes retain upstream names for compatibility. Upstream desktop release downloads are not Hattera releases.
 
 ## Run locally
 
@@ -13,6 +13,19 @@ docker compose up -d --build
 ```
 
 Open `http://127.0.0.1:8080/pair`. Compose builds this checkout's server image and saves app data and engine sign-ins in the named Docker volume. The existing Compose project and volume names stay `openmausbot` so current local data remains attached.
+
+For a fresh, separate browser-app run from this checkout, build the web app and start the local launcher. Add `--tailscale` to publish it to signed-in devices on your tailnet through Tailscale Serve:
+
+```sh
+npm run build
+node --experimental-strip-types scripts/start-hattera-local.ts --tailscale
+```
+
+The flag uses the existing `serve --tailscale` integration, prints the HTTPS and pairing links, and turns off the endpoint on normal shutdown. Tailscale must be installed, running, signed in, and able to issue HTTPS certificates for the tailnet. Hattera refuses to replace an endpoint already using HTTPS port 443. If a crashed process leaves Serve active, run `tailscale serve --https=443 off` after confirming that it is Hattera's endpoint. Omit `--tailscale` for local-only use. This launcher writes a fresh data directory under `.omb-scratch`; it does not attach to the Compose volume.
+
+The launcher reports whether its process can reach the Codex sign-in and npm registry hosts. A reachable host does not prove that an account is authorized or a provider is installed. The server needs outbound HTTPS for provider sign-in and downloads; proxy and trusted CA settings must be available to the server process.
+
+For a Codex CLI account, Hattera offers browser sign-in and a one-time code in the web app. Local Docker Compose forwards Codex's callback automatically. From another device, paste the final localhost callback address into Hattera if the browser cannot open it; Hattera verifies that it belongs to the sign-in started in that session. Both choices require the server to reach OpenAI's authentication service, and the person signing in must authorize their own account. API-key providers use their separate key setup.
 
 To enable GitHub sign-in, copy `.env.example` to `.env` and set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `BETTER_AUTH_SECRET`, and the allowed account's numeric `GITHUB_OWNER_ID`. For local OAuth, set `OMB_PUBLIC_URL=http://127.0.0.1:8080` and `GITHUB_REDIRECT_URI=http://127.0.0.1:8080/identity/callback/github`; register that exact callback in your GitHub OAuth app. Keep `.env` out of Git. See [local deployment](deploy/local/README.md) for pairing, CLI login, port changes, and optional Tailscale Serve.
 
@@ -30,7 +43,7 @@ The included [Render Blueprint](render.yaml) builds the `main` branch of this fo
 
 ## Project status
 
-This is an early fork for one GitHub owner. A production deployment still needs durable storage for **all** structured records and files, backup and restore testing, and a deployment environment that can run agent CLIs and their long-lived work. Rebranding the UI, release binaries, and native mobile app is separate future work.
+This is an early fork for one GitHub owner. A production deployment still needs durable storage for **all** structured records and files, backup and restore testing, and a deployment environment that can run agent CLIs and their long-lived work. Desktop release identity, native mobile branding, and the proposed SDK are separate future work.
 
 ## Upstream and license
 

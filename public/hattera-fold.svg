@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title">
+  <title id="title">Folded Hattera H</title>
+  <defs>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff8c78"/><stop offset=".48" stop-color="#ed6659"/><stop offset="1" stop-color="#963943"/></linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff9b7e"/><stop offset=".52" stop-color="#f16657"/><stop offset="1" stop-color="#a03943"/></linearGradient>
+    <linearGradient id="bridge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff9a7a"/><stop offset=".48" stop-color="#ef6256"/><stop offset="1" stop-color="#bb4245"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#4f263c"/><stop offset="1" stop-color="#1b2130"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#f66d5b" stop-opacity=".35"/><stop offset="1" stop-color="#f66d5b" stop-opacity="0"/></radialGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="25"/></filter>
+  </defs>
+  <ellipse cx="300" cy="485" rx="260" ry="78" fill="url(#glow)" filter="url(#blur)"/>
+  <path d="M78 492 292 424l245 69-237 62Z" fill="#e85e55" opacity=".12"/>
+  <path d="m111 100 107 38v319l-107 39Z" fill="url(#left)"/>
+  <path d="m218 138 25-13v319l-25 13Z" fill="url(#shade)"/>
+  <path d="m111 100 107 38 25-13-106-40Z" fill="#ffab8a"/>
+  <path d="m376 130 111-42v407l-111-42Z" fill="url(#right)"/>
+  <path d="m352 144 24-14v323l-24 13Z" fill="url(#shade)"/>
+  <path d="m352 144 24-14 111-42-25-11Z" fill="#ffa787"/>
+  <path d="m218 257 158-48v112l-158 49Z" fill="url(#bridge)"/>
+  <path d="m218 257 25-13 133-41v6Z" fill="#ffb18e"/>
+  <path d="m218 370 25-13 133-42v6Z" fill="#8b3541" opacity=".8"/>
+  <path d="m111 496 107-39 25-13-106 58Z" fill="#8d3540" opacity=".72"/>
+  <path d="m376 453 111 42-25 8-110-37Z" fill="#7a3441" opacity=".7"/>
+</svg>

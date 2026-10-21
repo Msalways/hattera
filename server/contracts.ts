@@ -441,11 +441,8 @@ export interface EngineInstall {
   /** Set up inside the app rather than in a terminal: the engine needs a key
    * saved under Settings → API keys, and the setup card links there. */
   settings?: "connections";
-  /** Settings can install or update this engine on the machine running the
-   * server, as the server's own user, into a directory the app owns. Set by
-   * the registry when the install one-liner is an npm package and npm is on
-   * PATH; never something a client chooses. */
-  server?: { package: string };
+  /** A built-in server installer; never selected by a browser request. */
+  server?: { package: string } | { vendor: "cursor" | "hermes" };
 }
 
 export interface ProviderAuthenticationStart {
@@ -551,8 +548,9 @@ export interface ProviderInstance {
   readonly startupModelRefresh?: Promise<void>;
   /** Optional first-party runtime installation and account setup. */
   readonly installRuntime?: () => Promise<void>;
-  readonly startAuthentication?: () => Promise<ProviderAuthenticationStart>;
+  readonly startAuthentication?: (method?: "device-code" | "browser-pkce") => Promise<ProviderAuthenticationStart>;
   readonly authenticationMethod?: "browser-pkce";
+  readonly authenticationMethods?: readonly ("device-code" | "browser-pkce")[];
   readonly getAuthentication?: (flowId: string) => Promise<ProviderAuthenticationStatus>;
   readonly completeAuthentication?: (flowId: string, callbackUrl: string) => Promise<void>;
   readonly cancelAuthentication?: () => Promise<void>;

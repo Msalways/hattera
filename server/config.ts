@@ -428,6 +428,7 @@ const appConfigSchema = z.object({
     phone: z.enum(["ios", "android"]).optional(),
   }).optional(),
   mistral: z.object({ key: optionalText }).optional(),
+  minimax: z.object({ key: optionalText }).optional(),
   cerebras: z.object({ key: optionalText }).optional(),
   groq: z.object({ key: optionalText, url: optionalText }).optional(),
   xai: z.object({ key: optionalText, url: optionalText }).optional(),
@@ -620,6 +621,7 @@ export interface AppConfig {
   language?: string;
   xai?: { key?: string; url?: string };
   mistral?: { key?: string };
+  minimax?: { key?: string };
   cerebras?: { key?: string };
   groq?: { key?: string; url?: string };
   /** `everyClaudeBot`: the key runs every Claude bot instead of its login.
@@ -953,6 +955,7 @@ function fallbackEnv(entry: InstanceConfigMap[string]): string[] {
   const named = typeof config.apiKeyEnv === "string" && config.apiKeyEnv ? config.apiKeyEnv : undefined;
   switch (entry.driver) {
     case "mistral": return ["MISTRAL_API_KEY"];
+    case "minimax": return ["MINIMAX_API_KEY"];
     case "cerebras": return ["CEREBRAS_API_KEY"];
     case "grok": return [named ?? "XAI_API_KEY"];
     case "openai-compat":
@@ -1057,6 +1060,8 @@ export function loadConfig(): AppConfig {
   // shadow the save until the next launch.
   cfg.mistral = { ...cfg.mistral };
   if (process.env.MISTRAL_API_KEY !== undefined) cfg.mistral.key = process.env.MISTRAL_API_KEY;
+  cfg.minimax = { ...cfg.minimax };
+  if (process.env.MINIMAX_API_KEY !== undefined) cfg.minimax.key = process.env.MINIMAX_API_KEY;
   cfg.cerebras = { ...cfg.cerebras };
   if (process.env.CEREBRAS_API_KEY !== undefined) cfg.cerebras.key = process.env.CEREBRAS_API_KEY;
   cfg.groq = { ...cfg.groq };
@@ -1148,6 +1153,7 @@ export function syncCredentialEnv(patch: Partial<Omit<AppConfig, "threads" | "ne
   const secrets: Array<[value: string | undefined, name: string]> = [
     [patch.xai?.key, "XAI_API_KEY"],
     [patch.mistral?.key, "MISTRAL_API_KEY"],
+    [patch.minimax?.key, "MINIMAX_API_KEY"],
     [patch.cerebras?.key, "CEREBRAS_API_KEY"],
     [patch.groq?.key, "OMB_GROQ_API_KEY"],
     [patch.anthropic?.key, "OMB_ANTHROPIC_API_KEY"],
@@ -1192,6 +1198,7 @@ export function syncCredentialEnv(patch: Partial<Omit<AppConfig, "threads" | "ne
 export const WORKSPACE_CREDENTIAL_ENV = [
   "XAI_API_KEY",
   "MISTRAL_API_KEY",
+  "MINIMAX_API_KEY",
   "CEREBRAS_API_KEY",
   "OMB_GROQ_API_KEY",
   "OMB_ANTHROPIC_API_KEY",
@@ -1388,7 +1395,7 @@ export function saveConfig(
   // back after we have successfully recognized the legacy list.
   const storedProfiles = storedBrowserProfilesSchema.safeParse(disk.browserProfiles);
   if (storedProfiles.success) disk.browserProfiles = storedProfiles.data;
-  for (const key of ["xai", "anthropic", "mistral", "cerebras", "groq", "openai", "openrouter", "openaiCompat", "composio", "box", "opencodeGo", "tts", "decider", "imageGen", "live", "profile", "rooms", "mcp", "threads", "context", "memory", "localVm", "features", "budgets", "billing", "decisions", "onboarding", "browserEngine", "newBots"] as const) {
+  for (const key of ["xai", "anthropic", "mistral", "minimax", "cerebras", "groq", "openai", "openrouter", "openaiCompat", "composio", "box", "opencodeGo", "tts", "decider", "imageGen", "live", "profile", "rooms", "mcp", "threads", "context", "memory", "localVm", "features", "budgets", "billing", "decisions", "onboarding", "browserEngine", "newBots"] as const) {
     const section = checkedPatch[key];
     if (!section) continue;
     const current = jsonObjectSchema.safeParse(disk[key]);
@@ -1622,6 +1629,8 @@ export function instanceOwnsRouting(
         || ownUrl(routingDefaults?.url || cfg.openaiCompat?.url || process.env.OPENAI_COMPAT_URL || "https://openrouter.ai/api/v1");
     case "mistral":
       return own(entry.environment?.MISTRAL_API_KEY) || ownUrl("https://api.mistral.ai/v1");
+    case "minimax":
+      return own(entry.environment?.MINIMAX_API_KEY) || ownUrl("https://api.minimax.io/v1");
     case "cerebras":
       return own(entry.environment?.CEREBRAS_API_KEY) || ownUrl("https://api.cerebras.ai/v1");
     case "groq":
@@ -1643,6 +1652,7 @@ export function instanceOwnsRouting(
 function injectedEnvironment(cfg: AppConfig, instanceId: string, driver: string): Map<string, string> {
   const environment = new Map<string, string>();
   if (driver === "mistral" && cfg.mistral?.key) environment.set("MISTRAL_API_KEY", cfg.mistral.key);
+  if (driver === "minimax" && cfg.minimax?.key) environment.set("MINIMAX_API_KEY", cfg.minimax.key);
   if (driver === "cerebras" && cfg.cerebras?.key) environment.set("CEREBRAS_API_KEY", cfg.cerebras.key);
   if (driver === "groq" && cfg.groq?.key) environment.set("GROQ_API_KEY", cfg.groq.key);
   if (driver === "grok" && cfg.xai?.key) environment.set("XAI_API_KEY", cfg.xai.key);
@@ -1733,6 +1743,7 @@ export function instanceConfigs(cfg: AppConfig): InstanceConfigMap {
     opencodeGo: { driver: "opencodeGo" },
     openaiCompat: { driver: "openai-compat" },
     mistral: { driver: "mistral" },
+    minimax: { driver: "minimax" },
     cerebras: { driver: "cerebras" },
     groq: { driver: "groq" },
     ...API_KEY_FLEET,
@@ -1753,8 +1764,10 @@ export function instanceConfigs(cfg: AppConfig): InstanceConfigMap {
   const PRODUCT_FLEET_ADDITIONS = {
     chatgpt: { driver: "codex", displayName: "ChatGPT plan", config: { authMode: "chatgpt-plan" } },
     cursor: { driver: "cursorAgent" },
+    opencodeGo: { driver: "opencodeGo" },
     openaiCompat: { driver: "openai-compat" },
     mistral: { driver: "mistral" },
+    minimax: { driver: "minimax" },
     cerebras: { driver: "cerebras" },
     groq: { driver: "groq" },
     ...API_KEY_FLEET,

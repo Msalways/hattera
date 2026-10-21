@@ -1,5 +1,6 @@
 import { Component, createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
 import { useAdvancedMode } from "@/lib/interface-mode";
+import { brand } from "@/lib/brand";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { useCopyFeedback } from "@/lib/copy-text";
 import {
@@ -1354,7 +1355,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const canOpenResults = resultsThreadId && [...state.bots, ...state.groups].some((owner) => owner.threadId === resultsThreadId || owner.tasks?.some((task) => task.threadId === resultsThreadId));
 
   return (
-    <main className="relative flex h-full min-w-0 flex-1 flex-col bg-app">
+    <main data-chat-main className="relative flex h-full min-w-0 flex-1 flex-col bg-app">
       {/* A take-turns call covers the thread while the bot is on the line */}
       <CallOverlay bot={bot} />
       {/* The transcript scrolls on under the header (and the banners that
@@ -1367,6 +1368,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
       {/* Header */}
       <div
         {...headerDragProps}
+        data-hattera-chat-header
         className={cn(
           // @container so the chips on the right can fold to icon bubbles
           // when the column is narrow (side panel open, small window). A
@@ -1387,6 +1389,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
             when room is short it takes it from the empty side, which slides
             the name left rather than under the controls. */}
         <div data-chathead-row className="flex items-center justify-between @max-[30rem]/chathead:flex-wrap @max-[30rem]/chathead:gap-y-1 @min-[30rem]/chathead:grid @min-[30rem]/chathead:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(max-content,1fr)]">
+        {!window.ogb?.platform && <div className="hattera-mobile-brand"><img src={brand().logo ?? "/hattera-mark.svg"} alt="" /><span>{brand().name}</span></div>}
         <div data-chathead-identity className="flex min-w-0 items-center gap-2 @max-[30rem]/chathead:basis-full @min-[30rem]/chathead:col-start-2 @min-[30rem]/chathead:justify-self-center" style={headerNoDragStyle}>
           {/* The bot as one pill, the same shape as the model chip across the
               header: avatar and name together, opening the bot's settings.

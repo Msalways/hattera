@@ -1,0 +1,15 @@
+---
+title: Hosting and data
+description: Choose a deployment that can keep your work.
+icon: Server
+---
+
+| Deployment | Availability | Data |
+| --- | --- | --- |
+| Local Compose | While your computer is on | Named Docker volume |
+| Render Free preview | May sleep or restart | Ephemeral container filesystem |
+| Oracle Always Free VM | While the VM runs | PostgreSQL and VM-backed volumes |
+
+Use Render Free only for disposable testing. Restarts, redeploys, and idle spin-down may erase its files. PostgreSQL and an S3-compatible bucket can retain some structured data and backups, but bot workspaces and CLI credentials still require a durable `/data` filesystem.
+
+See the [hosting readiness checklist](https://github.com/Msalways/hattera/blob/main/docs/hattera-hosting.md), the [Render preview guide](https://github.com/Msalways/hattera/blob/main/deploy/render/README.md), and the [Oracle VM guide](https://github.com/Msalways/hattera/blob/main/deploy/oracle/README.md) before storing important data.

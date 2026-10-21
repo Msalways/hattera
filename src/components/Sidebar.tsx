@@ -136,6 +136,7 @@ import { plainPreviewText } from "@/lib/plain-preview";
 import { isClientCancellation } from "../../shared/client-cancel";
 import { usePopoverDismiss } from "@/hooks/use-popover-dismiss";
 import { useAdvancedMode } from "@/lib/interface-mode";
+import { brand } from "@/lib/brand";
 
 /** Vertical centre of the macOS traffic lights, in CSS px from the window
  * top: electron/window-chrome.mjs sets trafficLightPosition.y = 16 and the
@@ -2349,9 +2350,8 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
           <div aria-hidden="true" data-traffic-light-space className={density === "icons" ? "h-5 w-full" : "w-[72px] shrink-0"} />
         ) : browser ? (
           <div className={cn("flex shrink-0 items-center gap-2", density !== "icons" && "mr-3")}>
-            <span className="size-3 rounded-full bg-[#ff5f57]" />
-            <span className="size-3 rounded-full bg-[#febc2e]" />
-            <span className="size-3 rounded-full bg-[#28c840]" />
+            <img src={brand().logo ?? "/hattera-mark.svg"} alt="" className="size-8" />
+            {density !== "icons" && <span className="text-[19px] font-semibold tracking-[-0.03em] text-ink">{brand().name}</span>}
           </div>
         ) : null}
         {density !== "icons" && (

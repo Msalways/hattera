@@ -223,11 +223,12 @@ const support: AcpSupport = {
 
   install: {
     command: {
-      darwin: "curl -fsSL https://app.factory.ai/cli | sh",
-      linux: "curl -fsSL https://app.factory.ai/cli | sh",
-      win32: "irm https://app.factory.ai/cli/windows | iex",
+      darwin: "npm install -g droid",
+      linux: "npm install -g droid",
+      win32: "npm install -g droid",
     },
     docsUrl: "https://docs.factory.ai/droid-cli/quickstart",
+    needsNode: true,
     signInCommand: "droid",
   },
 

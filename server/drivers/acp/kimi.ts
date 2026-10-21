@@ -512,11 +512,12 @@ const support: AcpSupport = {
   // POSIX-only curl|bash instruction.
   install: {
     command: {
-      darwin: "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash",
-      linux: "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash",
-      win32: "irm https://code.kimi.com/kimi-code/install.ps1 | iex",
+      darwin: "npm install -g @moonshot-ai/kimi-code",
+      linux: "npm install -g @moonshot-ai/kimi-code",
+      win32: "npm install -g @moonshot-ai/kimi-code",
     },
     docsUrl: "https://moonshotai.github.io/kimi-code/en/guides/getting-started.html",
+    needsNode: true,
     signInCommand: "kimi login",
   },
 

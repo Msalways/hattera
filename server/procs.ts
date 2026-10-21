@@ -64,7 +64,7 @@ export function spawnCli(
   args: string[],
   opts: SpawnOptions,
 ): ChildProcessByStdio<Writable, Readable, Readable> {
-  const resolved = resolveCli(cli, args);
+  const resolved = resolveCli(cli, args, opts.env);
   assertSafeCliArgv(resolved);
   const child = spawn(resolved.command, resolved.args, {
     ...opts,
@@ -95,7 +95,7 @@ export function execCli(
   opts: ExecFileOptions,
   cb: (err: Error | null, stdout: string, stderr?: string) => void,
 ): void {
-  const resolved = resolveCli(cli, args);
+  const resolved = resolveCli(cli, args, opts.env);
   try {
     assertSafeCliArgv(resolved);
   } catch (error) {

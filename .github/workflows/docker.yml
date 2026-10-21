@@ -15,6 +15,7 @@ on:
       - src/**
       - enterprise/**
       - scripts/bundle-server.mjs
+      - scripts/testing/verify-public-provider-installs.mjs
       - package.json
       - pnpm-lock.yaml
       - .github/workflows/docker.yml
@@ -23,6 +24,7 @@ on:
       - Dockerfile
       - .dockerignore
       - deploy/**
+      - scripts/testing/verify-public-provider-installs.mjs
       - .github/workflows/docker.yml
 
 permissions:
@@ -32,7 +34,7 @@ jobs:
   build-and-smoke:
     name: build image + boot smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build image
@@ -49,6 +51,23 @@ jobs:
           # the renderer is served by the server itself (OMB_STATIC_DIR)
           docker exec omb curl -sf http://127.0.0.1:8799/ | grep -qi "<html" || { docker logs omb; echo "UI not served"; exit 1; }
           docker logs omb | tail -5
+      - name: Install every offered provider through the running server API
+        run: |
+          set -euo pipefail
+          # A separate container gets a disposable /data volume. Build-time
+          # ENGINES is empty here, so baked-in CLIs cannot make this pass.
+          trap 'docker rm -fv omb-install >/dev/null 2>&1 || true' EXIT
+          for group in npm vendor; do
+            docker run -d --name omb-install openmausbot:ci
+            for i in $(seq 1 40); do
+              if docker exec omb-install curl -sf http://127.0.0.1:8799/api/health | grep -q openmausbot; then break; fi
+              sleep 2
+              if [ "$i" = "40" ]; then docker logs omb-install; echo "install container never became healthy"; exit 1; fi
+            done
+            docker cp scripts/testing/verify-public-provider-installs.mjs omb-install:/tmp/verify-public-provider-installs.mjs
+            docker exec omb-install node /tmp/verify-public-provider-installs.mjs --"$group"
+            docker rm -fv omb-install
+          done
       - name: Prove the image finds its enterprise layer
         # The image ships dist-server/ alone, so the bundled layer sits inside
         # the server root (server/enterprise.ts looks there after the sibling

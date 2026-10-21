@@ -82,6 +82,15 @@ describe("signed out: the in-app code", () => {
 });
 
 describe("Grok cannot run here: an xAI key instead", () => {
+  it("offers Hattera's managed install when the server advertises one", () => {
+    const installable = { ...missing, install: { ...missing.install!, server: { package: "@xai-official/grok" } } };
+    const html = render(installable, undefined);
+    expect(grokKeyInstead(installable, false)).toBe(false);
+    expect(html).toContain("Install Grok on this server");
+    expect(html).not.toContain("data-engine-setup-key-instead");
+    expect(html).not.toContain("Add xAI key");
+  });
+
   it.each([
     ["a server's page in a browser", undefined, false],
     ["My Cloud in the desktop app's window", desktop, true],

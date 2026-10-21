@@ -990,7 +990,7 @@ export async function runServe(options: CliOptions, log: (line: string) => void 
       serveOwnerToken = ownerToken;
     }
   } catch (error) {
-    if ((tailscaleServing || (startupCancelled && tailscaleAttempted)) && tailscale) await tailscaleServeOff(tailscale).catch(() => undefined);
+    if ((tailscaleServing || (startupCancelled && tailscaleAttempted)) && tailscale) await tailscaleServeOff(tailscale).catch(() => log("tailscale: could not turn off Serve; check `tailscale serve status` and remove Hattera's endpoint manually"));
     plan?.account?.service.dispose();
     if (plan) cleanupTunnelOrigin(plan.origin);
     if (error instanceof SetupCancelled) {
@@ -1018,7 +1018,7 @@ export async function runServe(options: CliOptions, log: (line: string) => void 
       // The gateway and the edge stop accepting before the server they forward to goes away.
       if (tunnel) await tunnel.stop().catch(() => undefined);
       if (caddy) await caddy.stop().catch(() => undefined);
-      if (tailscaleServing && tailscale) await tailscaleServeOff(tailscale).catch(() => undefined);
+      if (tailscaleServing && tailscale) await tailscaleServeOff(tailscale).catch(() => log("tailscale: could not turn off Serve; check `tailscale serve status` and remove Hattera's endpoint manually"));
       if (exited === null) {
         child.kill("SIGTERM");
         const timer = setTimeout(() => child.kill("SIGKILL"), 10_000);

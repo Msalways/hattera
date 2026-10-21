@@ -37,10 +37,9 @@ import { useSidebarPhoneStatus } from "./SidebarPhoneButton";
 import { useStore, type Action } from "@/state/store";
 import type { CloudAccountBridge, CloudAccountState } from "../../electron/cloud-account.mjs";
 import { useUpdaterState, type UpdaterState } from "@/lib/updater";
-import { brand } from "../lib/brand";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
-import { FEEDBACK_URL, HELP_CENTER_URL, openExternalLink } from "@/lib/app-links";
+import { APP_NAME, FEEDBACK_URL, HELP_CENTER_URL, HATTERA_DOCS_URL, HATTERA_FEEDBACK_URL, openExternalLink } from "@/lib/app-links";
 import {
   cloudPhoneDestination,
   connectPhoneEntry,
@@ -101,8 +100,8 @@ export function updateLabel(phase: UpdatePhase, state: UpdaterState | null): str
       // An unknown version leaves a double space behind, in every language.
       return (
         state?.installMode === "handoff"
-          ? t("sidebar.update.readyInstall", { app: brand().name, version: state?.version ?? "" })
-          : t("sidebar.update.ready", { app: brand().name, version: state?.version ?? "" })
+          ? t("sidebar.update.readyInstall", { app: APP_NAME, version: state?.version ?? "" })
+          : t("sidebar.update.ready", { app: APP_NAME, version: state?.version ?? "" })
       ).replace("  ", " ");
     case "installing":
       return (
@@ -372,8 +371,8 @@ export function SidebarProfileMenu({ iconOnly = false }: { iconOnly?: boolean } 
       dispatch({ type: "toggleShortcuts", open: true });
     },
     onAbout: () => setAboutOpen(true),
-    onHelp: () => void openExternalLink(HELP_CENTER_URL),
-    onFeedback: () => void openExternalLink(FEEDBACK_URL),
+    onHelp: () => void openExternalLink(window.ogb?.platform ? HELP_CENTER_URL : HATTERA_DOCS_URL),
+    onFeedback: () => void openExternalLink(window.ogb?.platform ? FEEDBACK_URL : HATTERA_FEEDBACK_URL),
     onAccount: () => dispatch({ type: "toggleAppSettings", open: true, section: "cloudAccount" }),
   });
   const noteworthy = update && updateNoteworthy(update.phase, update.pending) && !updateHasButton(update.phase);

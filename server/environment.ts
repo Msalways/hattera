@@ -23,6 +23,8 @@ export interface EnvironmentDescriptor {
   label: string;
   platform: NodeJS.Platform;
   version: string;
+  /** The origin that owns the GitHub OAuth callback and its cookies. */
+  githubSignInOrigin?: string;
   capabilities: {
     /** Pairing and sessions are available (this build). */
     remoteSessions: true;
@@ -122,12 +124,13 @@ export function serverVersion(): string {
   return "unknown";
 }
 
-export function environmentDescriptor(input: { environmentId: string; desktopManaged: boolean; emailSignIn?: boolean; githubSignIn?: boolean; sharedComputers?: boolean; cloudHome?: boolean }): EnvironmentDescriptor {
+export function environmentDescriptor(input: { environmentId: string; desktopManaged: boolean; emailSignIn?: boolean; githubSignInOrigin?: string; sharedComputers?: boolean; cloudHome?: boolean }): EnvironmentDescriptor {
   return {
     environmentId: input.environmentId,
     label: process.env.OMB_ENVIRONMENT_LABEL?.trim() || hostname(),
     platform: process.platform,
     version: serverVersion(),
+    ...(input.githubSignInOrigin ? { githubSignInOrigin: input.githubSignInOrigin } : {}),
     capabilities: {
       remoteSessions: true,
       // Never advertise a protocol this server would refuse: the routes are
@@ -138,7 +141,7 @@ export function environmentDescriptor(input: { environmentId: string; desktopMan
       ...(input.cloudHome === true ? { cloudHome: true as const } : {}),
       selfUpdate: input.desktopManaged ? "desktop-managed" : "operator",
       emailSignIn: input.emailSignIn === true,
-      ...(input.githubSignIn === true ? { githubSignIn: true as const } : {}),
+      ...(input.githubSignInOrigin ? { githubSignIn: true as const } : {}),
     },
   };
 }

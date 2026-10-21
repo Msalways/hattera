@@ -31,6 +31,17 @@ describe("resolveLocale", () => {
 });
 
 describe("t", () => {
+  it("uses the deployment name in browser copy across translated catalogs", () => {
+    vi.stubGlobal("document", { documentElement: { dataset: { browserBrand: "hattera" } } });
+    try {
+      expect(t("onboarding.hosted.intro")).toContain("Hattera");
+      setLocale("de");
+      expect(t("pro.disclaimer")).toContain("Hattera");
+      expect(t("pro.name")).toBe("MausBot Cloud");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it("returns the English catalog value by default", () => {
     expect(t("engines.cloud")).toBe("Cloud");
   });

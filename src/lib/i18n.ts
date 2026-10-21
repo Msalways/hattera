@@ -2,6 +2,7 @@
 // the system language; unknown tags and untranslated keys fall back to
 // English, so a partial pack can ship the day it has one string.
 import { en, localeChoices, locales, type LocaleKey, type LocalePack } from "@/locales";
+import { brand } from "./brand";
 
 /** "zh-Hant-TW" → exact tag, then "zh-hant", then "zh", then "en". Pure, for tests. */
 export function resolveLocale(tag: string | undefined, available: ReadonlySet<string>): string {
@@ -77,8 +78,14 @@ export function tFromServer(key: string | undefined, fallback: string | undefine
  * its seams instead of dropping words. */
 export function t(key: LocaleKey, params?: Record<string, string | number>): string {
   const template = activePack[key] ?? en[key];
-  if (!params) return template;
-  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+  // Upstream catalog translations still name the inherited product. The
+  // browser deployment uses the served brand; desktop releases and the
+  // distinct upstream Cloud service keep their own identity.
+  const displayed = typeof document !== "undefined" && document.documentElement?.dataset?.browserBrand === "hattera"
+    ? template.replace(/OpenMausBot(?! Cloud)/g, brand().name)
+    : template;
+  if (!params) return displayed;
+  return displayed.replace(/\{(\w+)\}/g, (match, name: string) =>
     name in params ? String(params[name]) : match,
   );
 }

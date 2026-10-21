@@ -50,19 +50,23 @@ it("disables recheck while a probe is running", async () => {
   expect(button("Check again").disabled).toBe(false);
 });
 
-it("does not claim install success when the returned provider probe is unavailable", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ instances: [engine] }))));
+it("confirms the CLI install even when account setup keeps the provider unavailable", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(
+    url.endsWith("/install/status") ? { install: { state: "succeeded", instances: [engine] } } : { install: { state: "running" } },
+  )))));
   mount(createElement(EngineSetup, { instance: engine }));
   await act(async () => button("Install Kimi on this server").click());
-  expect(host.textContent).toContain("installer finished, but the provider is not usable yet");
-  expect(host.textContent).not.toContain("Installation verified");
+  expect(host.textContent).toContain("Installation verified. Sign in if requested.");
+  expect(host.textContent).not.toContain("installer finished, but the provider is not usable yet");
   expect(refreshModels).not.toHaveBeenCalled();
   expect(dispatch).toHaveBeenCalledWith({ type: "instances", instances: [engine] });
 });
 
 it("uses the verified install response instead of relying on another status request", async () => {
   const installed = { ...engine, snapshot: { state: "available", authenticated: false } };
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ instances: [installed] }))));
+  vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(
+    url.endsWith("/install/status") ? { install: { state: "succeeded", instances: [installed] } } : { install: { state: "running" } },
+  )))));
   mount(createElement(EngineSetup, { instance: engine }));
   await act(async () => button("Install Kimi on this server").click());
   expect(dispatch).toHaveBeenCalledWith({ type: "instances", instances: [installed] });
@@ -70,10 +74,37 @@ it("uses the verified install response instead of relying on another status requ
   expect(host.textContent).toContain("Installation verified. Sign in if requested.");
 });
 
+it("shows an asynchronous installer failure and allows a retry", async () => {
+  let checks = 0;
+  vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(
+    url.endsWith("/install/status")
+      ? { install: ++checks === 1 ? { state: "idle" } : { state: "failed", error: "Package download failed" } }
+      : { install: { state: "running" } },
+  )))));
+  mount(createElement(EngineSetup, { instance: engine }));
+  await act(async () => button("Install Kimi on this server").click());
+  expect(host.textContent).toContain("Package download failed");
+  expect(button("Install Kimi on this server").disabled).toBe(false);
+});
+
+it("resumes an installation already running when Settings is reopened", async () => {
+  let checks = 0;
+  const fetcher = vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(
+    url.endsWith("/install/status")
+      ? { install: ++checks === 1 ? { state: "running" } : { state: "succeeded", instances: [engine] } }
+      : { install: { state: "running" } },
+  ))));
+  vi.stubGlobal("fetch", fetcher);
+  await act(async () => mount(createElement(EngineSetup, { instance: engine })));
+  expect(host.textContent).toContain("Installation verified. Sign in if requested.");
+  expect(fetcher.mock.calls.every(([, init]) => init?.method !== "POST")).toBe(true);
+});
+
 it("never opens a local terminal to install on a paired remote server", () => {
   vi.stubGlobal("window", Object.assign(window, { ogb: { platform: "win32", openInstallTerminal: vi.fn(), remoteClient: { active: true } } }));
   mount(createElement(EngineSetup, { instance: engine }));
   expect(host.textContent).not.toContain("Open install in Terminal");
-  expect(host.textContent).toContain("fixture-install");
-  expect(host.textContent).toContain("server—not this device");
+  expect(host.textContent).toContain("Install Kimi on this server");
+  expect(host.textContent).not.toContain("fixture-install");
+  expect(host.textContent).toContain("installation happens on the server");
 });

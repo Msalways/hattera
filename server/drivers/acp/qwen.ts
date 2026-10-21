@@ -227,11 +227,13 @@ const support: AcpSupport = {
   loginNote: "Qwen Code CLI is not installed",
   install: {
     command: {
-      darwin: "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh | bash",
-      linux: "curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh | bash",
-      win32: "irm https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.ps1 | iex",
+      darwin: "npm install -g @qwen-code/qwen-code",
+      linux: "npm install -g @qwen-code/qwen-code",
+      win32: "npm install -g @qwen-code/qwen-code",
     },
     docsUrl: "https://qwenlm.github.io/qwen-code-docs/en/users/overview/",
+    needsNode: true,
+    signInCommand: "qwen",
   },
   // A raw -m only changes the model within the saved provider. ACP switches
   // the complete route and confirms it before any prompt leaves OMB.
@@ -242,7 +244,9 @@ const support: AcpSupport = {
   selectModel: { configId: "model" },
   pickAuthMethod: () => null,
   authFailure: "continue",
-  isAuthenticated: () => true,
+  // Qwen has no usable custom route until its own first-run /auth wizard
+  // saves a provider. A runnable CLI alone must not appear signed in.
+  isAuthenticated: (env) => readQwenModelCatalog(env).options.length > 0,
   buildPromptText: (turn) => (turn.system ? `${turn.system}\n\n${turn.text}` : turn.text),
   // Qwen says nothing over ACP while it retries a rate limit or compresses
   // its history, but its debug log does. Turn the log on (unless the person

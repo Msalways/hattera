@@ -15,6 +15,7 @@ import { filterCustomModels, partitionCustomModels, suggestedModels } from "@/li
 import { configuredModelInstances, isClaudeAccount, isCustomOnly, SIGN_IN_FAMILY_LABEL, signInFamily, splitEngineRail, type SignInFamily } from "@/lib/engine-rail";
 import { InstanceProviderMark } from "./ProviderIcons";
 import { EngineSetup, EngineUpdateNotice, hasSavedApiKey, needsCli, needsSignIn } from "./EngineSetup";
+import { needsConfiguredRoute } from "./EngineLibrary";
 import { EngineGroupLabel } from "./EngineGroupLabel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ChatGptPlanStatus } from "./ChatGptPlanStatus";
@@ -758,7 +759,7 @@ export function ModelPicker({
   const { pinned, rest } = partitionCustomModels(filteredCustom);
   const blocked = railInstance
     ? pane === "custom"
-      ? needsCli(railInstance)
+      ? needsCli(railInstance) || (needsConfiguredRoute(railInstance) && needsSignIn(railInstance) && custom.length === 0)
       : needsCli(railInstance) || needsSignIn(railInstance)
     : false;
   const canOpenCustom = Boolean(railInstance && !needsCli(railInstance));
@@ -884,7 +885,7 @@ export function ModelPicker({
       {!contained && active && showActiveAccount && (
         <span data-model-account-compact className="hidden max-w-20 truncate @max-4xl/chathead:inline">{active.displayName}</span>
       )}
-      <span className={cn("flex min-w-0 items-center gap-1", !contained && active && "@max-4xl/chathead:hidden")}>
+      <span data-model-label className={cn("flex min-w-0 items-center gap-1", !contained && active && "@max-4xl/chathead:hidden")}>
         <span className="max-w-[160px] truncate">
           {active && showActiveAccount && (
             <span data-model-account className="text-ink-secondary">{active.displayName} · </span>
@@ -1097,7 +1098,7 @@ export function ModelPicker({
                   </div>
                 ) : blocked ? (
                   <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-1">
-                    <EngineSetup instance={railInstance} intent={pane === "custom" ? "inject" : "cloud"} />
+                    <EngineSetup instance={railInstance} intent={pane === "custom" && !needsConfiguredRoute(railInstance) ? "inject" : "cloud"} />
                     {railInstance.claudeAccount && needsSignIn(railInstance) && pane !== "custom" && (
                       <p className="mt-2 text-[11.5px] leading-relaxed text-ink-secondary">
                         {railInstance.claudeAccount.signInShell === "powershell" && `${t("engines.account.powershell")} `}

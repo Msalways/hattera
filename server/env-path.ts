@@ -260,7 +260,10 @@ export function splitCliString(cli: string): string[] {
 
 function isFile(p: string): boolean {
   try {
-    return statSync(p, { throwIfNoEntry: false })?.isFile() ?? false;
+    // Windows can stat a shim behind an inaccessible directory junction
+    // while existsSync/readFileSync and CreateProcess still fail on it.
+    // Discovery uses existsSync too; execution must choose the same copy.
+    return existsSync(p) && (statSync(p, { throwIfNoEntry: false })?.isFile() ?? false);
   } catch {
     return false;
   }
@@ -308,6 +311,14 @@ function parseCmdShim(shim: string, env?: NodeJS.ProcessEnv): ResolvedSpawn | nu
     return null;
   }
   const dir = dirname(shim);
+  // Hermes' Windows installer normally publishes hermes.exe, but its
+  // documented fallback is a Python .cmd launcher. Resolve that exact
+  // generated form without cmd.exe, whose line limit can break the wrapper.
+  if (basename(shim).toLowerCase() === "hermes.cmd") {
+    const line = text.split(/\r?\n/).map((entry) => entry.trim()).find((entry) => entry.startsWith('"'));
+    const match = line && /^"([^"\r\n]+[\\/]python\.exe)" -I -c "(import base64; exec\(base64\.b64decode\('[A-Za-z0-9+/=]+'\)\))" %\*$/i.exec(line);
+    if (match && isFile(match[1]!)) return { command: match[1]!, args: ["-I", "-c", match[2]!] };
+  }
   // npm's own npm.cmd / npx.cmd, installed beside node.exe, name their entry
   // in a variable next to a helper script that is not the CLI:
   // SET "NPX_CLI_JS=%~dp0\node_modules\npm\bin\npx-cli.js". The launcher's

@@ -302,6 +302,39 @@ export class ChatGptPlanAuthController {
     if (!flowId || this.flow?.status.flowId !== flowId) throw new Error("This sign-in is no longer available. Start again.");
     return { ...this.flow.status };
   }
+  /** Hand a remote browser's localhost redirect to this flow's own listener.
+   * Its state and token exchange stay under the same checks as a local visit. */
+  async completeCallback(flowId: string, callbackUrl: string): Promise<void> {
+    const invalid = (message: string) => Object.assign(new Error(message), { status: 400 });
+    const flow = this.flow;
+    if (!flowId || flow?.status.flowId !== flowId || flow.status.phase !== "waiting" || flow.consumed) {
+      throw invalid("This ChatGPT sign-in has ended. Start again.");
+    }
+    if (callbackUrl.length > 8192) throw invalid("The callback URL is too long. Copy the browser address again.");
+    let callback: URL;
+    try { callback = new URL(callbackUrl.trim()); }
+    catch { throw invalid("Paste the complete localhost callback URL from the sign-in browser."); }
+    const expected = new URL(flow.redirectUri);
+    const state = callback.searchParams.get("state") ?? "";
+    if (callback.origin !== expected.origin || callback.pathname !== expected.pathname || callback.username || callback.password || callback.hash ||
+        callback.searchParams.getAll("state").length !== 1 || Buffer.byteLength(state) !== Buffer.byteLength(flow.state) ||
+        !timingSafeEqual(Buffer.from(state), Buffer.from(flow.state)) ||
+        [...callback.searchParams.keys()].some((key) => callback.searchParams.getAll(key).length !== 1) ||
+        (!callback.searchParams.has("code") && !callback.searchParams.has("error"))) {
+      throw invalid("That callback does not match this sign-in. Copy the complete localhost address from the browser tab you opened here.");
+    }
+    let response: Response;
+    try { response = await fetch(callback.href, { redirect: "manual", signal: AbortSignal.timeout(15_000) }); }
+    catch { throw new Error("ChatGPT's callback listener is unavailable on this server. Start sign-in again."); }
+    if (!response.ok) throw invalid("ChatGPT did not accept the browser callback. Start sign-in again.");
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const current = await this.get(flowId);
+      if (current.phase === "succeeded") return;
+      if (current.phase !== "waiting") throw new Error(current.message ?? "ChatGPT sign-in did not finish. Start again.");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error("ChatGPT is still finishing browser sign-in. Check its status in this browser.");
+  }
   async cancel(): Promise<void> {
     await this.starting?.catch(() => {});
     if (this.flow) this.finish(this.flow, "cancelled", "ChatGPT sign-in cancelled.");

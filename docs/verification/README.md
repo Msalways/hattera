@@ -1,5 +1,7 @@
 # Verifying OpenMausBot
 
+For the browser app as Hattera, use the [full-app smoke](hattera-app.md). It checks 21 browser journeys in an isolated fixture, including remote browser pairing, pairing contrast across saved skins, and a local-registry provider install, then exits. The same guide describes a separate clean launcher for checking public provider downloads and optional Tailscale Serve from a normal terminal.
+
 OpenMausBot has one development control surface: `pnpm control:omb`. It is a
 thin command-line adapter over `scripts/mcp-server.ts`, so verification uses
 the same URL validation, task pinning, bounded transcripts, wait states, and

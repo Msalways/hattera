@@ -51,4 +51,19 @@ describe("the greeting beat", () => {
       expect(html).not.toContain("shared OpenMausBot");
     }
   });
+
+  it("opens a browser workspace without asking for a mailing-list email", () => {
+    vi.stubGlobal("window", {});
+    try {
+      const { html, tree } = render(false);
+      expect(html).toContain("choose a configured model");
+      expect(html).not.toContain("<input");
+      const primary = nodes(tree).find((node) => typeof node.type === "function" && node.props.onClick);
+      primary!.props.onClick!();
+      expect(props.onNext).toHaveBeenCalledOnce();
+      expect(store.api).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

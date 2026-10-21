@@ -59,6 +59,7 @@ export const GROK_DEVICE_SIGN_IN: DeviceSignIn = {
   provider: "grok",
   product: "Grok",
   account: "Grok",
+  authHost: "accounts.x.ai",
   homeEnv: "GROK_HOME",
   homeDir: ".grok",
   loginArgs: ["login", "--device-auth"],
@@ -365,10 +366,12 @@ const support: AcpSupport = {
   // to docsUrl, which is honest rather than broken.
   install: {
     command: {
-      darwin: "curl -fsSL https://x.ai/cli/install.sh | bash",
-      linux: "curl -fsSL https://x.ai/cli/install.sh | bash",
+      darwin: "npm install -g @xai-official/grok",
+      linux: "npm install -g @xai-official/grok",
+      win32: "npm install -g @xai-official/grok",
     },
     docsUrl: "https://x.ai/cli",
+    needsNode: true,
     // The terminal route, for people who prefer it; the app's own sign-in
     // is the device code below, which needs no terminal.
     signInCommand: "grok login",

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -8,10 +8,29 @@ import {
   assertSafeCliArgv,
   describeSpawnFailure,
   estimatedWindowsCommandLineChars,
+  spawnCli,
   WINDOWS_SAFE_COMMAND_LINE_CHARS,
 } from "./procs.ts";
 
 describe("Windows CLI argument safety", () => {
+  it.skipIf(process.platform !== "win32")("resolves a CLI using the child environment's PATH", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omb-child-path-"));
+    try {
+      writeFileSync(join(dir, "npm.js"), "console.log('isolated-npm');\n");
+      writeFileSync(join(dir, "npm.cmd"), '@echo off\r\nnode "%~dp0\\npm.js" %*\r\n');
+      const output = await new Promise<string>((resolve, reject) => {
+        const child = spawnCli("npm", ["--version"], { env: { ...process.env, PATH: dir }, stdio: ["pipe", "pipe", "pipe"] });
+        let stdout = "";
+        child.stdin.end();
+        child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+        child.once("error", reject);
+        child.once("close", (code) => code === 0 ? resolve(stdout.trim()) : reject(new Error(`fixture npm exited ${code}`)));
+      });
+      expect(output).toBe("isolated-npm");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
   it("accepts ordinary launches", () => {
     const resolved = { command: "agy.exe", args: ["--model", "gemini-3.1-pro-high"] };
     expect(estimatedWindowsCommandLineChars(resolved)).toBeLessThan(WINDOWS_SAFE_COMMAND_LINE_CHARS);

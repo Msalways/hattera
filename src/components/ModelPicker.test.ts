@@ -335,7 +335,7 @@ describe("ModelPicker trigger", () => {
     expect(markup).not.toMatch(/<span data-model-account[^>]*>Personal/);
     // The account remains a compact-only sibling of the hidden model label,
     // and its button no longer squeezes into the icon-only 30px square.
-    expect(markup).toMatch(/<span data-model-account-compact="true" class="hidden max-w-20 truncate @max-4xl\/chathead:inline">Work<\/span><span class="[^"]*@max-4xl\/chathead:hidden"/);
+    expect(markup).toMatch(/<span data-model-account-compact="true" class="hidden max-w-20 truncate @max-4xl\/chathead:inline">Work<\/span><span data-model-label="true" class="[^"]*@max-4xl\/chathead:hidden"/);
     expect(markup).not.toContain("@max-4xl/chathead:size-[30px]");
   });
 });

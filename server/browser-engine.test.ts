@@ -472,6 +472,7 @@ describe("finding the browser engine", () => {
   });
 
   it("reports an unmanaged agent-browser's real version and warns when it is not the pin", () => {
+    const pinnedVersion = agentBrowserReleaseVersion(resolveAgentBrowserReleaseAsset());
     const dataDir = mkdtempSync(join(tmpdir(), "omb-engine-unmanaged-"));
     scratch.push(dataDir);
     const name = process.platform === "win32" ? "agent-browser.exe" : "agent-browser";
@@ -485,14 +486,14 @@ describe("finding the browser engine", () => {
         kind: "ready",
         binaryPath: binary,
         version: "0.38.1",
-        warning: expect.stringContaining(AGENT_BROWSER_VERSION),
+        warning: expect.stringContaining(pinnedVersion),
       });
       expect(describeBrowserEngine(mismatched)).toContain("0.38.1");
-      expect(describeBrowserEngine(mismatched)).toContain(AGENT_BROWSER_VERSION);
+      expect(describeBrowserEngine(mismatched)).toContain(pinnedVersion);
       expect(warn).toHaveBeenCalledOnce();
       warn.mockClear();
-      const matched = browserEngineStatus({ dataDir, env, exists, versionOf: () => AGENT_BROWSER_VERSION });
-      expect(matched).toEqual({ kind: "ready", binaryPath: binary, version: AGENT_BROWSER_VERSION });
+      const matched = browserEngineStatus({ dataDir, env, exists, versionOf: () => pinnedVersion });
+      expect(matched).toEqual({ kind: "ready", binaryPath: binary, version: pinnedVersion });
       expect(warn).not.toHaveBeenCalled();
       const unknown = browserEngineStatus({ dataDir, env, exists, versionOf: () => null });
       expect(unknown).toMatchObject({ kind: "ready", version: "unknown", warning: expect.stringContaining("unknown") });

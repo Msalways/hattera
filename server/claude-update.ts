@@ -1,7 +1,8 @@
 import type { ExecFileOptions } from "node:child_process";
 import { dirname } from "node:path";
 
-import { enginesBinDir, installNpmEngine } from "./engine-install.ts";
+import { DATA_DIR } from "./config.ts";
+import { activeEngineBinDir, enginesBinDir, installNpmEngine } from "./engine-install.ts";
 import { findCliCandidates } from "./env-path.ts";
 import { describeSpawnFailure, execCli } from "./procs.ts";
 
@@ -17,14 +18,14 @@ const FALLBACK = "Run `claude update` in Terminal, then refresh Engines.";
 /** Claude Code's npm package: the one ClaudeDriver's install descriptor names. */
 export const CLAUDE_CODE_PACKAGE = "@anthropic-ai/claude-code";
 
-/** True when `cli` runs the copy Settings installed into the app's own npm
- * prefix (engine-install.ts). That copy shadows every other one on PATH, and
+/** True when `cli` runs a copy Settings installed into the app's own tools
+ * folder (engine-install.ts). That copy shadows every other one on PATH, and
  * `claude update` cannot update it: Claude's updater reinstalls through the
  * first npm it finds, which updates some other copy and leaves this one as it
  * was. A configured path or wrapper is never the app's copy. */
 export function isAppInstalledClaude(cli: string, binDir: string = enginesBinDir()): boolean {
   const resolved = findCliCandidates(cli)[0];
-  return resolved !== undefined && dirname(resolved) === binDir;
+  return resolved !== undefined && (dirname(resolved) === binDir || dirname(resolved) === activeEngineBinDir(DATA_DIR, "claude"));
 }
 
 /** How the copy the app installed is updated: the way it was installed. */

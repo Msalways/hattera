@@ -16305,6 +16305,7 @@ function configStatus() {
   return {
     xai: { configured: Boolean(cfg.xai?.key) },
     mistral: { configured: Boolean(cfg.mistral?.key) },
+    minimax: { configured: Boolean(cfg.minimax?.key) },
     cerebras: { configured: Boolean(cfg.cerebras?.key) },
     groq: { configured: Boolean(cfg.groq?.key) },
     anthropic: { configured: Boolean(cfg.anthropic?.key), everyClaudeBot: cfg.anthropic?.everyClaudeBot !== false },
@@ -16711,6 +16712,8 @@ async function reloadProviders(before: Record<string, unknown>) {
 // and reload sequence single-flight so two settings requests cannot drop one
 // another's changes or dispose an engine while another reload is creating it.
 let providerConfigBusy = false;
+type EngineInstallJob = { state: "running" | "succeeded" | "failed"; error?: string; instances?: Awaited<ReturnType<typeof describeInstances>> };
+const engineInstallJobs = new Map<string, EngineInstallJob>();
 const providerInstancesChanging = new Set<string>();
 let mcpConfigBusy = false;
 const MAX_CONCURRENT_MCP_PROBES = 2;
@@ -17067,7 +17070,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     // paired session with the right scope.
     if (method === "GET" && !path.startsWith("/api/") && !path.startsWith("/.well-known/") && serveStatic(res, path)) return;
     if (method === "GET" && path === "/.well-known/openmausbot/environment") {
-      return json(res, 200, environmentDescriptor({ environmentId: ENVIRONMENT_ID, desktopManaged: DESKTOP_MANAGED, emailSignIn: !HOSTED_WORKSPACE && !CLOUD_HOME && emailSignIn.enabled(), githubSignIn: Boolean(githubIdentity), sharedComputers: lendingEnabled(), cloudHome: Boolean(CLOUD_HOME) }));
+      return json(res, 200, environmentDescriptor({ environmentId: ENVIRONMENT_ID, desktopManaged: DESKTOP_MANAGED, emailSignIn: !HOSTED_WORKSPACE && !CLOUD_HOME && emailSignIn.enabled(), githubSignInOrigin: GITHUB_IDENTITY?.publicUrl, sharedComputers: lendingEnabled(), cloudHome: Boolean(CLOUD_HOME) }));
     }
     const domainCheck = /^\/\.well-known\/openmausbot\/domain-check\/([a-f0-9]{64})$/.exec(path);
     if (method === "GET" && domainCheck) {
@@ -25065,6 +25068,11 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       const state = await providerAuthSessions.status(authStatus[1], auth.kind === "session" ? auth.session.id : "loopback", url.searchParams.get("flowId") ?? "");
       return json(res, 200, { auth: state });
     }
+    const installStatus = /^\/api\/instances\/([\w.-]+)\/install\/status$/.exec(path);
+    if (method === "GET" && installStatus) {
+      res.setHeader("cache-control", "no-store");
+      return json(res, 200, { install: engineInstallJobs.get(installStatus[1]) ?? { state: "idle" } });
+    }
     const instanceAction = /^\/api\/instances\/([\w.-]+)\/(refresh-models|install|auth\/start|auth\/complete|auth\/cancel|auth\/sign-out)$/.exec(path);
     if (method === "POST" && instanceAction) {
       if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
@@ -25080,25 +25088,39 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           return json(res, 200, { instances: await describeInstances() });
         }
         if (action === "install") {
-          if (!(await registry.installRuntime(instanceId))) return json(res, 404, { error: "Installing this engine from Settings is not available on this server. Use the install command on the machine running OpenMausBot." });
-          const instances = await describeInstances();
-          // OpenCode's first catalog probe can take over a minute on a small
-          // host. Start it only after the install response's version probe,
-          // so the two CLI processes do not compete for Render Free's CPU.
-          if (registry.get(instanceId)?.driverKind === "opencodeGo") {
-            res.once("finish", () => { void registry.refreshModels(instanceId).catch(() => {}); });
-          }
-          return json(res, 200, { instances });
+          const existing = engineInstallJobs.get(instanceId);
+          if (existing?.state === "running") return json(res, 202, { install: existing });
+          const instance = (await describeInstances()).find((candidate) => candidate.instanceId === instanceId);
+          if (!instance?.install?.server && !instance?.install?.managed) return json(res, 404, { error: "Hattera cannot install this provider on this server. Check the server runtime and try again." });
+          const job: EngineInstallJob = { state: "running" };
+          engineInstallJobs.set(instanceId, job);
+          void (async () => {
+            try {
+              if (!(await registry.installRuntime(instanceId))) throw new Error("This provider has no server installer.");
+              job.instances = await describeInstances();
+              job.state = "succeeded";
+              // OpenCode's initial catalog probe can be slow; do not make the
+              // verified install wait for it or compete with npm's version probe.
+              if (registry.get(instanceId)?.driverKind === "opencodeGo") void registry.refreshModels(instanceId).catch(() => {});
+            } catch (cause) {
+              job.error = cause instanceof Error ? cause.message : String(cause);
+              job.state = "failed";
+            }
+          })();
+          return json(res, 202, { install: job });
         }
         if (action === "auth/start") {
           const instance = registry.get(instanceId);
           if (!instance) return json(res, 404, { error: "unknown instance" });
-          // The official local OAuth callback terminates on this machine,
-          // not a phone or the browser visiting a remotely hosted workspace.
-          if (instance.authenticationMethod === "browser-pkce" && (isProxied(req) || !isLoopbackHost(req.socket.remoteAddress))) {
-            return json(res, 403, { error: "Continue with ChatGPT on the computer running OpenMausBot. Hosted Pro sign-in requires OpenAI's hosted-app approval." });
+          const body = await readBody(req, 4096);
+          const requestedMethod = body?.method;
+          if (requestedMethod !== undefined && requestedMethod !== "device-code" && requestedMethod !== "browser-pkce") {
+            return json(res, 400, { error: "Unknown sign-in method." });
           }
-          const started = await providerAuthSessions.start(instance, owner);
+          if (requestedMethod && !instance.authenticationMethods?.includes(requestedMethod)) {
+            return json(res, 400, { error: "This sign-in method is unavailable for this provider." });
+          }
+          const started = await providerAuthSessions.start(instance, owner, requestedMethod);
           // Revocation can arrive while the CLI is obtaining a device code.
           if (auth.kind === "session" && !sessions.isLive(auth.session.id)) {
             providerAuthSessions.revokeOwner(owner);
@@ -25497,7 +25519,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     }
     if ((method === "PUT" || method === "PATCH") && path === "/api/config") {
       const body = await readBody(req);
-      if (hostedModels && ["instances", "anthropic", "openai", "openrouter", "openaiCompat", "xai", "mistral", "cerebras", "groq", "opencodeGo"].some(key => Object.hasOwn(body, key))) return json(res, 403, { error: HOSTED_PROVIDER_SETTINGS_ERROR });
+      if (hostedModels && ["instances", "anthropic", "openai", "openrouter", "openaiCompat", "xai", "mistral", "minimax", "cerebras", "groq", "opencodeGo"].some(key => Object.hasOwn(body, key))) return json(res, 403, { error: HOSTED_PROVIDER_SETTINGS_ERROR });
       const patch = parseConfigPatch(body);
       // A Cloud home is personal: nobody is invited to sign in to it.
       if (CLOUD_HOME && (patch.signIn?.admins?.length || patch.signIn?.members?.length)) {

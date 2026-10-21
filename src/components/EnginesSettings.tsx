@@ -8,11 +8,11 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 
 import { api, useStore, type InstanceInfo } from "@/state/store";
-import { EngineCard, EngineSections, RefreshEngines, engineReady } from "./EngineLibrary";
+import { EngineCard, EngineSections, RefreshEngines, engineReady, needsConfiguredRoute } from "./EngineLibrary";
 import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
 import { t } from "@/lib/i18n";
-import { ApiKeyEngineManage, EngineSetup, EngineUpdateNotice, EngineWarningNotice, isApiKeyEngine } from "./EngineSetup";
+import { ApiKeyEngineManage, EngineSetup, EngineUpdateNotice, EngineWarningNotice, ServerEngineInstall, isApiKeyEngine } from "./EngineSetup";
 import { AddClaudeAccount, ClaudeAccountSettings } from "./ClaudeAccountSettings";
 import { AddProviderAccount, CodexAccountSettings } from "./CodexAccountSettings";
 import { DEVICE_SIGN_IN_COPY, deviceSignInProvider } from "./DeviceSignIn";
@@ -270,7 +270,7 @@ function EngineRow({ instance }: { instance: InstanceInfo }) {
   return (
     <EngineCard instance={instance}>
       {policyNote}
-      {!engineReady(instance) && <EngineSetup instance={instance} intent={instance.access === "custom" ? "inject" : "cloud"} unframed />}
+      {!engineReady(instance) && <EngineSetup instance={instance} intent={needsConfiguredRoute(instance) ? "cloud" : instance.access === "custom" ? "inject" : "cloud"} unframed />}
       {engineReady(instance) && <ApiKeyEngineManage instance={instance} className="mt-3" />}
       {instance.snapshot.update && <EngineUpdateNotice update={instance.snapshot.update} instance={instance} className="mt-3" />}
       {instance.snapshot.warning && <EngineWarningNotice warning={instance.snapshot.warning} className="mt-3" />}
@@ -297,8 +297,11 @@ function EngineRow({ instance }: { instance: InstanceInfo }) {
       {instance.snapshot.chatgptPlan && !instance.snapshot.authenticationUnavailableReason && (
         <div className="mt-3"><AddProviderAccount /></div>
       )}
-      <details className="mt-4 border-t border-hairline/40 pt-3">
+      {(instance.cli || instance.cliDefault || instance.install?.command || instance.install?.server || instance.install?.managed) && <details className="mt-4 border-t border-hairline/40 pt-3">
         <summary className="cursor-pointer rounded-md py-1 text-[12px] font-medium text-ink-secondary outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent">{t("engines.library.advanced")}</summary>
+        {instance.snapshot.state === "available" && instance.install?.server && instance.driverKind !== "claudeAgent" && !instance.cli && !instance.snapshot.update && (
+          <ServerEngineInstall instance={instance} mode="update" />
+        )}
         <p className="mt-2 text-[12px] leading-relaxed text-ink-secondary">{t("engines.footer")}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
           {instance.cli ? (
@@ -362,7 +365,7 @@ function EngineRow({ instance }: { instance: InstanceInfo }) {
             />
           </div>
         )}
-      </details>
+      </details>}
     </EngineCard>
   );
 }

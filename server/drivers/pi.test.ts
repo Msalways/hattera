@@ -1375,6 +1375,19 @@ describe("PiDriver snapshot", () => {
     await instance.dispose();
   });
 
+  it("keeps an installed pi CLI in setup when it has no configured models", async () => {
+    const instance = await PiDriver.create({
+      instanceId: "pi-no-routes", displayName: undefined,
+      environment: { FAKE_PI_MODE: "no-models" }, enabled: true,
+      config: { cli: FAKE_CLI, fullAuto: false },
+    });
+    try {
+      expect(await instance.snapshot()).toMatchObject({ state: "available", authenticated: false });
+    } finally {
+      await instance.dispose();
+    }
+  });
+
   it("reports unavailable with a reason when the CLI is missing", async () => {
     const instance = await PiDriver.create({
       instanceId: "pi-missing",

@@ -22,6 +22,8 @@ export type TailscaleFailure =
   | "no-magicdns"
   | "needs-operator"
   | "https-not-enabled"
+  | "serve-occupied"
+  | "serve-status-unavailable"
   | "unknown";
 
 /** Turn Tailscale's stderr into a reason without repeating it. */
@@ -50,6 +52,10 @@ export function explainTailscaleFailure(reason: TailscaleFailure): string {
       return "Tailscale refused: on Linux run `sudo tailscale set --operator=$USER` once, then try again";
     case "https-not-enabled":
       return "HTTPS certificates are off for this tailnet: enable them in the admin console (DNS → HTTPS Certificates)";
+    case "serve-occupied":
+      return "HTTPS port 443 already has a Tailscale Serve or Funnel endpoint. Stop that endpoint first so Hattera does not replace it";
+    case "serve-status-unavailable":
+      return "Could not read Tailscale Serve status; check `tailscale serve status --json` before trying again";
     default:
       return "Tailscale reported an error; run `tailscale status` and `tailscale serve status` to see it";
   }
@@ -116,11 +122,26 @@ export async function tailscaleServe(
   httpsPort = 443,
 ): Promise<{ origin: string } | { failure: TailscaleFailure }> {
   if (!status.dnsName) return { failure: "no-magicdns" };
+  const existing = await run(status.cli, ["serve", "status", "--json"], 10_000);
+  if (!existing.ok) return { failure: classifyTailscaleStderr(existing.stderr) === "unknown" ? "serve-status-unavailable" : classifyTailscaleStderr(existing.stderr) };
+  let configuration: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(existing.stdout);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { failure: "serve-status-unavailable" };
+    configuration = parsed as Record<string, unknown>;
+  } catch {
+    return { failure: "serve-status-unavailable" };
+  }
+  const tcp = configuration.TCP;
+  if (tcp && typeof tcp === "object" && Object.hasOwn(tcp, String(httpsPort))) return { failure: "serve-occupied" };
+  const web = configuration.Web;
+  if (web && typeof web === "object" && Object.keys(web).some((host) => host.endsWith(`:${httpsPort}`))) return { failure: "serve-occupied" };
   const result = await run(status.cli, ["serve", "--bg", `--https=${httpsPort}`, `http://127.0.0.1:${localPort}`], 20_000);
   if (!result.ok) return { failure: classifyTailscaleStderr(result.stderr || result.stdout) };
   return { origin: httpsPort === 443 ? `https://${status.dnsName}` : `https://${status.dnsName}:${httpsPort}` };
 }
 
 export async function tailscaleServeOff(status: TailscaleStatus, httpsPort = 443): Promise<void> {
-  await run(status.cli, ["serve", `--https=${httpsPort}`, "off"], 10_000);
+  const result = await run(status.cli, ["serve", `--https=${httpsPort}`, "off"], 10_000);
+  if (!result.ok) throw new Error("Tailscale Serve could not be stopped");
 }

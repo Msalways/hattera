@@ -6,6 +6,8 @@ import { useEffect, useRef } from "react";
 import {
   APP_NAME,
   APP_REPOSITORY,
+  HATTERA_REPOSITORY,
+  HATTERA_DOCS_URL,
   DOCS_URL,
   LICENSE_URL,
   RELEASES_URL,
@@ -33,6 +35,7 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
   if (!open) return null;
 
   const platform = platformLabel(window.ogb?.platform);
+  const browser = !platform;
 
   return (
     <div
@@ -45,22 +48,22 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
         aria-labelledby="about-dialog-title"
         className="w-full max-w-[360px] rounded-2xl border border-hairline/50 bg-panel p-6 text-center shadow-2xl"
       >
-        <img src="/app-icon.svg" alt="" width={56} height={56} className="mx-auto size-14" />
+        <img src={browser ? "/hattera-mark.svg" : "/app-icon.svg"} alt="" width={56} height={56} className="mx-auto size-14" />
         <h2 id="about-dialog-title" className="mt-3 text-[17px] font-semibold text-ink">
-          {APP_NAME}
+          {browser ? "Hattera" : APP_NAME}
         </h2>
         <p className="mt-1 text-[13px] text-ink-secondary">
           Version {appVersion()}
           {platform ? ` · ${platform}` : ""}
         </p>
         <p className="mt-3 text-[13px] leading-relaxed text-ink-secondary">
-          An open-source desktop home for your agents. Apache 2.0 licensed.
+          {browser ? "Your self-hosted agent workspace. Based on OpenMausBot and Apache 2.0 licensed." : "An open-source desktop home for your agents. Apache 2.0 licensed."}
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[13px]">
-          <AboutLink href={APP_REPOSITORY} label="GitHub" />
-          <AboutLink href={DOCS_URL} label="Docs" />
-          <AboutLink href={RELEASES_URL} label="Releases" />
-          <AboutLink href={LICENSE_URL} label="License" />
+          <AboutLink href={browser ? HATTERA_REPOSITORY : APP_REPOSITORY} label="GitHub" />
+          <AboutLink href={browser ? HATTERA_DOCS_URL : DOCS_URL} label="Docs" />
+          {!browser && <AboutLink href={RELEASES_URL} label="Releases" />}
+          <AboutLink href={browser ? `${HATTERA_REPOSITORY}/blob/main/LICENSE` : LICENSE_URL} label="License" />
         </div>
         <button
           ref={closeRef}

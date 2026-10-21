@@ -77,6 +77,21 @@ describe("memory routes through an isolated HTTP fixture", () => {
     expect((await api("GET", "/api/bots/nope/memory")).status).toBe(404);
   });
 
+  it("saves a new bot's empty MEMORY.md without a manufactured conflict", async () => {
+    const created = await api("POST", "/api/bots", { name: "First memory save" });
+    expect(created.status).toBe(201);
+    const freshId = created.body.bot.id as string;
+    const file = join(fixture.info.dataDir, "workspaces", freshId, "MEMORY.md");
+    expect(existsSync(file)).toBe(false);
+    const opened = await api("GET", `/api/bots/${freshId}/memory/file?path=MEMORY.md`);
+    expect(opened.body).toMatchObject({ text: "", hash: hashMemoryText(""), exists: false });
+    const saved = await api("PUT", `/api/bots/${freshId}/memory/file`, {
+      path: "MEMORY.md", text: "A note from the person.\n", expectedHash: opened.body.hash,
+    });
+    expect(saved.status).toBe(200);
+    expect(readFileSync(file, "utf8")).toBe("A note from the person.\n");
+  });
+
   it("refuses an escaping path at the boundary without touching the disk", async () => {
     for (const path of ["../../etc/passwd", "/etc/passwd", "memory/../MEMORY.md", "memory/nested/x.md", "notes.txt"]) {
       expect((await api("GET", `/api/bots/${botId}/memory/file?path=${encodeURIComponent(path)}`)).status).toBe(400);

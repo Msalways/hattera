@@ -47,7 +47,7 @@ export function createGithubIdentity(input: { config: GithubIdentityConfig; data
   if (!input.postgresPool) mkdirSync(input.dataDir, { recursive: true, mode: 0o700 });
   const sqliteDb = input.postgresPool ? null : new DatabaseSync(join(input.dataDir, "github-identity.sqlite"));
   const auth = betterAuth({
-    appName: "OpenMausBot",
+    appName: "Hattera",
     baseURL: config.publicUrl,
     basePath: "/identity",
     secret: config.secret,
@@ -82,6 +82,28 @@ export function createGithubIdentity(input: { config: GithubIdentityConfig; data
     if (path !== "/identity" && !path.startsWith("/identity/")) return false;
     await ready;
     res.setHeader("cache-control", "no-store");
+    if (path === "/identity/start/github") {
+      if (req.method !== "GET") { res.writeHead(405); res.end(); return true; }
+      if (req.headers.host !== new URL(config.publicUrl).host) { res.writeHead(400); res.end("Open the configured Hattera address to sign in."); return true; }
+      const started = await auth.handler(new Request(`${config.publicUrl}/identity/sign-in/social`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: config.publicUrl, ...(req.headers.cookie ? { cookie: req.headers.cookie } : {}) },
+        body: JSON.stringify({ provider: "github", callbackURL: `${config.publicUrl}/identity/finish`, errorCallbackURL: `${config.publicUrl}/pair?github=1`, disableRedirect: true }),
+      }));
+      const answer = await started.json().catch(() => null) as { url?: string } | null;
+      const destination = answer?.url ? new URL(answer.url) : null;
+      if (!started.ok || destination?.protocol !== "https:" || destination.hostname !== "github.com") {
+        res.writeHead(303, { location: "/pair?github=start" }); res.end(); return true;
+      }
+      res.setHeader("set-cookie", started.headers.getSetCookie());
+      res.writeHead(303, { location: destination.href }); res.end(); return true;
+    }
+    if (path === "/identity/error" && req.method === "GET") {
+      const reason = new URL(req.url ?? "", config.publicUrl).searchParams.get("error");
+      res.writeHead(303, { location: reason === "state_mismatch" ? "/pair?github=state" : "/pair?github=1" });
+      res.end();
+      return true;
+    }
     if (path !== "/identity/finish") {
       await nodeHandler(req, res);
       return true;

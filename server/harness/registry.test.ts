@@ -7,12 +7,22 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ModelCatalog } from "../contracts.ts";
+import { activeEngineBinDir } from "../engine-install.ts";
 import { resetPathCacheForTests } from "../env-path.ts";
 import { removeTempDir } from "../testing/cleanup.ts";
 import { makeFakeDriver } from "../testing/fake-driver.ts";
 import { ProviderRegistry } from "./registry.ts";
 
 describe("ProviderRegistry", () => {
+  it("does not offer an npm button for a provider without a CLI to verify", async () => {
+    const fake = makeFakeDriver();
+    Object.assign(fake.driver, { install: { command: { [process.platform]: "npm install -g fixture-api-helper" } } });
+    const registry = new ProviderRegistry([fake.driver], { npmAvailable: () => true });
+    await registry.load({ a: { driver: "fake" } });
+    expect((await registry.describe())[0].install?.server).toBeUndefined();
+    expect(await registry.installRuntime("a")).toBe(false);
+  });
+
   it("creates live instances for known drivers", async () => {
     const fake = makeFakeDriver();
     const registry = new ProviderRegistry([fake.driver]);
@@ -76,6 +86,16 @@ describe("ProviderRegistry", () => {
     await registry.load({ local: { driver: "fake" } });
     const [described] = await registry.describe();
     expect(described.access).toBe("custom");
+  });
+
+  it("publishes per-instance API access to Settings and clears it on replacement", async () => {
+    const fake = makeFakeDriver();
+    const registry = new ProviderRegistry([fake.driver]);
+    await registry.load({ keyed: { driver: "fake", access: "api" } });
+    expect((await registry.describe())[0].access).toBe("api");
+    expect(registry.access("keyed")).toBe("api");
+    await registry.load({ keyed: { driver: "fake" } });
+    expect((await registry.describe())[0].access).toBe("subscription");
   });
 
   it("keeps an unknown driver as an unavailable shadow instead of failing", async () => {
@@ -344,8 +364,9 @@ process.exit(0);
     expect(await registry.installRuntime("a")).toBe(true);
     const calls = readFileSync(process.env.FAKE_NPM_LOG!, "utf8").trim().split("\n").map((line) => JSON.parse(line) as string[]);
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual(["install", "-g", "--prefix", join(scratch, "data", "tools", "npm"), "--loglevel=error", "--include=optional", "--allow-scripts=fake-engine", "fake-engine@latest"]);
-    expect(existsSync(join(scratch, "data", "tools", "npm", "bin", "fakebin"))).toBe(true);
+    const binDir = activeEngineBinDir(join(scratch, "data"), "fakebin")!;
+    expect(calls[0]).toEqual(["install", "-g", "--prefix", join(binDir, ".."), "--loglevel=error", "--include=optional", "--allow-scripts=fake-engine", "fake-engine@latest"]);
+    expect(existsSync(join(binDir, "fakebin"))).toBe(true);
     expect(await registry.installRuntime("missing")).toBe(false);
   });
 
@@ -367,5 +388,22 @@ process.exit(0);
     Object.assign(fake.driver, { install: { command: { linux: "npm install -g fake-engine" }, managed: { label: "Install", downloadBytes: 1 } } });
     expect((await registry.describe())[0].install?.server).toBeUndefined();
     expect(existsSync(join(scratch, "data"))).toBe(false);
+  });
+
+  it("never advertises npm installs inside a sealed verification fixture", async () => {
+    withFakeNpm(true);
+    const previous = process.env.OMB_TEST_SEALED_PATH;
+    process.env.OMB_TEST_SEALED_PATH = "1";
+    try {
+      const fake = makeFakeDriver();
+      Object.assign(fake.driver, { install: { command: { linux: "npm install -g fake-engine" } } });
+      const registry = new ProviderRegistry([fake.driver], { enginesBaseDir: join(scratch, "data") });
+      await registry.load({ a: { driver: "fake" } });
+      expect((await registry.describe())[0].install?.server).toBeUndefined();
+      expect(await registry.installRuntime("a")).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.OMB_TEST_SEALED_PATH;
+      else process.env.OMB_TEST_SEALED_PATH = previous;
+    }
   });
 });

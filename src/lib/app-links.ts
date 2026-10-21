@@ -3,6 +3,12 @@
 // answer rather than one per call site.
 export const APP_NAME = "OpenMausBot";
 export const APP_REPOSITORY = "https://github.com/milind-soni/OpenMausBot";
+export const HATTERA_REPOSITORY = "https://github.com/Msalways/hattera";
+export const HATTERA_DOCS_URL = `${HATTERA_REPOSITORY}/tree/main/apps/docs/content/docs`;
+export const HATTERA_FEEDBACK_URL = `${HATTERA_REPOSITORY}/issues`;
+export function repositoryGuide(path: string): string {
+  return `${typeof window !== "undefined" && window.ogb?.platform ? APP_REPOSITORY : HATTERA_REPOSITORY}/blob/main/docs/${path}`;
+}
 /** The docs tree is the help centre, and it is where openmausbot.com sends
  * people too — one destination, not two competing ones. */
 export const DOCS_URL = `${APP_REPOSITORY}/tree/main/docs`;

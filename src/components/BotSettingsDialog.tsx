@@ -30,6 +30,7 @@ import { VisibilitySection } from "./bot-settings/VisibilitySection";
 import { t } from "@/lib/i18n";
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { SimpleBotPanel } from "./bot-settings/SimpleBotPanel";
+import { BotAvatar } from "./Avatar";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import type { PromptPreviewData } from "./bot-settings/PromptPreview";
 
@@ -74,7 +75,8 @@ export function BotSettingsDialog({ bot, overlay = false }: {
   useEffect(() => {
     if (wantsFullView) setShowAll(true);
   }, [wantsFullView, section]);
-  const simpleView = !advanced && !showAll;
+  const hatteraBrowser = typeof document !== "undefined" && document.documentElement.dataset.browserBrand === "hattera";
+  const simpleView = !hatteraBrowser && !advanced && !showAll;
   // Slack is offered only where the server has an Admin page to link to
   // (a hosted organisation workspace); otherwise its row does not exist.
   const slackUrl = useSlackManagementUrl(bot.id);
@@ -346,6 +348,7 @@ export function BotSettingsDialog({ bot, overlay = false }: {
   return (
     <>
       <aside
+        data-hattera-settings={hatteraBrowser ? "" : undefined}
         ref={dialogRef}
         role="dialog"
         aria-labelledby="bot-settings-title"
@@ -354,7 +357,7 @@ export function BotSettingsDialog({ bot, overlay = false }: {
           // focus() lands here when the panel opens; the global :focus-visible
           // ring would frame the whole sheet, so it is off for the container.
           "animate-panel-in absolute inset-0 z-40 flex h-full min-w-0 flex-col border-l border-hairline/40 bg-panel outline-none focus-visible:outline-none",
-          overlay
+          hatteraBrowser ? "static z-auto flex-1 border-l-0" : overlay
             // Below md every panel already covers the window; from md up
             // this one hugs the right edge over the chat, shadowed so it
             // reads as a sheet on top of the panel that stays beneath it.
@@ -362,7 +365,46 @@ export function BotSettingsDialog({ bot, overlay = false }: {
             : "md:static md:z-auto md:w-[min(420px,42vw)] md:shrink-0",
         )}
       >
-        {simpleView ? (
+        {hatteraBrowser ? (
+          <>
+            <div className="hattera-settings-back">
+              <button type="button" onClick={() => dispatch({ type: "toggleSettings", open: false })}>
+                <ChevronLeft size={17} /> Back to {bot.name} chat
+              </button>
+            </div>
+            <div className="hattera-settings-heading">
+              <BotAvatar bot={bot} size={50} />
+              <div className="min-w-0 flex-1">
+                <h1 id="bot-settings-title" className="truncate text-[20px] font-semibold">{bot.name}</h1>
+                {bot.title && <p className="truncate text-ink-secondary">{bot.title}</p>}
+              </div>
+              <button type="button" className="hattera-settings-test" onClick={() => dispatch({ type: "toggleSettings", open: false })}>Test in chat</button>
+            </div>
+            <div className="hattera-settings-layout">
+              <nav className="hattera-settings-nav" aria-label={`${bot.name} settings`}>
+                {sections.map((entry) => {
+                  const Icon = entry.icon;
+                  return <button key={entry.id} type="button" aria-current={section === entry.id ? "page" : undefined}
+                    onClick={() => dispatch({ type: "toggleSettings", open: true, section: entry.id })}>
+                    <Icon size={18} /><span>{sectionLabel(entry)}</span>
+                  </button>;
+                })}
+              </nav>
+              <div className="hattera-settings-content">
+                {sections.map((entry) => {
+                  const Icon = entry.icon;
+                  return <section key={entry.id} hidden={section !== entry.id} aria-labelledby={`hattera-settings-${entry.id}`}>
+                    <header className="hattera-settings-section-header">
+                      <span className="hattera-settings-section-icon"><Icon size={24} /></span>
+                      <h2 id={`hattera-settings-${entry.id}`}>{sectionLabel(entry)}</h2>
+                    </header>
+                    {entry.id === "memory" ? <div hidden={section !== "memory"}>{renderSectionBody("memory")}</div> : section === entry.id ? renderSectionBody(entry.id) : null}
+                  </section>;
+                })}
+              </div>
+            </div>
+          </>
+        ) : simpleView ? (
           <SimpleBotPanel
             bot={bot}
             derived={derived}

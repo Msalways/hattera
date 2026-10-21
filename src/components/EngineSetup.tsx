@@ -1,7 +1,7 @@
 // A focused setup card shared by onboarding, the model picker, and runtime
 // errors. The command has one inline copy action and one primary next step;
 // unusable model lists stay out of the way until the engine is ready.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Copy, Download, ExternalLink, KeyRound, Loader2, LogIn, TerminalSquare, X } from "lucide-react";
 import { api, type EngineInstall, type InstanceInfo, useStore } from "@/state/store";
 import { cn } from "@/lib/cn";
@@ -55,12 +55,9 @@ export function serverTerminal(cloudHome: boolean): boolean {
   return Boolean(window.ogb?.openInstallTerminal) && window.ogb?.remoteClient?.active !== true && !cloudHome;
 }
 
-/** Grok Build cannot run here (no Grok CLI on this server, an older Cloud
- * computer image for one) and nobody here can install it. Its models are
- * still an xAI API key away, so the card says that instead of handing over
- * an install command that cannot run. */
+/** Offer the API-key route only when this server cannot install Grok. */
 export function grokKeyInstead(instance: InstanceInfo, cloudHome: boolean): boolean {
-  return instance.driverKind === "grokAgent" && needsCli(instance) && !serverTerminal(cloudHome);
+  return instance.driverKind === "grokAgent" && needsCli(instance) && !instance.install?.server && !serverTerminal(cloudHome);
 }
 
 export function CommandRow({
@@ -178,45 +175,67 @@ export function CommandRow({
   );
 }
 
-/** One click installs or updates the engine on the machine running the
- * server, as the server's own user, into the app's own folder. The terminal
- * command stays behind a disclosure for people who prefer it. */
-function ServerEngineInstall({ instance, mode, command }: { instance: InstanceInfo; mode: "install" | "update"; command: string | null }) {
-  const { state, dispatch, refreshModels } = useStore();
+/** One click installs or updates the engine on the machine running the server. */
+type ServerInstallResult = { install: { state: "idle" | "running" | "succeeded" | "failed"; error?: string; instances?: InstanceInfo[] } };
+
+async function waitForServerInstall(instanceId: string): Promise<InstanceInfo[]> {
+  const path = `/api/instances/${encodeURIComponent(instanceId)}/install/status`;
+  for (;;) {
+    const { install } = await api<ServerInstallResult>(path, { timeoutMs: 30_000 });
+    if (install.state === "succeeded" && install.instances) return install.instances;
+    if (install.state === "failed" || install.state === "idle") throw new Error(install.error ?? "The server install was interrupted. Try again.");
+    await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+  }
+}
+
+export function ServerEngineInstall({ instance, mode }: { instance: InstanceInfo; mode: "install" | "update" }) {
+  const { dispatch, refreshModels } = useStore();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const tracking = useRef(false);
 
-  const run = async () => {
-    if (busy) return;
+  const finish = useCallback(async (instances: InstanceInfo[]) => {
+    const installed = instances.find((candidate) => candidate.instanceId === instance.instanceId);
+    if (!installed) throw new Error(t("engineSetup.installNotVerified", { reason: t("engineSetup.noReason") }));
+    dispatch({ type: "instances", instances });
+    setDone(true);
+    if (installed.snapshot.state === "available" && instance.driverKind !== "opencodeGo") {
+      await refreshModels(instance.instanceId).catch(() => {});
+    }
+  }, [dispatch, instance.driverKind, instance.instanceId, refreshModels]);
+
+  const track = useCallback(async (start: boolean) => {
+    if (tracking.current) return;
+    tracking.current = true;
     setBusy(true);
     setDone(false);
     setError(null);
     try {
-      const { instances } = await api(`/api/instances/${encodeURIComponent(instance.instanceId)}/install`, { method: "POST" });
-      const installed = (instances as InstanceInfo[] | undefined)?.find((candidate) => candidate.instanceId === instance.instanceId);
-      if (instances) dispatch({ type: "instances", instances });
-      if (installed?.snapshot.state !== "available") {
-        throw new Error(t("engineSetup.installNotVerified", { reason: installed?.snapshot.reason ?? t("engineSetup.noReason") }));
-      }
-      setDone(true);
-      // OpenCode's first model probe can outlast a hosted HTTP request. The
-      // server already starts it after installation; EngineCard picks up the
-      // resulting catalog when it is ready.
-      if (instance.driverKind !== "opencodeGo") await refreshModels(instance.instanceId).catch(() => {});
+      if (start) await api(`/api/instances/${encodeURIComponent(instance.instanceId)}/install`, { method: "POST" });
+      await finish(await waitForServerInstall(instance.instanceId));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
+      tracking.current = false;
       setBusy(false);
     }
-  };
+  }, [finish, instance.instanceId]);
+
+  useEffect(() => {
+    let mounted = true;
+    void api<ServerInstallResult>(`/api/instances/${encodeURIComponent(instance.instanceId)}/install/status`)
+      .then(({ install }) => { if (mounted && install.state === "running") void track(false); })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [instance.instanceId, track]);
 
   return (
     <div className="mt-3 space-y-2">
       <button
         type="button"
         disabled={busy}
-        onClick={() => void run()}
+        onClick={() => void track(true)}
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2 text-[12.5px] font-semibold text-white hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
@@ -226,12 +245,6 @@ function ServerEngineInstall({ instance, mode, command }: { instance: InstanceIn
       </button>
       {done && !busy && <p role="status" className="text-center text-[11px] text-success">{t("engineSetup.installVerified")}</p>}
       {error && <p role="alert" className="whitespace-pre-wrap text-[11.5px] leading-relaxed text-danger">{error}</p>}
-      {command && (
-        <details className="rounded-lg border border-hairline/50 bg-app px-2.5 py-2 text-[11.5px] text-ink-secondary">
-          <summary className="cursor-pointer select-none">{t("engineSetup.preferTerminal")}</summary>
-          <CommandRow command={command} actionLabel={t(mode === "update" ? "engineSetup.openUpdate" : "engineSetup.openInstall")} compact allowTerminal={state.config?.cloudHome !== true} />
-        </details>
-      )}
     </div>
   );
 }
@@ -260,7 +273,7 @@ export function EngineUpdateNotice({
         </div>
       </div>
       {instance?.install?.server
-        ? <ServerEngineInstall instance={instance} mode="update" command={update.command} />
+        ? <ServerEngineInstall instance={instance} mode="update" />
         : <CommandRow command={update.command} actionLabel={t("engineSetup.openUpdate")} compact />}
     </div>
   );
@@ -316,6 +329,7 @@ function ManagedEngineSetup({ instance, signInOnly }: { instance: InstanceInfo; 
   const install = () => run("install", async () => {
     try {
       await api(`/api/instances/${encodeURIComponent(instance.instanceId)}/install`, { method: "POST" });
+      await waitForServerInstall(instance.instanceId);
     } finally {
       // Keep the latest setup reason without replacing the install error if
       // the status refresh also fails.
@@ -601,7 +615,7 @@ export function EngineSetup({
 
       {deviceSignIn || browserSignIn ? (
         <>
-          <DeviceSignIn key={instance.instanceId} instanceId={instance.instanceId} browserPkce={browserSignIn} provider={provider} />
+          <DeviceSignIn key={instance.instanceId} instanceId={instance.instanceId} browserPkce={browserSignIn} provider={provider} availableMethods={instance.authentication?.methods} />
           {/* Grok keeps its terminal sign-in for people who prefer one, where
               a terminal runs on this server; the code above needs none. */}
           {deviceSignIn && provider === "grok" && signInCommand && serverTerminal(cloudHome) && (
@@ -614,7 +628,7 @@ export function EngineSetup({
       ) : pasteSignIn ? (
         <ClaudeSignIn key={instance.instanceId} instanceId={instance.instanceId} />
       ) : install.server && !signInOnly ? (
-        <ServerEngineInstall instance={instance} mode="install" command={installCommand} />
+        <ServerEngineInstall instance={instance} mode="install" />
       ) : install.managed ? (
         <ManagedEngineSetup instance={instance} signInOnly={signInOnly} />
       ) : command ? (
@@ -625,7 +639,7 @@ export function EngineSetup({
         />
       ) : (
         <p className="mt-3 rounded-lg bg-inset px-2.5 py-2 text-[12px] leading-relaxed text-ink-secondary">
-          {t("engineSetup.noInstaller")}
+          {t(signInOnly ? "engineSetup.noSignInMethod" : "engineSetup.noInstaller")}
         </p>
       )}
 
@@ -643,8 +657,8 @@ export function EngineSetup({
 
       {(install.command || signInCommand) && !deviceSignIn && !browserSignIn && !pasteSignIn && !install.managed && (
         <div className="mt-3 border-t border-hairline/40 pt-2">
-          <p className="mb-1 text-[11.5px] leading-relaxed text-ink-secondary">{t("engineSetup.sameMachine")}</p>
-          {needsCli(instance) && <p className="mb-1 text-[11.5px] leading-relaxed text-ink-secondary">{t("engineSetup.pathHint")}</p>}
+          <p className="mb-1 text-[11.5px] leading-relaxed text-ink-secondary">{t(signInOnly ? "engineSetup.sameMachineSignIn" : "engineSetup.sameMachine")}</p>
+          {!signInOnly && needsCli(instance) && <p className="mb-1 text-[11.5px] leading-relaxed text-ink-secondary">{t("engineSetup.pathHint")}</p>}
           <RefreshEngines key={instance.instanceId} />
         </div>
       )}
