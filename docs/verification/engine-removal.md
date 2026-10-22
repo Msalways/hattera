@@ -46,3 +46,9 @@ docker rm -fv hattera-engine-removal-verify
 Both phases must report `ok: true`. Removal checks actual deletion and unchanged bots, configuration and credentials. After restart, the provider must remain unavailable with no models while the image's real `cline --version` still works. Explicit restoration must enable that bundled binary with the credentials unchanged. Removing this named fixture container also removes its own anonymous volume; the live Compose volume is never attached.
 
 Disabling an image-bundled engine does not reclaim image layers. To reduce the image, rebuild with a smaller `ENGINES` argument and retain the existing app data volume.
+
+## Verification record: 22 October 2026
+
+The focused server/component/auth suite passed 63 checks. Registry regression checks also verified repeated stop failures, blocked restoration/reinstall until the old process stops, and successful removal on retry. The final Linux image `sha256:40497b1660dc9252eb477f92dc34470a4b14c92602c0f845bf471f1ebe9eaa36` passed both disposable-container phases. Its extracted server bundle and web assets passed all 27 Edge browser checks, including the uninstall confirmation at phone width.
+
+Windows source-fixture startup hit its 60-second cold-import limit during final reruns, so release verification used the compiled server without increasing that startup limit. The expanded browser journey has a four-minute outer budget for its two local npm installs; each individual step retains its own timeout. These results do not authorize a real vendor account or prove public download availability for every engine.

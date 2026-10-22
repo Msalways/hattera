@@ -4,7 +4,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { closeSync, mkdirSync, mkdtempSync, openSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs, type ParseArgsOptionsConfig } from "node:util";
 
@@ -523,7 +523,11 @@ export async function launchVerificationServer(
     AGENT_BROWSER_EXECUTABLE_PATH: browser.executablePath,
   });
   if (boatFixtureApi) childEnv.OMB_BOX_API = boatFixtureApi;
-  const child = spawn(process.execPath, verificationServerArgs(childEnv), {
+  const serverArgs = verificationServerArgs(childEnv);
+  // Release checks can use the built server instead of paying the source
+  // TypeScript import cost. It still gets this fixture's isolated home/env.
+  if (parentEnv.OMB_VERIFY_SERVER_ENTRY) serverArgs[serverArgs.length - 1] = resolve(parentEnv.OMB_VERIFY_SERVER_ENTRY);
+  const child = spawn(process.execPath, serverArgs, {
     cwd: ROOT,
     env: childEnv,
     stdio: ["ignore", log, log],

@@ -183,7 +183,9 @@ try {
   if (!address || typeof address === "string") throw new Error("No preview port");
   const previewUrl = `http://127.0.0.1:${address.port}`;
   const smoke = await promisify(execFile)(process.execPath, [resolve(root, "scripts/testing/hattera-browser-smoke.mjs"), previewUrl, executablePath],
-    { cwd: root, timeout: 120_000 });
+    // The expanded journey installs twice (initial setup and reinstall).
+    // Each step keeps its own deadline; allow both within the outer budget.
+    { cwd: root, timeout: 240_000 });
   const smokeResult = JSON.parse(smoke.stdout) as { ok?: boolean; checks?: string[] };
   if (smokeResult.ok !== true || !Array.isArray(smokeResult.checks)) throw new Error(`Browser smoke did not pass: ${smoke.stdout}`);
   const afterSmoke = await json("GET", "/api/instances");

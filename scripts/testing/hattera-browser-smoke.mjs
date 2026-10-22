@@ -53,6 +53,7 @@ try {
   };
   const until = async (check, timeoutMs, label) => {
     stage = label;
+    console.error(`Browser check: ${label}`);
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const result = await check();
