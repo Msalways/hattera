@@ -25077,6 +25077,48 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       return selections;
     });
     const providerAccount = /^\/api\/instances\/([\w.-]+)\/account$/.exec(path);
+    const runtimeRemovalAction = /^\/api\/instances\/([\w.-]+)\/(uninstall|restore-runtime)$/.exec(path);
+    if (method === "POST" && runtimeRemovalAction) {
+      if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) return json(res, 415, { error: "content-type must be application/json" });
+      const body = await readBody(req, 4096);
+      const instanceId = runtimeRemovalAction[1];
+      const removing = runtimeRemovalAction[2] === "uninstall";
+      if (removing && body?.confirm !== true) return json(res, 400, { error: "Confirm engine removal before continuing." });
+      const ids = registry.runtimeInstanceIds(instanceId);
+      if (!ids.length) return json(res, 404, { error: "This provider has no removable server runtime." });
+      if (providerConfigBusy) return json(res, 409, { error: "Provider settings are already being updated. Try again shortly." });
+      providerConfigBusy = true;
+      for (const id of ids) providerInstancesChanging.add(id);
+      res.setHeader("cache-control", "no-store");
+      try {
+        if (ids.some(id => engineInstallJobs.get(id)?.state === "running" || providerAuthSessions.isActive(id))) return json(res, 409, { error: "Finish or cancel this engine's installation or sign-in before removing or enabling it." });
+        const descriptions = await describeInstances();
+        if (descriptions.some(instance => ids.includes(instance.instanceId) && "readOnly" in instance && instance.readOnly)) return json(res, 403, { error: "This runtime is shared with a managed account and cannot be removed here." });
+        if (!removing && !descriptions.find(instance => instance.instanceId === instanceId)?.runtimeRemoval?.removed) return json(res, 400, { error: "This engine has not been removed." });
+        if (busyProviderSelections().some(selection => ids.includes(selection.instanceId))) return json(res, 409, { error: "Wait for work using this engine to finish before removing or enabling it." });
+        if (removing) {
+          const selected = (selection: ModelSelection | undefined | null) => Boolean(selection && ids.includes(selection.instanceId));
+          if (selected(cfg.defaultModelSelection) || selected(cfg.newBotDefaults?.profile.modelSelection) || (cfg.automaticRecovery?.enabled && selected(cfg.automaticRecovery.backup))) return json(res, 409, { error: "Choose another default or automatic recovery model before removing this engine." });
+          const bots = store.bots.filter(bot => selected(bot.modelSelection) || bot.fallback?.some(selected)
+            || store.tasks(bot.id).some(task => task.archivedAt === undefined && selected(task.modelSelection)));
+          if (bots.length) return json(res, 409, { error: `Choose another model for these bots and their open threads before removing this engine: ${bots.map(bot => bot.name).join(", ")}.` });
+        }
+        for (const id of ids) { providerAuthSessions.clearInstance(id); bus.detach(id); }
+        try {
+          if (removing) await registry.removeRuntime(instanceId);
+          else await registry.restoreRuntime(instanceId);
+        } finally {
+          for (const id of ids) { const live = registry.get(id); if (live) bus.attach([live]); }
+          resetPathCache();
+        }
+        return json(res, 200, { instances: await describeInstances() });
+      } catch (error) {
+        return json(res, 400, { error: error instanceof Error ? error.message : "Engine removal could not finish. Retry from Settings." });
+      } finally {
+        for (const id of ids) providerInstancesChanging.delete(id);
+        providerConfigBusy = false;
+      }
+    }
     if (method === "POST" && providerAccount) {
       if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) return json(res, 415, { error: "content-type must be application/json" });
       const parsed = providerAccountInput.safeParse(await readBody(req, 16_384));
@@ -25127,15 +25169,25 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           return json(res, 200, { instances: await describeInstances() });
         }
         if (action === "install") {
+          if (providerConfigBusy) return json(res, 409, { error: "Provider settings are already being updated. Try again shortly." });
+          const related = registry.runtimeInstanceIds(instanceId);
+          const sharedJob = related.map(id => engineInstallJobs.get(id)).find(job => job?.state === "running");
+          if (sharedJob) { engineInstallJobs.set(instanceId, sharedJob); return json(res, 202, { install: sharedJob }); }
           const existing = engineInstallJobs.get(instanceId);
           if (existing?.state === "running") return json(res, 202, { install: existing });
           const instance = (await describeInstances()).find((candidate) => candidate.instanceId === instanceId);
+          if (providerConfigBusy) return json(res, 409, { error: "Provider settings are already being updated. Try again shortly." });
+          const pendingJob = related.map(id => engineInstallJobs.get(id)).find(job => job?.state === "running");
+          if (pendingJob) { engineInstallJobs.set(instanceId, pendingJob); return json(res, 202, { install: pendingJob }); }
           if (!instance?.install?.server && !instance?.install?.managed) return json(res, 404, { error: "Hattera cannot install this provider on this server. Check the server runtime and try again." });
           const job: EngineInstallJob = { state: "running" };
           engineInstallJobs.set(instanceId, job);
           void (async () => {
             try {
               if (!(await registry.installRuntime(instanceId))) throw new Error("This provider has no server installer.");
+              if (instance.runtimeRemoval?.removed) for (const id of related) {
+                bus.detach(id); const live = registry.get(id); if (live) bus.attach([live]);
+              }
               job.instances = await describeInstances();
               job.state = "succeeded";
               // OpenCode's initial catalog probe can be slow; do not make the
@@ -25149,9 +25201,11 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           return json(res, 202, { install: job });
         }
         if (action === "auth/start") {
+          if (providerInstancesChanging.has(instanceId)) return json(res, 409, { error: "This provider is being updated. Try again shortly." });
           const instance = registry.get(instanceId);
           if (!instance) return json(res, 404, { error: "unknown instance" });
           const body = await readBody(req, 4096);
+          if (providerInstancesChanging.has(instanceId) || registry.get(instanceId) !== instance) return json(res, 409, { error: "This provider changed while sign-in was starting. Check its status and try again." });
           const requestedMethod = body?.method;
           if (requestedMethod !== undefined && requestedMethod !== "device-code" && requestedMethod !== "browser-pkce") {
             return json(res, 400, { error: "Unknown sign-in method." });

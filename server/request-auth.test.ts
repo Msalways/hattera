@@ -402,6 +402,8 @@ describe("resolveRequestAuth", () => {
     ["DELETE", "/api/settings/custom-domain"],
     ["GET", "/api/instances/codex/auth/status?flowId=private-device-flow"],
     ["POST", "/api/instances/codex/auth/start"],
+    ["POST", "/api/instances/pi/uninstall"],
+    ["POST", "/api/instances/cline/restore-runtime"],
     ["POST", "/api/instances/codex/auth/cancel"],
     ["POST", "/api/instances/codex/auth/sign-out"],
     ["POST", "/api/instances/claude-work/auth/sign-out"],

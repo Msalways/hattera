@@ -15,7 +15,7 @@ import { browserSessionId, closeBrowserSession } from "../server/browser-engine.
 import { activeEngineBinDir } from "../server/engine-install.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const dist = resolve(root, "dist");
+const dist = resolve(process.env.OMB_VERIFY_WEB_DIST ?? resolve(root, "dist"));
 const binaryPath = process.env.OMB_VERIFY_BROWSER_BINARY;
 const executablePath = process.env.OMB_VERIFY_BROWSER_CHROME;
 if (!binaryPath || !executablePath || !existsSync(binaryPath) || !existsSync(executablePath)) {
@@ -82,6 +82,10 @@ const registryAddress = registry.address();
 if (!registryAddress || typeof registryAddress === "string") throw new Error("Local npm registry has no port");
 const fixture = await launchVerificationServer({ ...process.env, FAKE_CODEX_MODE: "logged-out", OMB_TEST_NPM_REGISTRY_URL: `http://127.0.0.1:${registryAddress.port}/` },
   undefined, undefined, { binaryPath, executablePath }, undefined, undefined, ["opencode", "codex", "qwen"]);
+let closing = false;
+fixture.child.once("exit", (code, signal) => {
+  if (!closing) console.error(`Isolated server exited unexpectedly: code=${code} signal=${signal}; log=${fixture.info.logPath}`);
+});
 let chrome: ChildProcess | undefined;
 const mime: Record<string, string> = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
@@ -89,7 +93,17 @@ const mime: Record<string, string> = {
 };
 let browserTestVisits = 0;
 let fixtureBotId: string | undefined;
+let clineAccountReceipt: string | undefined;
 const server = createServer(async (req, res) => {
+  if (req.url === "/__hattera-cline-runtime") {
+    const accountPath = join(fixture.info.dataDir, ".cline", "data", "settings", "providers.json");
+    const account = existsSync(accountPath) ? await readFile(accountPath, "utf8") : undefined;
+    clineAccountReceipt ??= account;
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ installed: existsSync(join(fixture.info.dataDir, "tools", "engines", "cline")),
+      accountKept: Boolean(account && account === clineAccountReceipt) }));
+    return;
+  }
   if (req.url === "/__hattera-cline-auth/approve" && req.method === "POST") {
     await writeFile(join(fixture.info.dataDir, "cline-auth-approved"), "fixture only");
     res.writeHead(200, { "content-type": "application/json" });
@@ -113,7 +127,11 @@ const server = createServer(async (req, res) => {
       res.writeHead(response.statusCode ?? 502, response.headers);
       response.pipe(res);
     });
-    proxy.on("error", () => { if (!res.headersSent) res.writeHead(502); res.end("Fixture unavailable"); });
+    proxy.on("error", (error: NodeJS.ErrnoException) => {
+      if (!closing) console.error(`Isolated proxy failed for ${req.url}: ${error.code}`);
+      if (!res.headersSent) res.writeHead(502);
+      res.end("Fixture unavailable");
+    });
     req.pipe(proxy);
     return;
   }
@@ -181,6 +199,7 @@ try {
   console.log(JSON.stringify({ ok: true, simulatedProviders: true, browserEngine: config.browserEngine.kind,
     checks: smokeResult.checks }, null, 2));
 } finally {
+  closing = true;
   if (fixtureBotId) await closeBrowserSession(binaryPath, {
     ...process.env, HOME: fixture.info.dataDir, USERPROFILE: fixture.info.dataDir,
     AGENT_BROWSER_SESSION: browserSessionId(fixtureBotId, ""),

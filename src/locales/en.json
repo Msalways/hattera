@@ -4100,5 +4100,16 @@
   "data.editor.resize": "Resize SQL editor",
   "computer.files.homeFolder": "Home folder",
   "computer.files.changeDefaultFolder": "Change default",
-  "computer.files.pinnedFolderHint": "This chat keeps its current folder. Change the default for new chats."
+  "computer.files.pinnedFolderHint": "This chat keeps its current folder. Change the default for new chats.",
+  "engines.removal.uninstall": "Uninstall engine",
+  "engines.removal.disable": "Disable engine",
+  "engines.removal.titleUninstall": "Uninstall {name}?",
+  "engines.removal.titleDisable": "Disable {name}?",
+  "engines.removal.body": "Remove the software installed by Hattera. Your chats, bots, account credentials and provider settings are kept. Bots and open threads must use another engine first. Any bundled or system copy will also be disabled in Hattera until you explicitly enable or reinstall it.",
+  "engines.removal.external": "This software is bundled with the server image or installed outside Hattera. Hattera will stop using it and remember that choice after a restart. Its files stay on the server; disabling it cannot shrink the Docker image. Your chats, bots and account credentials are kept.",
+  "engines.removal.shared": "This engine is shared by {count} provider accounts. Removal or disabling applies to all of them.",
+  "engines.removal.kept": "Removed from Hattera. Your chats, bots and account settings are kept. Reinstall to use it again, or explicitly enable an existing server installation.",
+  "engines.removal.restore": "Enable existing server installation",
+  "engines.removal.removed": "Removed",
+  "engines.removal.failed": "Engine removal could not finish. Try again."
 }

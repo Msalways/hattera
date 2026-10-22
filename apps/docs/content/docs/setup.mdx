@@ -54,6 +54,14 @@ MiniMax checks the saved key when a model request runs; it has no separate non-b
 
 See [local deployment](https://github.com/Msalways/hattera/blob/main/deploy/local/README.md) for port changes, CLI login, pairing, and optional Tailscale Serve. Never commit `.env`.
 
+## Remove an engine
+
+Expand its card under **Settings → AI → Model providers and accounts**. **Uninstall engine** removes software installed in Hattera's tools folder. Your chats, bots, account credentials and provider settings stay intact. Move bots, open threads, fallback models and default model selections to another engine first. Finish or cancel any running installation or sign-in before removing it.
+
+Accounts sharing a binary are affected together, including Codex and ChatGPT accounts. Hattera remembers removal across restarts and will not silently use another server copy. Use **Install on this server** to reinstall, or **Enable existing server installation** to explicitly restore a detected copy.
+
+Engines bundled in a Docker image or installed outside Hattera offer **Disable engine** instead. Disabling persists across restarts but leaves those files intact and cannot reduce the Docker image size. To exclude bundled engines from future images, change the `ENGINES` build argument in `.env` and rebuild; keep the existing data volume.
+
 ## Open a fresh local run on your tailnet
 
 To test this checkout without using your Compose volume, build the browser app and start an isolated server. Add `--tailscale` to make it available over tailnet HTTPS:

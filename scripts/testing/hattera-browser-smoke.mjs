@@ -15,6 +15,7 @@ const chrome = spawn(chromePath, [
   '--no-default-browser-check', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank',
 ], { stdio: 'ignore', windowsHide: true });
 let socket;
+let stage = 'browser startup';
 let sequence = 0;
 const pending = new Map();
 const browserRequests = [];
@@ -51,6 +52,7 @@ try {
     return result.result.value;
   };
   const until = async (check, timeoutMs, label) => {
+    stage = label;
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const result = await check();
@@ -214,6 +216,9 @@ try {
   }
   if (!browserRequests.some((entry) => entry.body?.includes('"navigate"'))) throw new Error('Browser panel did not submit a navigate action');
   await until(async () => (await (await fetch(statusUrl)).json()).visits > before, 45_000, 'native browser navigation');
+  // A page visit precedes the navigation reply. Close an idle panel so this
+  // check exercises explicit hand-back, rather than server disconnect cleanup.
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify('button[aria-label="New tab"]:not(:disabled)')})`), 45_000, 'completed browser navigation');
   const output = resolve('output/playwright/hattera-browser-smoke.png');
   await mkdir(resolve('output/playwright'), { recursive: true });
   const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -363,6 +368,8 @@ try {
   if (await evaluate(`document.querySelector(${JSON.stringify(clineCard)}).innerText.includes('Finish signing in to your account in Terminal')`)) throw new Error('Cline still requires a server terminal');
   await evaluate('document.querySelector("[data-device-sign-in=cline] button").click()');
   await until(() => evaluate('Array.from(document.querySelectorAll("[data-device-sign-in=cline] a")).some(link => link.href === "https://authkit.cline.bot/device?user_code=ABCD-EFGH")'), 10_000, 'Cline one-time code');
+  const duringAuth = await fetch(new URL('/api/instances/cline/uninstall', base), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: true }) });
+  if (duringAuth.status !== 409) throw new Error(`Engine removal during sign-in was not blocked: ${duringAuth.status}`);
   await evaluate('Array.from(document.querySelectorAll("[data-device-sign-in=cline] button")).find(button => button.textContent?.includes("Cancel")).click()');
   await until(() => evaluate('document.querySelector("[data-device-sign-in=cline]")?.innerText.includes("cancelled")'), 10_000, 'Cline auth cancellation');
   await evaluate('Array.from(document.querySelectorAll("[data-device-sign-in=cline] button")).find(button => button.textContent?.includes("Try again")).click()');
@@ -373,7 +380,53 @@ try {
   await writeFile(clineAuthScreenshot, Buffer.from(clineAuthShot.data, 'base64'));
   await fetch(new URL('/__hattera-cline-auth/approve', base), { method: 'POST' });
   await until(async () => (await (await fetch(new URL('/api/instances', base))).json()).instances?.find(instance => instance.instanceId === 'cline')?.snapshot.authenticated === true, 20_000, 'Cline saved account confirmation');
-  console.log(JSON.stringify({ ok: true, checks: ['chat-reply', 'opencode-model-picker', 'opencode-acp-reply', 'opencode-provider-card', 'minimax-setup-card', 'qwen-setup-card', 'codex-auth-choices', 'cline-browser-server-install', 'cline-browser-device-auth', 'bedrock-provider-setup', 'browser-navigation', 'browser-release', 'bot-settings-navigation', 'bot-browser-permission', 'bot-creation', 'bot-identity-edit', 'bot-memory-edit', 'bot-tool-selection', 'bot-skill-authoring', 'bot-approval-level', 'mobile-chat-layout', 'pairing-skin-contrast', 'remote-browser-pairing'], previewUrl: base.href, testPage, screenshots: [pickerScreenshot, providerScreenshot, miniMaxScreenshot, qwenScreenshot, codexScreenshot, codexCodeScreenshot, output, mobileScreenshot, darkPairScreenshot, pairScreenshot, clineAuthScreenshot] }));
+  const runtimeStatus = async () => (await fetch(new URL('/__hattera-cline-runtime', base))).json();
+  const cardButton = async (card, text) => {
+    const cardSelector = `[data-engine-card=${card}]`;
+    const selector = `${cardSelector} button`;
+    await evaluate(`(() => { const card = document.querySelector(${JSON.stringify(cardSelector)}); if (card && !card.open) card.querySelector('summary').click(); })()`);
+    await until(() => evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(selector)})).some(button => button.getClientRects().length && button.textContent?.trim() === ${JSON.stringify(text)})`), 10_000, text);
+    await evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(selector)})).find(button => button.textContent?.trim() === ${JSON.stringify(text)}).click()`);
+  };
+  const dialogButton = async text => {
+    await until(() => evaluate('!!document.querySelector("[role=alertdialog]")'), 5_000, 'engine removal confirmation');
+    await evaluate(`Array.from(document.querySelectorAll('[role=alertdialog] button')).find(button => button.textContent?.trim() === ${JSON.stringify(text)}).click()`);
+    await until(() => evaluate('!document.querySelector("[role=alertdialog]")'), 10_000, 'engine removal confirmation closed');
+  };
+  if (!(await runtimeStatus()).installed) throw new Error('No managed Cline runtime before uninstall');
+  await cardButton('cline', 'Uninstall engine');
+  await until(() => evaluate('document.activeElement?.textContent === "Cancel"'), 5_000, 'safe uninstall confirmation focus');
+  const removalShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(resolve('output/playwright/hattera-engine-uninstall.png'), Buffer.from(removalShot.data, 'base64'));
+  await dialogButton('Cancel');
+  if (!(await runtimeStatus()).installed) throw new Error('Cancel removed the engine');
+  await cardButton('cline', 'Uninstall engine');
+  await dialogButton('Uninstall engine');
+  const afterRemoval = await runtimeStatus();
+  if (afterRemoval.installed || !afterRemoval.accountKept) throw new Error(`Uninstall did not remove software and preserve the account: ${JSON.stringify(afterRemoval)}`);
+  await send('Page.reload');
+  await until(() => evaluate('!!document.querySelector("[data-sidebar] button[aria-haspopup=menu]")'), 15_000, 'chat after reload');
+  await evaluate('Array.from(document.querySelectorAll("[data-sidebar] button[aria-haspopup=menu]")).at(-1).click()');
+  await until(() => evaluate('!!document.querySelector("[data-menu-key=settings]")'), 10_000, 'Settings menu after reload');
+  await evaluate('document.querySelector("[data-menu-key=settings]").click()');
+  await until(() => evaluate('!!document.querySelector("[data-settings-page=ai]")'), 10_000, 'Settings after reload');
+  await evaluate('document.querySelector("[data-settings-page=ai]").click()');
+  await until(() => evaluate('!!document.querySelector("[data-engine-card=cline]")'), 15_000, 'provider card after reload');
+  if (!await evaluate('document.querySelector("[data-engine-card=cline]").innerText.includes("Removed")')) throw new Error('Removed state was lost on reload');
+  await evaluate('document.querySelector("[data-engine-card=cline] summary").click()');
+  await cardButton('cline', 'Install Cline on this server');
+  await until(async () => (await (await fetch(new URL('/api/instances', base))).json()).instances?.find(instance => instance.instanceId === 'cline')?.snapshot.authenticated === true, 90_000, 'Cline reinstall with preserved account');
+  if (!(await runtimeStatus()).installed || !(await runtimeStatus()).accountKept) throw new Error('Reinstall lost the saved account');
+  await evaluate('document.querySelector("[data-engine-card=qwen] summary").click()');
+  await cardButton('qwen', 'Disable engine');
+  await dialogButton('Disable engine');
+  const qwenRemoved = (await (await fetch(new URL('/api/instances', base))).json()).instances.find(instance => instance.instanceId === 'qwen');
+  if (!qwenRemoved?.runtimeRemoval?.removed || qwenRemoved.models.options.length) throw new Error('External runtime remained selectable after disable');
+  await cardButton('qwen', 'Enable existing server installation');
+  await until(async () => !(await (await fetch(new URL('/api/instances', base))).json()).instances.find(instance => instance.instanceId === 'qwen')?.runtimeRemoval?.removed, 10_000, 'explicit external runtime restore');
+  console.log(JSON.stringify({ ok: true, checks: ['chat-reply', 'opencode-model-picker', 'opencode-acp-reply', 'opencode-provider-card', 'minimax-setup-card', 'qwen-setup-card', 'codex-auth-choices', 'cline-browser-server-install', 'cline-browser-device-auth', 'engine-removal-sign-in-guard', 'engine-uninstall-cancel', 'engine-uninstall-reinstall-account-preserved', 'external-engine-disable-restore', 'bedrock-provider-setup', 'browser-navigation', 'browser-release', 'bot-settings-navigation', 'bot-browser-permission', 'bot-creation', 'bot-identity-edit', 'bot-memory-edit', 'bot-tool-selection', 'bot-skill-authoring', 'bot-approval-level', 'mobile-chat-layout', 'pairing-skin-contrast', 'remote-browser-pairing'], previewUrl: base.href, testPage, screenshots: [pickerScreenshot, providerScreenshot, miniMaxScreenshot, qwenScreenshot, codexScreenshot, codexCodeScreenshot, output, mobileScreenshot, darkPairScreenshot, pairScreenshot, clineAuthScreenshot] }));
+} catch (error) {
+  throw new Error(`Browser check failed during ${stage}: ${error.message}`, { cause: error });
 } finally {
   socket?.close();
   chrome.kill();

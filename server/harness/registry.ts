@@ -7,6 +7,7 @@
 import { findCliCandidates } from "../env-path.ts";
 import { installNpmEngine, npmAvailable, serverInstallFor } from "../engine-install.ts";
 import { installOfficialEngine, officialEngineFor } from "../official-engine-install.ts";
+import { engineRuntime, engineRemoved, hasOwnedEngineFiles, markEngineRemoved, removeEngineFiles, restoreEngine, type EngineRuntime } from "../engine-removal.ts";
 import type {
   AnyProviderDriver,
   EngineAccess,
@@ -67,6 +68,9 @@ export class ProviderRegistry {
    * from their own config; this map only reports what was configured */
   private cliByInstance = new Map<InstanceId, string>();
   private accessByInstance = new Map<InstanceId, EngineAccess>();
+  private configurations = new Map<InstanceId, InstanceConfigMap[string]>();
+  /** Keep failed disposals reachable so retry cannot delete a running runtime. */
+  private runtimeStops = new Map<string, ProviderInstance[]>();
   /** What describe() last read of each live instance. A turn's start checks
    * a thread's own engine against it without waiting on that engine's CLI. */
   private lastSnapshots = new Map<InstanceId, ProviderSnapshot>();
@@ -93,6 +97,7 @@ export class ProviderRegistry {
     const loaded = await Promise.all(
       Object.entries(configs).map(async ([instanceId, entry]) => {
         const ready = await this.createEntry(instanceId, entry, decorate);
+        this.configurations.set(instanceId, entry);
         if (entry.access) this.accessByInstance.set(instanceId, entry.access);
         else this.accessByInstance.delete(instanceId);
         // Usable as soon as it is ready, not after the slowest CLI.
@@ -134,6 +139,11 @@ export class ProviderRegistry {
         },
       };
     }
+    const runtime = engineRuntime(driver.driverKind, driver.install, cliDefaultOf(driver));
+    if (runtime && engineRemoved(runtime, this.enginesBaseDir)) return {
+      instanceId, shadow: { instanceId, driverKind: entry.driver, displayName: entry.displayName ?? driver.metadata.displayName,
+        cli: cliOfRaw(entry.config), shadow: true, reason: "This engine was removed from Hattera. Reinstall it or enable an existing server installation to use it again." },
+    };
     try {
       const config = entry.config === undefined ? driver.defaultConfig() : driver.decodeConfig(entry.config);
       // Override detection is on the RAW config, never the decoded one:
@@ -214,19 +224,72 @@ export class ProviderRegistry {
   async installRuntime(instanceId: InstanceId): Promise<boolean> {
     const entry = this.byId.get(instanceId);
     if (!entry) return false;
-    if (entry.live?.installRuntime) {
-      await entry.live.installRuntime();
-      return true;
-    }
     const driver = this.driversByKind.get(entry.shadow?.driverKind ?? entry.live!.driverKind);
-    const cli = cliDefaultOf(driver);
-    const server = serverInstallFor(driver?.install, cli, this.npmPresent());
-    if (server) await installNpmEngine(server.package, { baseDir: this.enginesBaseDir, cli });
-    else {
-      const official = driver?.install && cli && !driver.install.managed ? officialEngineFor(driver.driverKind) : null;
-      if (!official) return false;
-      await installOfficialEngine(official.vendor, this.enginesBaseDir);
+    const runtime = this.runtime(instanceId);
+    if (runtime && this.runtimeStops.has(runtime.key)) throw new Error("The engine has not stopped safely. Retry uninstall before reinstalling it.");
+    const removed = runtime && engineRemoved(runtime, this.enginesBaseDir);
+    if (entry.live?.installRuntime) await entry.live.installRuntime();
+    else if (removed && driver?.install?.managed) {
+      const saved = this.configurations.get(instanceId)!;
+      const temporary = await driver.create({ instanceId, displayName: saved.displayName ?? driver.metadata.displayName,
+        enabled: saved.enabled ?? true, environment: saved.environment ?? {},
+        config: saved.config === undefined ? driver.defaultConfig() : driver.decodeConfig(saved.config) });
+      try {
+        if (!temporary.installRuntime) return false;
+        await temporary.installRuntime();
+      } finally { await temporary.dispose(); }
+    } else {
+      const cli = cliDefaultOf(driver);
+      const server = serverInstallFor(driver?.install, cli, this.npmPresent());
+      if (server) await installNpmEngine(server.package, { baseDir: this.enginesBaseDir, cli });
+      else {
+        const official = driver?.install && cli && !driver.install.managed ? officialEngineFor(driver.driverKind) : null;
+        if (!official) return false;
+        await installOfficialEngine(official.vendor, this.enginesBaseDir);
+      }
     }
+    if (removed && runtime) await this.restoreRuntime(instanceId);
+    return true;
+  }
+
+  runtime(instanceId: InstanceId): EngineRuntime | null {
+    const entry = this.byId.get(instanceId);
+    const driver = entry && this.driversByKind.get(entry.shadow?.driverKind ?? entry.live!.driverKind);
+    return driver ? engineRuntime(driver.driverKind, driver.install, cliDefaultOf(driver)) : null;
+  }
+
+  runtimeInstanceIds(instanceId: InstanceId): string[] {
+    const runtime = this.runtime(instanceId);
+    return runtime ? [...this.byId.keys()].filter(id => this.runtime(id)?.key === runtime.key) : [];
+  }
+
+  async removeRuntime(instanceId: InstanceId): Promise<boolean> {
+    const runtime = this.runtime(instanceId);
+    if (!runtime) return false;
+    const configs = Object.fromEntries(this.runtimeInstanceIds(instanceId).map(id => [id, this.configurations.get(id)!]));
+    markEngineRemoved(runtime, this.enginesBaseDir);
+    try {
+      const stopping = [
+        ...(this.runtimeStops.get(runtime.key) ?? []).map(instance => ({ instance, stop: () => instance.dispose() })),
+        ...Object.keys(configs).map(id => ({ instance: this.get(id), stop: () => this.dispose(id) })),
+      ];
+      const stopped = await Promise.allSettled(stopping.map(item => item.stop()));
+      const failed = stopped.flatMap((result, index) => result.status === "rejected" && stopping[index].instance ? [stopping[index].instance!] : []);
+      if (failed.length) this.runtimeStops.set(runtime.key, failed);
+      else this.runtimeStops.delete(runtime.key);
+      if (stopped.some(result => result.status === "rejected")) throw new Error("The engine could not stop safely. Its files were kept; retry removal from Settings.");
+      await removeEngineFiles(runtime, this.enginesBaseDir);
+    } finally { await this.load(configs); }
+    return true;
+  }
+
+  async restoreRuntime(instanceId: InstanceId): Promise<boolean> {
+    const runtime = this.runtime(instanceId);
+    if (!runtime) return false;
+    if (this.runtimeStops.has(runtime.key)) throw new Error("The engine has not stopped safely. Retry uninstall before enabling it.");
+    const configs = Object.fromEntries(this.runtimeInstanceIds(instanceId).map(id => [id, this.configurations.get(id)!]));
+    restoreEngine(runtime, this.enginesBaseDir);
+    await this.load(configs);
     return true;
   }
 
@@ -272,6 +335,11 @@ export class ProviderRegistry {
     return Promise.all(
       this.entries().map(async (entry) => {
         const driver = this.driversByKind.get(entry.shadow?.driverKind ?? entry.live!.driverKind);
+        const runtime = this.runtime(entry.instanceId);
+        const runtimeRemoval = runtime ? { key: runtime.key, removed: engineRemoved(runtime, this.enginesBaseDir),
+          managed: hasOwnedEngineFiles(runtime, this.enginesBaseDir),
+          restoreAvailable: Boolean(cliOfRaw(this.configurations.get(entry.instanceId)?.config) || candidatesFor(driver).length),
+          accounts: this.runtimeInstanceIds(entry.instanceId).length } : undefined;
         if (entry.shadow) {
           return {
             instanceId: entry.instanceId,
@@ -283,6 +351,7 @@ export class ProviderRegistry {
             // an unknown driver has no driver record, hence no install path
             access: this.access(entry.instanceId) ?? "subscription",
             install: withServerInstall(driver, npmPresent),
+            runtimeRemoval,
             cli: entry.shadow.cli,
             cliDefault: cliDefaultOf(driver),
             // a shadow is exactly the "your CLI is broken, pick another"
@@ -321,6 +390,7 @@ export class ProviderRegistry {
           },
           access: this.access(entry.instanceId) ?? "subscription",
           install: withServerInstall(driver, npmPresent),
+          runtimeRemoval,
           authentication: inst.startAuthentication
             ? {
                 method: inst.authenticationMethod ?? (inst.getAuthentication && inst.completeAuthentication
@@ -345,10 +415,12 @@ export class ProviderRegistry {
   }
 
   async disposeAll() {
-    await Promise.allSettled(this.instances().map((i) => i.dispose()));
+    await Promise.allSettled([...this.instances(), ...[...this.runtimeStops.values()].flat()].map((i) => i.dispose()));
+    this.runtimeStops.clear();
     this.byId.clear();
     this.cliByInstance.clear();
     this.lastSnapshots.clear();
+    this.configurations.clear();
   }
 
   async dispose(instanceId: InstanceId) {
@@ -357,6 +429,7 @@ export class ProviderRegistry {
     this.cliByInstance.delete(instanceId);
     this.accessByInstance.delete(instanceId);
     this.lastSnapshots.delete(instanceId);
+    this.configurations.delete(instanceId);
     await entry?.live?.dispose();
   }
 }

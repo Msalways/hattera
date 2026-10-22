@@ -918,6 +918,7 @@ export interface InstanceInfo {
   /** `signOut`: the browser may remove the stored sign-in to switch accounts. */
   authentication?: { method: "device-code" | "paste-code" | "browser" | "browser-pkce"; methods?: ("device-code" | "browser-pkce")[]; signOut?: boolean };
   install?: EngineInstall;
+  runtimeRemoval?: { key: string; removed: boolean; managed: boolean; restoreAvailable: boolean; accounts: number };
   /** Configured CLI path override — set ONLY when the user overrode it;
    * absent means the driver default is in effect. */
   cli?: string;

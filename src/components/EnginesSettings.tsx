@@ -19,6 +19,7 @@ import { DEVICE_SIGN_IN_COPY, deviceSignInProvider } from "./DeviceSignIn";
 import { AntigravityFreeSpace } from "./AntigravityFreeSpace";
 import { providerAccountForm } from "../../shared/provider-account-setup";
 import { ProviderAccountSetup } from "./ProviderAccountSetup";
+import { EngineRuntimeRemoval } from "./EngineRuntimeRemoval";
 import { ApiKeyRow, OpenCodeProviderKeys } from "./ApiKeys";
 
 interface ProbeResult {
@@ -306,7 +307,7 @@ function EngineRow({ instance }: { instance: InstanceInfo }) {
       {instance.snapshot.chatgptPlan && !instance.snapshot.authenticationUnavailableReason && (
         <div className="mt-3"><AddProviderAccount /></div>
       )}
-      {(instance.cli || instance.cliDefault || instance.install?.command || instance.install?.server || instance.install?.managed) && <details className="mt-4 border-t border-hairline/40 pt-3">
+      {!instance.runtimeRemoval?.removed && (instance.cli || instance.cliDefault || instance.install?.command || instance.install?.server || instance.install?.managed) && <details className="mt-4 border-t border-hairline/40 pt-3">
         <summary className="cursor-pointer rounded-md py-1 text-[12px] font-medium text-ink-secondary outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent">{t("engines.library.advanced")}</summary>
         {instance.snapshot.state === "available" && instance.install?.server && instance.driverKind !== "claudeAgent" && !instance.cli && !instance.snapshot.update && (
           <ServerEngineInstall instance={instance} mode="update" />
@@ -375,6 +376,7 @@ function EngineRow({ instance }: { instance: InstanceInfo }) {
           </div>
         )}
       </details>}
+      <EngineRuntimeRemoval instance={instance} />
     </EngineCard>
   );
 }

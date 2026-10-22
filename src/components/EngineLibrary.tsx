@@ -62,7 +62,7 @@ export function EngineCard({ instance, children }: { instance: InstanceInfo; chi
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
           <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium", ready ? "bg-success/10 text-success" : "bg-control text-ink-secondary")}>
             {ready ? <Check size={12} aria-hidden="true" /> : <span className="size-1.5 rounded-full bg-warning" aria-hidden="true" />}
-            {ready ? t("onboarding.engines.ready") : instance.snapshot.state === "available" && instance.snapshot.authenticated === false
+            {ready ? t("onboarding.engines.ready") : instance.runtimeRemoval?.removed ? t("engines.removal.removed") : instance.snapshot.state === "available" && instance.snapshot.authenticated === false
               ? t("model.signInRequired") : t("onboarding.engines.needsSetup")}
           </span>
           {ready ? (
