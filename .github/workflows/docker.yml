@@ -57,6 +57,39 @@ jobs:
           # the renderer is served by the server itself (OMB_STATIC_DIR)
           docker exec omb curl -sf http://127.0.0.1:8799/ | grep -qi "<html" || { docker logs omb; echo "UI not served"; exit 1; }
           docker logs omb | tail -5
+      - name: Prove Render preview boots and restarts within 512 MiB
+        run: |
+          set -euo pipefail
+          trap 'docker logs omb-render; docker rm -fv omb-render >/dev/null 2>&1 || true' EXIT
+          # Fresh anonymous /data, no real accounts or network access. The
+          # default image has no engine CLIs; this is a preview startup gate,
+          # not a capacity test for provider processes or Chromium.
+          docker run -d --name omb-render --memory 512m --memory-swap 512m --cpus 0.1 --network none \
+            -e RENDER=true -e RENDER_EXTERNAL_URL=https://fixture.onrender.com \
+            -e PORT=10000 -e GITHUB_CLIENT_ID=fixture-client \
+            -e GITHUB_CLIENT_SECRET=fixture-secret -e GITHUB_OWNER_ID=1 \
+            -e BETTER_AUTH_SECRET=fixture-only-secret-at-least-thirty-two-characters openmausbot:ci
+          ready() {
+            for i in $(seq 1 90); do
+              if docker exec omb-render curl -sf --max-time 5 http://127.0.0.1:10000/api/health | grep -q '^{"app":"openmausbot"}$'; then return; fi
+              test "$(docker inspect -f '{{.State.Running}}' omb-render)" = true || return 1
+              sleep 2
+            done
+            echo 'Render backend never became ready'; return 1
+          }
+          for boot in cold restart; do
+            if [ "$boot" = restart ]; then docker restart omb-render; fi
+            ready
+            test "$(docker inspect -f '{{.State.OOMKilled}}' omb-render)" = false
+            docker exec omb-render curl -sf --max-time 5 http://127.0.0.1:10000/health | grep -q '^{"app":"openmausbot"}$'
+            docker exec omb-render curl -sf --max-time 5 http://127.0.0.1:10000/ | grep -qi '<html'
+            if docker exec omb-render curl -s --max-time 2 http://127.0.0.1:2019/ >/dev/null; then
+              echo 'Caddy admin port should not be listening'; exit 1
+            fi
+          done
+          # A dead backend must never be reported healthy by the edge.
+          docker exec omb-render sh -c 'for pid in $(cat /proc/1/task/1/children); do if tr "\000" " " < /proc/$pid/cmdline | grep -q "/app/dist-server/index.js"; then kill -STOP "$pid"; exit 0; fi; done; exit 1'
+          if docker exec omb-render curl -sf --max-time 2 http://127.0.0.1:10000/health >/dev/null; then exit 1; fi
       - name: Stop provider helpers in a container without a reaping init
         run: |
           set -euo pipefail

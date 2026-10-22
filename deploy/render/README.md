@@ -18,6 +18,54 @@ For a custom image that includes selected CLIs, `ENGINES` is an optional
 build argument; the default image includes none.
 Remove any `ENGINES` value from an existing Render service to use this default.
 
+## If deployment reports 502 or out of memory
+
+Check the runtime log before changing proxy ports. `dial tcp
+127.0.0.1:8799: connect: connection refused` means Caddy cannot reach the
+backend; it does not identify why the backend stopped. In the October 21
+`f75c973` deployment, Render explicitly reported `Out of memory (used over
+512Mi)`. Its build log also showed Claude, Codex and OpenCode installed by
+an `ENGINES` override, despite this repository's empty default.
+
+For a disposable preview, remove `ENGINES` from the service's Environment
+settings and redeploy the latest commit. Check the new build log: the
+server stage's engine-install loop must have no package names. This keeps
+engine installation available in the app; it does not make provider CLIs,
+their installers or Chromium fit the Free instance's memory limit. For
+those workloads, use a server with more memory and durable storage. A
+smaller Node heap does not cap native engine processes.
+
+Use `/api/health` for the Render health check. The edge also maps legacy
+`/health` checks to that same backend endpoint; a successful check must
+return `{"app":"openmausbot"}`, not the application's HTML. The Caddy admin
+listener is disabled because this image uses process signals for shutdown,
+so Render's port scanner cannot mistake it for the public app.
+
+The Docker workflow checks cold startup and restart of the default image
+with 512 MiB, no swap, 0.1 CPU and a disposable data volume. This proves
+preview readiness only, not engine installation, sign-in or chat capacity
+within that budget.
+
+### Verification on October 22, 2026
+
+All containers used disposable `/data` volumes, fake GitHub configuration,
+no network and no swap. The engine comparison used the current compiled
+app and current installed CLIs, rather than the failed deployment's exact
+image or provider releases.
+
+| Fixture | Memory / CPU limit | Result |
+| --- | --- | --- |
+| Default preview, no engine CLIs | 512 MiB / 0.1 CPU | Cold start, restart, UI and both health paths passed; peak 159 MiB, no OOM |
+| Claude, Codex and OpenCode discoverable | 512 MiB / 1 CPU | Reached 512 MiB; Docker recorded an OOM kill |
+| Same three discoverable engines | 1 GiB / 1 CPU | Backend became ready; peak 596 MiB, no OOM |
+
+The preview check also proved the admin port was closed and that suspending
+the backend did not produce a successful health response. The 1 GiB result
+is startup evidence only; it does not qualify concurrent chats, installs or
+browser sessions at that size.
+
+## Create the service
+
 1. Create a separate GitHub OAuth app for Render with temporary Homepage URL
    `http://127.0.0.1:8080` and callback
    `http://127.0.0.1:8080/identity/callback/github`. Copy its client ID and

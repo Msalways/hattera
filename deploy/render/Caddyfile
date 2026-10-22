@@ -1,5 +1,12 @@
+{
+	admin off
+}
+
 :{$PORT:10000} {
 	encode zstd gzip
+	# Older manually configured Render services probe /health. Keep that path
+	# tied to backend readiness rather than the renderer's HTML fallback.
+	rewrite /health /api/health
 	handle /hooks/* {
 		reverse_proxy 127.0.0.1:8800
 	}
