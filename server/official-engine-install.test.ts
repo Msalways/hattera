@@ -29,10 +29,14 @@ it("only offers built-in official installers on supported systems and never in a
 it.each(["cursor", "hermes"] as const)("runs the official %s installer in the server's owned folder and verifies its CLI", async (vendor) => {
   const base = mkdtempSync(join(tmpdir(), "hattera-official-install-"));
   scratch.push(base);
+  // A real executable lets the installer verify --version. Link the Node
+  // fixture on the same volume rather than copying ~100 MB for each case;
+  // cross-volume CI homes fall back to a copy. Both paths are test-owned.
+  const windowsExecutable = (cli: string) => `try { New-Item -ItemType HardLink -Path (Join-Path $dir "${cli}.exe") -Target (Get-Command node).Source -ErrorAction Stop | Out-Null } catch { Copy-Item (Get-Command node).Source (Join-Path $dir "${cli}.exe") -ErrorAction Stop }`;
   const script = process.platform === "win32"
     ? vendor === "cursor"
-      ? '$dir = Join-Path $env:LOCALAPPDATA "cursor-agent"; New-Item -ItemType Directory -Force $dir | Out-Null; Copy-Item (Get-Command node).Source (Join-Path $dir "cursor-agent.exe")'
-      : '$dir = Join-Path $env:HERMES_HOME "bin"; New-Item -ItemType Directory -Force $dir | Out-Null; Copy-Item (Get-Command node).Source (Join-Path $dir "hermes.exe")'
+      ? '$dir = Join-Path $env:LOCALAPPDATA "cursor-agent"; New-Item -ItemType Directory -Force $dir | Out-Null; ' + windowsExecutable("cursor-agent")
+      : '$dir = Join-Path $env:HERMES_HOME "bin"; New-Item -ItemType Directory -Force $dir | Out-Null; ' + windowsExecutable("hermes")
     : vendor === "cursor"
       ? 'mkdir -p "$HOME/.local/bin"; printf "#!/bin/sh\\necho fixture\\n" > "$HOME/.local/bin/cursor-agent"; chmod +x "$HOME/.local/bin/cursor-agent"'
       : 'mkdir -p "$HERMES_HOME/bin"; printf "#!/bin/sh\\necho fixture\\n" > "$HERMES_HOME/bin/hermes"; chmod +x "$HERMES_HOME/bin/hermes"';
