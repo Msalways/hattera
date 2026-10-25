@@ -90,3 +90,42 @@ For current local evidence, use the JSON reports under `output/npm-install/`.
 Linux Docker checks and Windows checks must be reported separately. A Windows
 attempt on 25 October 2026 installed and launched successfully but exhausted C:
 during Data operations; that attempt does not qualify Windows end to end.
+
+## Executed qualification: 25 October 2026
+
+[Workflow 40209844280](https://github.com/Msalways/hattera/actions/runs/40209844280)
+passed all eight native platform/version jobs at source commit `c5e9247e`.
+Each job installed and exercised the same tarball, with SHA-256
+`c7302fea7779dac120e980429e6f6f3df0771409f37dcfec3ed16ba45bd7f807`.
+
+| Platform | Architecture | Node.js | Result |
+| --- | --- | --- | --- |
+| Windows | x64 | 24.22.1 | Passed |
+| Windows | ARM64 | 24.22.1 | Passed |
+| macOS | x64 | 24.19.0 | Passed |
+| macOS | ARM64 | 24.20.0 | Passed |
+| Linux | x64 | 24.0.0 | Passed |
+| Linux | x64 | 24.21.0 | Passed |
+| Linux | x64 | 26.12.1 | Passed |
+| Linux | ARM64 | 24.21.0 | Passed |
+
+All eight jobs passed the ten core installation checks above, including native
+Data/PNG operations, hosted authentication, uninstall and cached npx execution.
+The Linux x64 Node 24 job additionally passed public installs of Grok, Kimi,
+Droid, Claude Code, Codex, OpenCode, Qwen, Cline and pi, plus managed browser
+installation and a real headless app launch. Its fleet shutdown check passed.
+The public downloads are qualified on Linux x64, not on the other five targets.
+
+Locally, four focused installer/registry/shutdown suites passed 41 tests, with
+ten platform skips. Lint, typecheck and all ten locale catalogs passed. A native
+Windows probe also executed DuckDB and rendered PNG using the npm-installed
+addons; the full local Windows attempt remained disk-limited. The clean Windows
+CI jobs above completed the full app checks independently of that limitation.
+
+A minimal Debian Node container completed browser download and launch after
+installing sudo and CA certificates. A later local repeat did not complete the
+browser-install command within its ten-minute test deadline. The failed report
+is retained alongside the successful local core and CI reports; it is not counted
+as a pass. External downloads still depend on the deployment's network and OS
+prerequisites. No real provider account was authorized, no physical tailnet was
+joined, and no npm package was published by this qualification.
