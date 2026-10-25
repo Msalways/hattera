@@ -9,7 +9,7 @@ describe("brand", () => {
       vi.stubGlobal("window", { ogb: undefined });
       expect(appDisplayName()).toBe("Custom Hattera");
       vi.stubGlobal("window", { ogb: { platform: "win32" } });
-      expect(appDisplayName()).toBe("OpenMausBot");
+      expect(appDisplayName()).toBe("Hattera");
     } finally {
       vi.unstubAllGlobals();
       applyBrand({ brand: DEFAULT_BRAND, source: "default", file: "" });

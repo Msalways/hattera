@@ -422,7 +422,7 @@ describe("createOpenAIChatRuntime mid-turn steer", () => {
     await instance.dispose();
   });
 
-  it("delivers mid-turn asides into the next completion request after the tool round", async () => {
+  it("delivers mid-turn asides and keeps totals incomplete when the next tool round omits usage", async () => {
     const toolCallBody = 'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"c1","type":"function","function":{"name":"fx_write","arguments":"{}"}}]}}]}\n\n'
       + 'data: {"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}\n\n';
     const finalBody = 'data: {"choices":[{"index":0,"delta":{"content":"done."}}]}\n\n'
@@ -457,7 +457,7 @@ describe("createOpenAIChatRuntime mid-turn steer", () => {
     const aside = "[aside from @Peer — peer context, not steering]\nheads up\n[end aside]";
     await expect(instance.adapter.steer!("t", aside)).resolves.toBe("steered");
     await expect(instance.adapter.steer!("t", "second aside")).resolves.toBe("steered");
-    release(new Response(toolCallBody, { status: 200, headers: { "content-type": "text/event-stream" } }));
+    release(new Response(toolCallBody + 'data: {"choices":[],"usage":{"prompt_tokens":20,"completion_tokens":5,"cost":0.001}}\n\n', { status: 200, headers: { "content-type": "text/event-stream" } }));
     await vi.waitFor(() => {
       if (!events.some((event) => event.type === "turn.completed")) throw new Error("turn still running");
     }, { timeout: 10_000 });
@@ -475,6 +475,7 @@ describe("createOpenAIChatRuntime mid-turn steer", () => {
     expect(asideIndex).toBeGreaterThan(toolIndex);
     expect(second[asideIndex]!.content).toContain("[end aside]\n\nsecond aside");
     expect(events.at(-1)).toMatchObject({ type: "turn.completed", ok: true });
+    expect(events.at(-1)).toMatchObject({ usage: { input: 20, output: 5, tokensReported: false }, cost: null });
     // Once the turn settled the seam refuses: late words go back to the queue.
     await expect(instance.adapter.steer!("t", "late")).resolves.toBe("refused");
   }, 20_000);

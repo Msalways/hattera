@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { transformSync } from "esbuild";
 import { expect, it } from "vitest";
-import { launchVerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer } from "../scripts/control-hattera.ts";
 import { activeEngineBinDir } from "./engine-install.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 
@@ -73,7 +73,7 @@ it.each([
     await new Promise<void>((resolve) => registry!.listen(0, "127.0.0.1", resolve));
     const address = registry.address();
     if (!address || typeof address === "string") throw new Error("Registry address unavailable");
-    fixture = await launchVerificationServer({ OMB_TEST_NPM_REGISTRY_URL: `http://127.0.0.1:${address.port}/` },
+    fixture = await launchVerificationServer({ OMB_VERIFY_SERVER_ENTRY: process.env.OMB_VERIFY_SERVER_ENTRY, OMB_TEST_NPM_REGISTRY_URL: `http://127.0.0.1:${address.port}/` },
       undefined, undefined, undefined, undefined, undefined,
       engine === "codex" || engine === "grok" || engine === "kimi" || engine === "droid" || engine === "gemini" ? [engine] : []);
     const api = async (method: string, path: string, payload?: unknown) => {

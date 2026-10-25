@@ -252,7 +252,7 @@ it("a workspace shared with other people never receives one, and says why", asyn
 
 it("a server is shared only when someone besides its owner can sign in: the owner's own email alone is not", () => {
   const lists = (admins: string[], members: string[] = []) => ({ hosted: false, cloudHome: false, signIn: { admins, members } });
-  // `openmausbot access add me@example.test`: the owner signs in from a browser.
+  // `hattera access add me@example.test`: the owner signs in from a browser.
   expect(workspaceShared(lists(["me@example.test"]))).toBe(false);
   expect(workspaceShared(lists([]))).toBe(false);
   // Anyone else: a member, a second admin, a whole domain.

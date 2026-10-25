@@ -1,10 +1,10 @@
-// Real renderer and API against an explicit control-omb UI fixture handle.
+// Real renderer and API against an explicit control-hattera UI fixture handle.
 // The only substituted responses exercise unavailable-provider and retry UI.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { runControlOmb } from "./control-omb.ts";
+import { runControlOmb } from "./control-hattera.ts";
 
 const handle = process.argv[2];
 if (!handle) throw new Error("Usage: node --experimental-strip-types scripts/verify-command-allowlist-ui.ts /path/to/fixture/ui.json");

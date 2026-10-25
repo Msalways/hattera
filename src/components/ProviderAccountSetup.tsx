@@ -7,9 +7,9 @@ import { t } from "@/lib/i18n";
 /** Server account setup uses write-only inputs; existing credentials are never fetched. */
 export function ProviderAccountSetup({ instance }: { instance: InstanceInfo }) {
   const { dispatch, refreshModels } = useStore();
-  const form = providerAccountForm(instance.driverKind, instance.instanceId);
+  const form = providerAccountForm(instance.driverKind, instance.instanceId, instance.accountSetup);
   const [key, setKey] = useState("");
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(instance.accountSetup?.url ?? "");
   const [model, setModel] = useState(instance.accountSetup?.model ?? "");
   const [region, setRegion] = useState(instance.accountSetup?.region ?? "us-east-1");
   const [busy, setBusy] = useState(false);

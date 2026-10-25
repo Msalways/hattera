@@ -18,6 +18,17 @@ function fixture() {
 }
 
 describe("provider login ownership", () => {
+  it("releases a terminal native flow even when the browser stopped polling, while failed reads remain locked", async () => {
+    const { sessions, instance } = fixture();
+    await sessions.start(instance, "owner");
+    instance.getAuthentication.mockRejectedValueOnce(new Error("temporarily unavailable"));
+    await sessions.refresh([instance.instanceId]);
+    expect(sessions.isActive(instance.instanceId)).toBe(true);
+    instance.getAuthentication.mockResolvedValue({ phase: "succeeded", flowId: "random-flow", authorizationUrl: null, expiresAt: null });
+    await sessions.refresh([instance.instanceId]);
+    expect(sessions.isActive(instance.instanceId)).toBe(false);
+    await expect(sessions.status(instance.instanceId, "another owner", "random-flow")).rejects.toMatchObject({ status: 404 });
+  });
   it("forgets only the replaced provider's login reservation", async () => {
     const { sessions, instance } = fixture();
     const sibling = { ...instance, instanceId: "other" };

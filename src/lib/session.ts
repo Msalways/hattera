@@ -8,7 +8,7 @@ export interface EnvironmentDescriptor {
   platform: string;
   version: string;
   githubSignInOrigin?: string;
-  capabilities: { remoteSessions: true; selfUpdate: "desktop-managed" | "operator"; emailSignIn?: boolean; githubSignIn?: true; sharedComputers?: true; cloudHome?: true };
+  capabilities: { remoteSessions: true; selfUpdate: "desktop-managed" | "operator"; emailSignIn?: boolean; githubSignIn?: true; sharedComputers?: true; cloudHome?: true; localCli?: true };
 }
 
 export type SessionState =

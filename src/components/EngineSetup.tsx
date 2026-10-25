@@ -578,11 +578,11 @@ export function EngineSetup({
         ? t("engineSetup.installDescSignIn")
         : t("engineSetup.installDesc"));
 
-  if (!instance.snapshot.authenticationUnavailableReason && !deviceSignIn && !browserSignIn && providerAccountForm(instance.driverKind, instance.instanceId) && (instance.snapshot.state === "available" || !install?.command)) {
+  if (!instance.snapshot.authenticationUnavailableReason && !deviceSignIn && !browserSignIn && providerAccountForm(instance.driverKind, instance.instanceId, instance.accountSetup) && (instance.snapshot.state === "available" || !install?.command)) {
     return <ProviderAccountSetup instance={instance} />;
   }
 
-  if (signInOnly && instance.driverKind === "opencodeGo") {
+  if (signInOnly && instance.driverKind === "opencodeGo" && !instance.accountProfile?.isolated) {
     return <div className="mt-3 space-y-3"><ApiKeyRow section="opencodeGo" /><OpenCodeProviderKeys /></div>;
   }
 
@@ -628,7 +628,7 @@ export function EngineSetup({
       {deviceSignIn || browserSignIn ? (
         <>
           <DeviceSignIn key={instance.instanceId} instanceId={instance.instanceId} browserPkce={browserSignIn} provider={provider} availableMethods={instance.authentication?.methods} />
-          {providerAccountForm(instance.driverKind, instance.instanceId) && <details className="mt-3"><summary className="cursor-pointer text-[12px] text-ink-secondary">{t("engineSetup.account.useKey")}</summary><ProviderAccountSetup instance={instance} /></details>}
+          {providerAccountForm(instance.driverKind, instance.instanceId, instance.accountSetup) && <details className="mt-3"><summary className="cursor-pointer text-[12px] text-ink-secondary">{t("engineSetup.account.useKey")}</summary><ProviderAccountSetup instance={instance} /></details>}
           {/* Grok keeps its terminal sign-in for people who prefer one, where
               a terminal runs on this server; the code above needs none. */}
           {deviceSignIn && provider === "grok" && signInCommand && serverTerminal(cloudHome) && (

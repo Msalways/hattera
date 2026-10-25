@@ -38,6 +38,16 @@ describe("usage ledger files", () => {
   beforeEach(() => { dataDir = mkdtempSync(join(tmpdir(), "omb-usage-")); });
   afterEach(async () => { await removeTempDir(dataDir); });
 
+  it("keeps missing telemetry distinct from real zero usage and groups named accounts separately", async () => {
+    await appendUsage(dataDir, row({ at: "2026-10-01T00:00:00.000Z", instanceId: "personal", input: 0, output: 0, tokensReported: true }));
+    await appendUsage(dataDir, row({ at: "2026-10-01T00:01:00.000Z", instanceId: "work", input: 0, output: 0, tokensReported: false }));
+    const summary = summarizeUsage(readUsage(dataDir, parseUsageRange("2026-10-01", "2026-10-01")!), "account");
+    expect(summary.groups).toHaveLength(2);
+    expect(summary.groups.find(group => group.key === "account:work")?.unreportedTokens).toBe(1);
+    expect(summary.groups.find(group => group.key === "account:personal")?.unreportedTokens).toBeUndefined();
+    expect(summary.total.unreportedTokens).toBe(1);
+  });
+
   it("appends one private row per turn into the month's file and reads it back in order", async () => {
     appendUsage(dataDir, row({ at: "2026-09-03T10:00:00.000Z" }));
     appendUsage(dataDir, row({ at: "2026-09-03T11:00:00.000Z", botId: "b2", botName: "Clerk", costUsd: null }));
@@ -183,11 +193,11 @@ describe("usage summaries", () => {
       { ...rows[1]!, botName: '=HYPERLINK("x")', trigger: { kind: "user", email: "a,b@example.test" } },
     ]);
     const lines = csv.trim().split("\n");
-    expect(lines[0]).toBe("time,bot,model,engine,triggered_by,input_tokens,output_tokens,cached_input_tokens,cost_usd,cost_source,thread");
-    expect(lines[1]).toBe("2026-09-01T10:00:00.000Z,Scout,claude-sonnet-5,claudeAgent,ada@example.test,1200,300,900,0.012,reported,t1");
+    expect(lines[0]).toBe("time,bot,model,engine,triggered_by,input_tokens,output_tokens,cached_input_tokens,cost_usd,cost_source,thread,account,tokens_reported");
+    expect(lines[1]).toBe("2026-09-01T10:00:00.000Z,Scout,claude-sonnet-5,claudeAgent,ada@example.test,1200,300,900,0.012,reported,t1,claude,");
     expect(lines[2]).toContain("\"'=HYPERLINK(\"\"x\"\")\"");
     expect(lines[2]).toContain('"a,b@example.test"');
-    expect(lines[2]).toMatch(/,,,t1$/);
+    expect(lines[2]).toMatch(/,,,t1,claude,$/);
     expect(usageCsv([{ ...rows[0]!, costSource: "estimated" }]).split("\n")[1]).toContain(",0.012,estimated,t1");
   });
 

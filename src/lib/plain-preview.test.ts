@@ -4,7 +4,7 @@ import { plainPreviewText } from "./plain-preview";
 describe("plainPreviewText", () => {
   it.each([
     ["I added the **cover card** to the deck (11 slides).", "I added the cover card to the deck (11 slides)."],
-    ["I read **[Prudctual/OpenMausBot](https://github.com/Prudctual/OpenMausBot)** and the issues.", "I read Prudctual/OpenMausBot and the issues."],
+    ["I read **[Prudctual/Hattera](https://github.com/Prudctual/Hattera)** and the issues.", "I read Prudctual/Hattera and the issues."],
     ["See [the guide](https://example.com/a_(b)) first", "See the guide first"],
     ["![chart](/api/attachments/chart.png) is attached", "chart is attached"],
     ["Open <https://example.com/x> now", "Open https://example.com/x now"],
@@ -42,7 +42,7 @@ describe("plainPreviewText", () => {
   });
 
   it("keeps right-to-left text and its own punctuation", () => {
-    expect(plainPreviewText("قرأت تفاصيل **[Prudctual/OpenMausBot](https://github.com/x)** مستودعك")).toBe("قرأت تفاصيل Prudctual/OpenMausBot مستودعك");
+    expect(plainPreviewText("قرأت تفاصيل **[Prudctual/Hattera](https://github.com/x)** مستودعك")).toBe("قرأت تفاصيل Prudctual/Hattera مستودعك");
   });
 
   it("folds every line break and run of spaces into one line", () => {

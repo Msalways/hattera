@@ -1,4 +1,4 @@
-# OpenMausBot harness server — hosted/self-hosted tenant image, and the
+# Hattera harness server — hosted/self-hosted tenant image, and the
 # OMB Cloud Pro home machine (docs/cloud-pro.md).
 #
 # Build the renderer + the self-contained server bundle, then ship only those
@@ -11,12 +11,12 @@
 # Caddy in the same network namespace to terminate TLS and authentication at
 # the edge.
 #
-#   docker build -t openmausbot .
-#   docker build --build-arg ENGINES="@anthropic-ai/claude-code @openai/codex" -t openmausbot .
+#   docker build -t hattera .
+#   docker build --build-arg ENGINES="@anthropic-ai/claude-code @openai/codex" -t hattera .
 #   docker build --target cloud-home -t omb-cloud-home .
 #
 # HOME is the /data volume, so engine CLI logins (~/.claude, ~/.codex, ~/.grok,
-# ...) and OpenMausBot's own state (~/.openmausbot) persist across container
+# ...) and Hattera's own state (~/.openmausbot) persist across container
 # restarts.
 
 FROM caddy:2.10.2 AS edge
@@ -24,6 +24,17 @@ FROM caddy:2.10.2 AS edge
 # edge uses the unprivileged 8080, and a plain copy to a fresh inode drops the
 # capability (and the build user's ownership).
 RUN cp /usr/bin/caddy /caddy
+
+# App-owned userspace networking; no TUN device, privileged runtime or host daemon.
+FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm AS network-build
+WORKDIR /network
+COPY network/go.mod network/go.sum ./
+RUN go mod download
+COPY network/ ./
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -p=2 -trimpath -ldflags="-s -w" -o /out/hattera-network . \
+  && HATTERA_LICENSE_GOOS=${TARGETOS:-linux} HATTERA_LICENSE_GOARCH=${TARGETARCH:-amd64} go run -p=2 ./cmd/notices > /out/THIRD_PARTY_NOTICES.txt
 
 FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS build
 WORKDIR /src
@@ -149,6 +160,8 @@ COPY deploy/fly/Caddyfile /app/cloud/Caddyfile
 COPY --from=build /src/dist-native/duckdb ./duckdb-platforms
 RUN ln -s "duckdb-platforms/linux-$(node -p process.arch)" duckdb
 COPY --from=build /src/dist-server ./dist-server
+COPY --from=network-build /out/hattera-network ./network/hattera-network
+COPY --from=network-build /out/THIRD_PARTY_NOTICES.txt ./network/THIRD_PARTY_NOTICES.txt
 COPY --from=build /src/dist ./dist
 COPY --from=build /src/package.json ./package.json
 RUN export HOME=/tmp/omb-build-home \
@@ -174,6 +187,7 @@ CMD ["node", "/app/dist-server/cloud-home-start.js"]
 
 # The self-hosted server, last so a plain `docker build .` builds it.
 FROM runtime AS server
+LABEL org.opencontainers.image.title="Hattera" org.opencontainers.image.source="https://github.com/Msalways/hattera"
 # Optional engine CLIs baked into the image (space-separated npm packages).
 ARG ENGINES=""
 RUN --mount=type=cache,target=/tmp/npm-cache \
@@ -185,6 +199,8 @@ RUN --mount=type=cache,target=/tmp/npm-cache \
 COPY --from=build --chown=maus:maus /src/dist-native/duckdb ./duckdb-platforms
 RUN ln -s "duckdb-platforms/linux-$(node -p process.arch)" duckdb
 COPY --from=build --chown=maus:maus /src/dist-server ./dist-server
+COPY --from=network-build /out/hattera-network ./network/hattera-network
+COPY --from=network-build /out/THIRD_PARTY_NOTICES.txt ./network/THIRD_PARTY_NOTICES.txt
 COPY --from=build --chown=maus:maus /src/dist ./dist
 COPY --from=build --chown=maus:maus /src/package.json ./package.json
 # The default launcher starts Caddy on Render and only the server in local

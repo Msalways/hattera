@@ -219,7 +219,7 @@ describe("redactSecretsInText", () => {
 
   it("masks an assignment to any name ending in KEY, whatever the value looks like", () => {
     expect(redactSecretsInText(`OPENAI_API_KEY=sk-${"a".repeat(20)} pnpm test`)).toBe("OPENAI_API_KEY=«redacted 23 chars» pnpm test");
-    expect(redactSecretsInText("X_KEY=value pnpm control:omb doctor")).toBe("X_KEY=«redacted 5 chars» pnpm control:omb doctor");
+    expect(redactSecretsInText("X_KEY=value pnpm control:hattera doctor")).toBe("X_KEY=«redacted 5 chars» pnpm control:hattera doctor");
     expect(redactSecretsInText("export xai-key='abc.def'")).toBe("export xai-key='«redacted 7 chars»'");
   });
 

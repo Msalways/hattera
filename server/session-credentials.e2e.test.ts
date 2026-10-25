@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
 
-import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "../scripts/control-hattera.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 
 const jsonl = (path: string) => existsSync(path)

@@ -37,7 +37,7 @@ describe("t", () => {
       expect(t("onboarding.hosted.intro")).toContain("Hattera");
       setLocale("de");
       expect(t("pro.disclaimer")).toContain("Hattera");
-      expect(t("pro.name")).toBe("MausBot Cloud");
+      expect(t("pro.name")).toBe("Hattera Cloud");
     } finally {
       vi.unstubAllGlobals();
     }

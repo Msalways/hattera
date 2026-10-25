@@ -146,7 +146,7 @@ posixOnly("Live call e2e", () => {
       // the client's data channel may only hang up
       expect(session.body).toMatchObject({ session: { client: { data_channel: { allowed_client_events: ["session.close"] } } } });
       // a harness that is not a Cloud home runs on the person's own computer
-      expect((session.body.session as { instructions: string }).instructions).toContain("runs in OpenMausBot on the user's own computer.");
+      expect((session.body.session as { instructions: string }).instructions).toContain("runs in Hattera on the user's own computer.");
       await live.waitForAttach(session.id);
       await sse.until((frame) => frame.kind === "live.call" && frame.call?.callId === call.callId && frame.call?.status === "live");
 
@@ -484,7 +484,7 @@ posixOnly("Live call on the person's Cloud", () => {
       },
     }));
     mkdirSync(join(home, "web"));
-    writeFileSync(join(home, "web", "index.html"), "<!doctype html><title>OpenMausBot</title>");
+    writeFileSync(join(home, "web", "index.html"), "<!doctype html><title>Hattera</title>");
     const port = await freePortBlock([0, 1]);
     base = `http://127.0.0.1:${port}`;
     // Only loopback answers: the fake GPT-Live. The Admin and OpenAI are offline.
@@ -520,7 +520,7 @@ posixOnly("Live call on the person's Cloud", () => {
       await new Promise((r) => setTimeout(r, 150));
     }
     // One of the owner's devices, paired the way the Admin pairs the app.
-    const pairing = JSON.stringify({ label: "OpenMausBot app (Cloud)", ttlSeconds: 300 });
+    const pairing = JSON.stringify({ label: "Hattera app (Cloud)", ttlSeconds: 300 });
     const timestamp = String(Math.floor(Date.now() / 1000)), nonce = randomBytes(16).toString("base64url");
     const granted = await request("POST", "/api/cloud/pairing", JSON.parse(pairing), {
       "x-omb-cloud-timestamp": timestamp, "x-omb-cloud-nonce": nonce,

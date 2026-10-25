@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { verificationServerEnvironment } from "./control-omb.ts";
+import { verificationServerEnvironment } from "./control-hattera.ts";
 import { freePortBlock } from "../server/testing/ports.ts";
 import { waitForExit } from "../server/testing/cleanup.ts";
 
@@ -33,7 +33,7 @@ for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_p
 if (env.HTTPS_PROXY || env.https_proxy || env.HTTP_PROXY || env.http_proxy) env.NODE_USE_ENV_PROXY = "1";
 env.OMB_STATIC_DIR = dist;
 
-const child = spawn(process.execPath, ["--experimental-strip-types", join(root, "server", tailscale ? "openmausbot.ts" : "index.ts"),
+const child = spawn(process.execPath, ["--experimental-strip-types", join(root, "server", tailscale ? "hattera.ts" : "index.ts"),
   ...(tailscale ? ["serve", "--port", String(port), "--data-dir", dataDir, "--tailscale", "--no-open"] : [])],
   { cwd: root, env, stdio: "inherit", windowsHide: true });
 const closed = new Promise<number>((resolve) => child.once("close", (code) => resolve(code ?? 1)));

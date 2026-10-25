@@ -100,6 +100,10 @@ export interface TaskClosedBy {
 export interface TaskUsage {
   input: number;
   output: number;
+  /** False means these are known subtotals, not a complete token total. */
+  tokensReported?: boolean;
+  /** False when cachedInput is only a reported subtotal across turns. */
+  cachedInputReported?: boolean;
   /** cached share of input (context the model re-read); absent on records
    * from builds before it was tracked */
   cachedInput?: number;
@@ -107,7 +111,7 @@ export interface TaskUsage {
   costUsd: number | null;
   turns: number;
   /** the most recent settled turn on its own */
-  lastTurn?: { input: number; output: number; cachedInput?: number; costUsd: number | null };
+  lastTurn?: { input: number; output: number; cachedInput?: number; tokensReported?: boolean; costUsd: number | null };
   /** what filled the model's window on the last model call, and the window's size when known */
   context?: { tokens: number; window?: number };
 }
@@ -403,6 +407,8 @@ export type CardAnswerer = (
 /** One transcript line. Serialized as stored — the durable delivery
  * identity (roomRequest) rides the wire unchanged. */
 export interface WireMessage {
+  /** Verified group replication; conveys no execution or person authority. */
+  shared?: { groupId: string; eventId: string; origin: string; messageId: string; remote: boolean; author: string };
   roomRequest?: { id: string; phase: "request" | "result" };
   id: string;
   role: "bot" | "user";
@@ -509,7 +515,7 @@ export interface WireMessage {
   routedBy?: { provider: "jev"; probability: number };
   /** Set on the user-role line another bot delivered into this bot's own
    * conversation (ask_bot, start_thread). `incident`: the line is
-   * OpenMausBot's Team incidents report about that bot's broken run in
+   * Hattera's Team incidents report about that bot's broken run in
    * `threadId` (server/incidents.ts), not its words; `notified`: that
    * failure already buzzed the person (a run that could not start, a
    * failed routine). */
@@ -670,6 +676,7 @@ export type GroupDefaultResponder =
 
 /** One independent conversation inside a user-created channel. */
 export interface GroupTask {
+  sharedTopicId?: string;
   threadId: string;
   title: string;
   createdAt: number;
@@ -694,6 +701,7 @@ export interface GroupTask {
 /** A room as a client may see it: the record plus the computed working
  * flag (publicGroupState). */
 export interface WireGroup {
+  sharedGroupId?: string;
   /** Computed from the usage ledger, not stored in groups.json. */
   usage?: GroupThreadUsage | null;
   id: string;

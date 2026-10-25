@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 import { resolveAgentBrowserBinary } from "../../server/browser-engine.ts";
 import { waitForExit } from "../../server/testing/cleanup.ts";
-import { runControlOmb } from "../control-omb.ts";
-import { UI_TOOLS_DIR } from "./control-omb-ui.ts";
+import { runControlOmb } from "../control-hattera.ts";
+import { UI_TOOLS_DIR } from "./control-hattera-ui.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const enabled = Boolean(resolveAgentBrowserBinary({ dataDir: UI_TOOLS_DIR, env: process.env })) || process.env.OMB_UI_E2E === "1";
@@ -17,7 +17,7 @@ interface SavedBot { id: string; name: string; toolScope?: { allow?: string[]; d
   try {
     let stdout = "", stderr = "";
     let info: { ui: string; url: string };
-    const launcher = new URL("./control-omb-ui.ts", import.meta.url).href;
+    const launcher = new URL("./control-hattera-ui.ts", import.meta.url).href;
     child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", `
       import { launchUi } from ${JSON.stringify(launcher)};
       process.on('message', message => { if (message === 'stop') process.emit('SIGINT'); });

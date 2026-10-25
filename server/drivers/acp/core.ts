@@ -26,6 +26,7 @@
 // before the prompt is sent, and `_meta.isReplay` updates are dropped. Session
 // configuration is the exception: its live updates apply before prompting too.
 import { mkdtempSync, rmSync } from "node:fs";
+import { tokenUsage, tokenCount } from "../../../shared/token-usage.ts";
 import { homedir, tmpdir } from "node:os";
 import { lstat, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -670,7 +671,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
   const SOURCE = support.nativeSource;
   const decodeConfig = decodeAcpConfig(support.defaultCli);
   const DENY_TIMEOUT_NOTE =
-    "OpenMausBot: nobody answered this permission request in time. Skip this action and finish what you can without it.";
+    "Hattera: nobody answered this permission request in time. Skip this action and finish what you can without it.";
   // shown to the person: no engine slug, and what to do next
   const QUESTION_NO_MATCH_NOTE =
     "That answer isn't one of the choices this engine can take, so the question was closed and the turn stopped. Ask again and pick one of the options.";
@@ -867,7 +868,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
       // an injected stdio proxy — e.g. the peer-agent comms tool — attaches
       // fine here. env is the ACP {name,value}[] shape.
       //
-      // A URL server is always mounted as OpenMausBot's remote proxy, even
+      // A URL server is always mounted as Hattera's remote proxy, even
       // for an agent that advertises http/sse: the proxy opens the
       // connection with the same minimal handshake as Settings → Test
       // (mcp-http.ts), where an agent's own MCP client adds capability
@@ -2208,7 +2209,8 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
             // opencode 1.18.18 reports usage at the result root; grok and
             // gemini put it under _meta. Read both rather than lose the count.
             const usage = result?.usage ?? result?._meta ?? {};
-            if (typeof usage.inputTokens === "number" || typeof usage.outputTokens === "number") {
+            const normalizedUsage = tokenUsage(usage.inputTokens, usage.outputTokens);
+            if (normalizedUsage) {
               // opencode 1.18.25 keeps only the uncached share in inputTokens
               // and reports cache reads beside it (omitted when 0); some
               // agents count them inside inputTokens. `input` is the whole
@@ -2218,9 +2220,8 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
               // stay out of `input`, exactly as in the Claude driver, and an
               // absent cache count emits the bare shape with no cachedInput
               // key: absent is not zero.
-              const input = usage.inputTokens ?? 0;
-              const output = usage.outputTokens ?? 0;
-              const cachedRead = typeof usage.cachedReadTokens === "number" && usage.cachedReadTokens > 0
+              const { input, output } = normalizedUsage;
+              const cachedRead = tokenCount(usage.cachedReadTokens) !== undefined && usage.cachedReadTokens > 0
                 ? usage.cachedReadTokens
                 : null;
               const exclusive = cachedRead !== null
@@ -2229,6 +2230,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
               emit({
                 ...base(threadId, turnId),
                 type: "thread.token-usage.updated",
+                ...(normalizedUsage.tokensReported === false ? { tokensReported: false } : {}),
                 input: cachedRead !== null && exclusive ? input + cachedRead : input,
                 output,
                 ...(cachedRead !== null
@@ -2441,7 +2443,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
             nativeImageInput: support.images === true,
             effortLevels: support.effortLevels,
             modelVariants: support.modelVariants === true,
-            // OpenMausBot supplies a per-bot approvalMode on every harness
+            // Hattera supplies a per-bot approvalMode on every harness
             // turn, which safely overrides a legacy instance fullAuto value.
             // Direct adapter calls that omit it still fail closed in sendTurn.
             localComputerMcp: true,

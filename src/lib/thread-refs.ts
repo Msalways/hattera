@@ -143,8 +143,8 @@ export interface ThreadRefAddress {
   botId?: string;
 }
 
-const THREAD_URL_PREFIX = "openmausbot://thread/";
-const BOT_URL_PREFIX = "openmausbot://bot/";
+const THREAD_URL_PREFIX = "hattera://thread/";
+const BOT_URL_PREFIX = "hattera://bot/";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ID_LIMIT = 256;
 
@@ -163,7 +163,7 @@ export function threadRefUrl(ref: { botId: string; threadId: string }): string {
  * near-misses with extra path, extra query or a foreign scheme. */
 export function parseThreadRefUrl(value: string): ThreadRefAddress | null {
   const raw = value.trim();
-  if (!raw.toLowerCase().startsWith(THREAD_URL_PREFIX)) return null;
+  if (![THREAD_URL_PREFIX,"openmausbot://thread/"].some(prefix=>raw.toLowerCase().startsWith(prefix))) return null;
   let url: URL;
   try {
     url = new URL(raw);
@@ -194,7 +194,7 @@ export function parseThreadRefUrl(value: string): ThreadRefAddress | null {
  * else, including near-misses with extra path or query. */
 export function parseBotRefUrl(value: string): { botId: string } | null {
   const raw = value.trim();
-  if (!raw.toLowerCase().startsWith(BOT_URL_PREFIX)) return null;
+  if (![BOT_URL_PREFIX,"openmausbot://bot/"].some(prefix=>raw.toLowerCase().startsWith(prefix))) return null;
   let url: URL;
   try {
     url = new URL(raw);
@@ -419,7 +419,7 @@ export function threadTokenFromPaste(
 ): { token: string; ref: ResolvedThreadRef } | null {
   const trimmed = pasted.trim();
   if (!trimmed) return null;
-  const wrapped = /^\[((?:\\.|[^\\\]])*)\]\((openmausbot:\/\/thread\/[^()\s]*)\)$/.exec(trimmed);
+  const wrapped = /^\[((?:\\.|[^\\\]])*)\]\(((?:hattera|openmausbot):\/\/thread\/[^()\s]*)\)$/.exec(trimmed);
   const address = wrapped
     ? parseThreadRefUrl(wrapped[2])
     : parseThreadRefUrl(trimmed) ?? (isThreadUuid(trimmed) ? { threadId: trimmed } : null);

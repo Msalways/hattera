@@ -12,11 +12,15 @@ dist-server
 *.tsbuildinfo
 electron/resources/speech-helper
 electron/resources/OpenMausBot Speech.app
+electron/resources/Hattera Speech.app
 # stale helper from the removed Teach a skill recorder
 electron/resources/OpenMausBot Recorder.app
+electron/resources/Hattera Recorder.app
 release
 .omb-scratch
-output/playwright/
+# Local verification output can contain pairing links, transcripts and logs.
+/output/
+/hattera-deploy-*.log
 .wrangler/
 .dev.vars
 .dev.vars.*

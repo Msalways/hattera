@@ -280,7 +280,7 @@ describe("hosted endpoint advertisement", () => {
       "PUT",
       "/hosted-endpoint",
       headers,
-      JSON.stringify({ url: "https://C-Opaque.OpenMausBot.Test/" }),
+      JSON.stringify({ url: "https://C-Opaque.Hattera.Test/" }),
     );
     expect(published.status).toBe(200);
     expect(published.body.endpoints[0]).toEqual({

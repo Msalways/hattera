@@ -1,4 +1,4 @@
-// What this person may buy from OpenMausBot Cloud (electron/cloud-account.mjs
+// What this person may buy from Hattera Cloud (electron/cloud-account.mjs
 // offer): the session's own offer when signed in, the public plans otherwise.
 import { useEffect, useState } from "react";
 import type { CloudOffer } from "../../electron/cloud-home.mjs";

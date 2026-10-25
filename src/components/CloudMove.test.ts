@@ -50,7 +50,7 @@ async function ready(component: () => ReactNode, state = overview()) {
 const failed = (error: NonNullable<CloudMoveState["error"]>, destination = CLOUD, extra: Partial<CloudMoveState> = {}) =>
   moveView(null, { phase: "failed", action: "move", error, destination, ...extra });
 
-it("Settings → MausBot Cloud: what comes and its size, that sign-ins stay here, and one click that names the Cloud", async () => {
+it("Settings → Hattera Cloud: what comes and its size, that sign-ins stay here, and one click that names the Cloud", async () => {
   await ready(settings());
   const { html } = render(settings());
   expect(bridge.state).toHaveBeenCalledWith("cloud");
@@ -159,17 +159,17 @@ it("every state reads as one sentence and one next step, for the Cloud and any o
     action: null, message: { tone: "note", text: expect.stringContaining("open Settings → Servers in this computer's window and choose Copy this computer here") } });
   // Blocked before it starts.
   const blocked = (reason: CloudMoveOverview["blocked"], extra: Partial<CloudMoveOverview> = {}) => view({}, { destination: VPS, blocked: reason, ...extra });
-  expect(blocked("owner_needed")).toMatchObject({ message: { text: "This app isn't signed in to bots.example.test as its owner. Pair it again with an owner code (openmausbot pair), then copy." }, action: { kind: "open", label: "Open bots.example.test" } });
+  expect(blocked("owner_needed")).toMatchObject({ message: { text: "This app isn't signed in to bots.example.test as its owner. Pair it again with an owner code (hattera pair), then copy." }, action: { kind: "open", label: "Open bots.example.test" } });
   expect(blocked("shared_workspace")).toMatchObject({ message: { text: "bots.example.test is shared with other people, so it can't receive this computer's bots and chats. Copy to a server only you use." }, action: null });
   expect(blocked("same_computer")).toMatchObject({ message: { text: "bots.example.test is this computer's own server." }, action: null });
   expect(blocked("outdated", { cloud: { ...emptyCloud, appVersion: "0.1.90" } })).toMatchObject({ message: { text: "bots.example.test runs 0.1.90; this computer runs 0.1.96. Update bots.example.test, then copy again." }, action: { kind: "check", label: "Check again" } });
-  expect(blocked("outdated", { cloud: null }).message?.text).toBe("Update OpenMausBot on bots.example.test, then copy again.");
+  expect(blocked("outdated", { cloud: null }).message?.text).toBe("Update Hattera on bots.example.test, then copy again.");
   expect(view({}, { destination: CLOUD, blocked: "outdated", cloud: null }).message?.text).toBe("My Cloud has not updated to a version that can receive a move yet. Try again once it has.");
   expect(blocked("unreachable")).toMatchObject({ message: { text: "bots.example.test didn't answer. Check that it's running, then try again." }, action: { kind: "check" } });
   expect(blocked("busy_elsewhere", { busyWith: "My Cloud" })).toMatchObject({ message: { text: "A copy to My Cloud is running. Wait for it to finish." }, action: null });
   // Failures: what happened, then the one step that can help.
   expect(failed({ code: "restart_timeout", message: "" }, VPS)).toMatchObject({
-    message: { tone: "error", text: "bots.example.test hasn't come back yet. If it doesn't start again on its own, start OpenMausBot there; it finishes installing the copy when it starts." },
+    message: { tone: "error", text: "bots.example.test hasn't come back yet. If it doesn't start again on its own, start Hattera there; it finishes installing the copy when it starts." },
     action: { kind: "open", label: "Open bots.example.test" } });
   expect(failed({ code: "restart_timeout", message: "" }).message?.text).toBe("My Cloud is taking longer than usual to restart. Check it again in a few minutes.");
   expect(failed({ code: "outdated", message: "", destVersion: "0.1.95", localVersion: "0.1.96" }, VPS)).toMatchObject({

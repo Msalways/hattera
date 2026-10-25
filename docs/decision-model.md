@@ -1,6 +1,6 @@
 # Decision model
 
-OpenMausBot can use a fast decision model to pick things for your bots. It
+Hattera can use a fast decision model to pick things for your bots. It
 answers in a few hundred milliseconds for a fraction of a cent. It never does
 the work: the chosen bot still runs its own turn on its own engine. The first
 supported model is TypeSafe's [Jev](https://typesafe.ai).

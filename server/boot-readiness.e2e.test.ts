@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, it } from "vitest";
-import { runControlOmb, verificationServerEnvironment } from "../scripts/control-omb.ts";
+import { runControlOmb, verificationServerEnvironment } from "../scripts/control-hattera.ts";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { freePortBlock } from "./testing/ports.ts";
 

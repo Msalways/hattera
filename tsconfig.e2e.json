@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.server.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] },
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "DOM.AsyncIterable"],
+    "types": ["node", "vite/client"]
+  },
+  "include": ["scripts/verify-hattera-e2e.ts", "scripts/verify-collaboration-ui.ts", "scripts/verify-collaboration-containers.ts", "scripts/verify-collaboration-container-ui.ts", "scripts/record-collaboration-demo.ts", "scripts/testing/cdp-browser.ts", "server/testing/collaboration-fixture.ts"]
+}

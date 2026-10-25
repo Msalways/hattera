@@ -57,7 +57,7 @@ describe("rendered files", () => {
   });
 
   it("requires the loopback fence to start successfully before every tenant instance", () => {
-    const unit = templateUnit({ node: "/usr/bin/node", script: "/src/server/openmausbot.ts", layout });
+    const unit = templateUnit({ node: "/usr/bin/node", script: "/src/server/hattera.ts", layout });
     const header = unit.split("[Service]")[0];
     expect(header).toContain("After=network-online.target openmausbot-fence.service\n");
     expect(header).toContain("Requires=openmausbot-fence.service\n");
@@ -199,7 +199,7 @@ describe("plans", () => {
       expect(() => deletePlan({ registry: incomplete, slug: "acme", keepData: false, layout })).toThrow("operator recovery");
     }
     const two = createPlan({ registry: created.registry, slug: "globex", seed: { admins: ["g@x.test"], members: [] }, now, layout }).registry;
-    expect(argvOf(upgradePlan({ registry: suspendPlan({ registry: two, slug: "globex", layout }).registry }))).toEqual(["npm install -g openmausbot@latest", "systemctl restart openmausbot@acme.service"]);
+    expect(argvOf(upgradePlan({ registry: suspendPlan({ registry: two, slug: "globex", layout }).registry, packageSpec:"hattera@0.1.107" }))).toEqual(["npm install -g hattera@0.1.107", "systemctl restart openmausbot@acme.service"]);
   });
 
   it("seeds only the trusted portal gateway and reserves the portal hostname", () => {

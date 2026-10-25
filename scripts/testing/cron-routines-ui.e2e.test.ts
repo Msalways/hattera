@@ -6,8 +6,8 @@ import { afterAll, expect, it } from "vitest";
 import { resolveAgentBrowserBinary } from "../../server/browser-engine.ts";
 import { waitForExit } from "../../server/testing/cleanup.ts";
 import type { Routine } from "../../src/lib/routines.ts";
-import { runControlOmb } from "../control-omb.ts";
-import { UI_TOOLS_DIR } from "./control-omb-ui.ts";
+import { runControlOmb } from "../control-hattera.ts";
+import { UI_TOOLS_DIR } from "./control-hattera-ui.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const enabled = process.env.OMB_UI_E2E === "1" || Boolean(resolveAgentBrowserBinary({ dataDir: UI_TOOLS_DIR, env: process.env }));
@@ -17,7 +17,7 @@ afterAll(() => waitForExit(child, { signal: "SIGINT", graceMs: 30_000 }));
 (enabled ? it : it.skip)("creates monthly routines, validates cron, preserves arbitrary expressions and excludes calls", async () => {
   let output = "";
   let stderr = "";
-  child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-omb.ts"), "ui", "launch"], { cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+  child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-hattera.ts"), "ui", "launch"], { cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout!.on("data", chunk => { output += String(chunk); });
   child.stderr!.on("data", chunk => { stderr += String(chunk); });
   let fixture: { ui: string; url: string; botId: string; logPath: string };

@@ -1,5 +1,5 @@
 // The "Other model providers" docs page tells people how to use OpenRouter,
-// Fireworks AI, DeepSeek and Cline before OpenMausBot has a screen for them.
+// Fireworks AI, DeepSeek and Cline before Hattera has a screen for them.
 // Each workaround it gives depends on a detail of today's code, so each one
 // is pinned here to that code. When one of these fails, the behaviour moved:
 // update apps/docs/content/docs/providers/model-providers.mdx with it.

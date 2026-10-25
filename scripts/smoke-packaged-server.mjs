@@ -88,6 +88,9 @@ const fixtureEnv = {
   OMB_DATA_DIR: join(home, ".openmausbot"),
   OMB_PORT: String(port),
   OMB_WEBHOOK_PORT: String(webhookPort),
+  // This disposable loopback fixture exercises packaged workers as an owner.
+  // Self-hosted authentication is checked separately by rebrand-container.mjs.
+  OMB_LOOPBACK_TRUST: "owner",
   // Not a genuine key: enough to make the server look for its enterprise
   // layer and say whether it found one (checked below), never enough to
   // unlock anything.

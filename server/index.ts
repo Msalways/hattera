@@ -1,3 +1,4 @@
+import "../shared/product-compat.mjs";
 import { randomUUID } from "node:crypto";
 import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

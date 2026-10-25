@@ -42,9 +42,11 @@ export const bedrockConverseFetch: typeof fetch = async (address, options) => {
   const body = JSON.parse(String(options?.body));
   url.pathname = `/model/${encodeURIComponent(body.model)}/converse`;
   const response = await fetch(url, { ...options, body: JSON.stringify(bedrockConverseBody(body)), redirect: "error" });
+  const headers = new Headers();
+  for (const [key, value] of response.headers) if (key.startsWith("x-ratelimit-") || key === "retry-after") headers.set(key, value);
   const json = await response.json() as { message?: unknown; output?: { message?: { content?: unknown } };
     stopReason?: string; usage?: { inputTokens?: number; outputTokens?: number } };
-  if (!response.ok) return Response.json({ error: { message: typeof json.message === "string" ? json.message : "Bedrock rejected the request." } }, { status: response.status });
+  if (!response.ok) return Response.json({ error: { message: typeof json.message === "string" ? json.message : "Bedrock rejected the request." } }, { status: response.status, headers });
   const blocks = json.output?.message?.content;
   if (!Array.isArray(blocks)) throw new Error("Bedrock returned no conversation message.");
   const calls = blocks.filter(block => block.toolUse).map(block => ({ id: block.toolUse.toolUseId, type: "function",
@@ -52,5 +54,5 @@ export const bedrockConverseFetch: typeof fetch = async (address, options) => {
   return Response.json({ choices: [{ index: 0,
     message: { role: "assistant", content: blocks.map(block => block.text ?? "").join(""), ...(calls.length ? { tool_calls: calls } : {}) },
     finish_reason: json.stopReason === "tool_use" ? "tool_calls" : json.stopReason === "max_tokens" ? "length" : "stop",
-  }], usage: { prompt_tokens: json.usage?.inputTokens ?? 0, completion_tokens: json.usage?.outputTokens ?? 0 } });
+  }], ...(json.usage ? { usage: { prompt_tokens: json.usage.inputTokens, completion_tokens: json.usage.outputTokens } } : {}) }, { headers });
 };

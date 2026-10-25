@@ -64,7 +64,8 @@ function TaskUpdatedTime({ task, now }: { task: { updatedAt?: number; createdAt?
 /** Quiet per-task token tally; the hover title explains the cached share. */
 function TaskUsage({ usage }: { usage: Task["usage"] }) {
   if (!usage) return null;
-  const label = formatTaskTokens(headlineTokens(usage));
+  const known = formatTaskTokens(headlineTokens(usage));
+  const label = known && usage.tokensReported === false ? `${known}+` : known;
   if (!label) return null;
   return (
     <span
@@ -216,7 +217,8 @@ function ConversationTaskPicker({
   // the picker button stays as-is — a token count next to a truncated title
   // and count would crowd it; the open task's tally rides the hover title
   const u = current?.usage;
-  const currentLabel = u ? formatTaskTokens(headlineTokens(u)) : null;
+  const currentKnown = u ? formatTaskTokens(headlineTokens(u)) : null;
+  const currentLabel = currentKnown && u?.tokensReported === false ? `${currentKnown}+` : currentKnown;
   const switchTitle =
     u && currentLabel
       ? t("task.switchWithUsageDetail", {

@@ -30,7 +30,7 @@ ipcRenderer.on("chat:open", (_event, link) => {
 
 // Main can finish loading the document before React subscribes. Retain only
 // the fixed actions (Organisation, the openmausbot://cloud link, plain
-// Settings → OpenMausBot Cloud from the lending menu-bar item, and the Add a
+// Settings → Hattera Cloud from the lending menu-bar item, and the Add a
 // Cloud dialog from the server menu, plain or reached through Show me how),
 // never a destination supplied by a renderer.
 const FIXED_SETTINGS_ACTIONS = new Set(["organization", "cloud", "cloud-settings", "cloud-add", "cloud-add-howto"]);
@@ -112,7 +112,7 @@ const bridge = {
     ipcRenderer.on("desktop:capabilities-changed", handler);
     return () => ipcRenderer.removeListener("desktop:capabilities-changed", handler);
   },
-  /** Pair this desktop app to another OpenMausBot host. The bearer remains in
+  /** Pair this desktop app to another Hattera host. The bearer remains in
    * the main process and is never returned over this bridge. */
   remoteClient: {
     active: desktopRemoteClient,

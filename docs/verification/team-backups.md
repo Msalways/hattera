@@ -66,7 +66,7 @@ download UI; verify those separately in a renderer connected to a fixture.
 OMB_UI_E2E=1 pnpm exec vitest run scripts/testing/team-template-ui.e2e.test.ts --silent=false
 ```
 
-This owns a disposable `control-omb ui` app. It sends a fixture conversation,
+This owns a disposable `control-hattera ui` app. It sends a fixture conversation,
 creates two existing sections, imports a catalog template, then imports the
 same template through the file input. It checks the preview copy, distinct
 new sections, and preservation of existing bots and their conversation.

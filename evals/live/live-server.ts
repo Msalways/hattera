@@ -3,7 +3,7 @@ import { closeSync, mkdirSync, mkdtempSync, openSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { verificationServerEnvironment } from "../../scripts/control-omb.ts";
+import { verificationServerEnvironment } from "../../scripts/control-hattera.ts";
 import { removeTempDir, waitForExit } from "../../server/testing/cleanup.ts";
 import { freePortBlock } from "../../server/testing/ports.ts";
 import type { LiveInstance } from "./types.ts";

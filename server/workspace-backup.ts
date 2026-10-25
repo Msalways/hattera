@@ -29,6 +29,8 @@ const HEADER_BYTES = MAGIC.length + 16 + 12;
 const TAG_BYTES = 16;
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const EXCLUDED = new Set([
+  "hattera-runtime.json",
+  "private-network", // app-specific tailnet credentials belong to this machine
   ".backups", "tools", "cache", ".cache", "tmp", ".tmp", "dist-native", "tunnel-runtime",
   ".openmausbot-server-child", "environment-id", "sessions.json", "tunnel-account.json",
   "team-computers.json",
@@ -604,7 +606,7 @@ export async function stageWorkspaceBackup(dataDir: string, archivePath: string,
     const versions = [manifest.summary.appVersion, options.currentAppVersion ?? ""].map((version) => /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(version)?.slice(1).map(Number));
     if (versions[0] && versions[1]) {
       for (let i = 0; i < 3; i++) {
-        if (versions[0][i] > versions[1][i]) throw new Error("This backup was made by a newer OpenMausBot version. Update the app before restoring it.");
+        if (versions[0][i] > versions[1][i]) throw new Error("This backup was made by a newer Hattera version. Update the app before restoring it.");
         if (versions[0][i] < versions[1][i]) break;
       }
     }

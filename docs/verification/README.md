@@ -1,8 +1,33 @@
-# Verifying OpenMausBot
+# Verifying Hattera
 
-For the browser app as Hattera, use the [full-app smoke](hattera-app.md). It checks 27 browser journeys in an isolated fixture, including remote browser pairing, pairing contrast across saved skins, and local-registry provider installation, removal and reinstall, then exits. See [engine removal](engine-removal.md) for safety and Docker restart checks. The same guide describes a separate clean launcher for checking public provider downloads and optional Tailscale Serve from a normal terminal.
+Run `npm run test:e2e` for fresh builds and the required isolated HTTP/browser
+acceptance checks. [E2E setup](e2e.md) covers prerequisites, automatic tooling,
+reports, the platform matrix and optional Docker/live-network challenge checks.
 
-OpenMausBot has one development control surface: `pnpm control:omb`. It is a
+The [Hattera rebrand record](rebranding.md) covers identity, compatibility,
+packaging and the release checks that still require native platform qualification.
+The [provider setup audit](provider-setup-audit.md),
+[Codex authentication audit](codex-auth-audit.md) and
+[collaboration audit](collaboration-audit.md) record their tested scope and gaps.
+
+For account allowances and the app-managed Tailscale connection, see
+[account reporting and private networking](account-network.md). Its optional live
+check obtains a browser sign-in challenge without authorizing an account.
+The [provider coverage matrix](provider-coverage.md) lists all registered engines,
+API routes, shared regressions and remaining provider-specific qualification.
+The [account profile and launcher fixture](profiles-runtime.md) covers separate
+native homes, API credentials, profile management and persistent runtime reuse.
+The [human group fixture](human-groups.md) covers encrypted peer invitations,
+replication into existing groups, restart/offline behavior and revocation, with
+live network qualification and remaining group features listed separately.
+[Shared provider execution](shared-execution.md) documents owner grants, choosing
+a colleague's account, native tasks and approvals, cancellation and isolated proof.
+[Three-container OpenCode testing](container-team.md) exercises live model replies
+and remote owner memory using separate profiles on a simulated private network.
+
+For the browser app as Hattera, use the [full-app smoke](hattera-app.md). It checks 31 browser journeys in an isolated fixture, including group-sharing consent and phone layout, account profile management, remote browser pairing, pairing contrast across saved skins, and local-registry provider installation, removal and reinstall, then exits. See [engine removal](engine-removal.md) for safety and Docker restart checks. The same guide describes a separate clean launcher for checking public provider downloads and optional Tailscale Serve from a normal terminal.
+
+Hattera has one development control surface: `pnpm control:hattera`. It is a
 thin command-line adapter over `scripts/mcp-server.ts`, so verification uses
 the same URL validation, task pinning, bounded transcripts, wait states, and
 redaction as external MCP clients.
@@ -12,7 +37,7 @@ redaction as external MCP clients.
 Start a fixture in one terminal:
 
 ```sh
-node --experimental-strip-types scripts/control-omb.ts launch
+node --experimental-strip-types scripts/control-hattera.ts launch
 ```
 
 Run the foreground launcher directly rather than through `pnpm`; this ensures
@@ -21,7 +46,7 @@ it receives Ctrl-C and can stop its child before removing the temporary data.
 It gives the child a temporary data directory and home, chooses a free
 harness/webhook port pair, installs only the repository's fake engine, prints
 the URL, PID, data directory, and persistent log path, then stays attached to
-that exact child. The parent shell and the user's OpenMausBot data are
+that exact child. The parent shell and the user's Hattera data are
 untouched. Only `FAKE_CLAUDE_*` variables cross from the launcher's
 environment into that child, so a recipe can script the fake engine's mode,
 replies and tool calls without writing a wrapper CLI. Live calls add one
@@ -34,7 +59,7 @@ reach the fake.
 Pass the printed URL explicitly from a second terminal:
 
 ```sh
-pnpm control:omb doctor --url http://127.0.0.1:PORT
+pnpm control:hattera doctor --url http://127.0.0.1:PORT
 ```
 
 Mutating commands refuse silent port discovery. This prevents a verification
@@ -88,7 +113,7 @@ Use only mapped, tested commands:
 - [Spend cap and sell prices](spend-cap.md)
 - [Enterprise layer loading and license expiry](enterprise-license.md)
 
-`control-omb ui` ([Chat UI, driven headlessly](chat-ui.md)) drives the real
+`control-hattera ui` ([Chat UI, driven headlessly](chat-ui.md)) drives the real
 renderer in a headless Chrome by accessible name, so composer sends, transcript
 rows, tool chips and server feature flags are provable from the command line.
 Other renderer-only behavior—Settings, sidebar drag-and-drop, the VM modal, the
@@ -177,7 +202,7 @@ in a disposable workspace with synthetic data.
 
 The [people invitation fixture](people.md) checks hosted workspace sign-in,
 roles and device revocation through the real HTTP API with a stubbed email
-service. It does not drive the People settings UI through `control-omb`.
+service. It does not drive the People settings UI through `control-hattera`.
 
 The [sidebar fixture](sidebar.md) checks archive and delete confirmations, their
 default focus, keyboard wrapping and focus return against two disposable bots.

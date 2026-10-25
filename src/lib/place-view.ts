@@ -25,7 +25,7 @@ export const placeTranslate: PlaceTranslate = (key, params) => t(key as LocaleKe
 /** What the app knows about where it runs and who is looking. */
 export interface PlaceSeat {
   server: ServerKind;
-  /** This desktop is signed in to a paid OpenMausBot Cloud plan. */
+  /** This desktop is signed in to a paid Hattera Cloud plan. */
   plan: boolean;
   role: "admin" | "user";
   mode: "simple" | "advanced";

@@ -65,7 +65,7 @@ role creation, optional setup, connected-app settings and failure recovery:
 pnpm exec vitest run scripts/testing/bot-tools-ui.e2e.test.ts src/state/store.test.ts
 ```
 
-It uses the disposable `control-omb ui` launcher, not the running app. Set
+It uses the disposable `control-hattera ui` launcher, not the running app. Set
 `OMB_UI_E2E=1` to install the pinned browser if unavailable.
 
 This browser fixture verifies renderer interaction and persistence, not

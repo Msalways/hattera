@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { ephemeralWorkspaceTokenPath, excludedWorkspaceAuthPath, liveDataEnginePath, portableWorkspaceConfig, redownloadedOrgLibraryPath, restoredWorkspaceConfig } from "./workspace-backup-policy.ts";
 
 describe("workspace backup data boundary", () => {
+  it("does not restore a runtime discovery record from another machine", () => {
+    expect(excludedWorkspaceAuthPath("hattera-runtime.json")).toBe(true);
+    expect(excludedWorkspaceAuthPath("HATTERA-RUNTIME.JSON")).toBe(true);
+    expect(excludedWorkspaceAuthPath("hattera-runtime.json.123.fixture.tmp")).toBe(true);
+  });
   it("exports ordinary settings only and retains destination connection sections unchanged", () => {
     const connections = {
       xai: { key: "xai-secret", url: "https://source.example" },
@@ -34,6 +39,9 @@ describe("workspace backup data boundary", () => {
   });
 
   it.each([
+    "private-network/state/tailscaled.state", "private-network/settings.json",
+    "PRIVATE-NETWORK/state/tailscaled.state",
+    "collaboration/identity.json", "collaboration/index.json", "COLLABORATION/a.jsonl",
     "providers/account/.credentials.json", "providers/antigravity/profile/antigravity-acp/acp_token.json",
     "workspace-credentials.json", "browser-engine-key", "caddy/data/certificates/private.key",
     "external-runtimes.json", "external-runtimes.json.123.tmp",

@@ -2300,6 +2300,16 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
       aria-label={t("sidebar.aria")}
       data-native-view-overlay
       data-sidebar
+      onClick={event => {
+        // Selecting the current conversation does not change selectedId,
+        // so the app's navigation effect alone cannot close the drawer.
+        if (open && event.target instanceof Element && event.target.closest("button[data-sidebar-group-row], button[data-sidebar-thread-row], button[data-sidebar-bot-row], [data-sidebar-bot-row][role=button]")) onClose();
+      }}
+      onKeyDown={event => {
+        // Custom bot rows handle activation themselves; native buttons
+        // close through their click event after keyboard activation.
+        if (open && (event.key === "Enter" || event.key === " ") && event.target instanceof Element && event.target.closest("[data-sidebar-bot-row][role=button]")) onClose();
+      }}
       style={{ "--sidebar-width": `${widthRef.current ?? defaultWidth}px` } as CSSProperties}
       className={cn(
         "relative flex h-full shrink-0 flex-col border-r border-hairline/40 bg-panel",

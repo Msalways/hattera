@@ -20,6 +20,7 @@ const GIT_INTERNALS = "Files inside .git cannot be changed through a shared fold
  * not, however the shared folder around them was chosen. Relative to home;
  * entries that do not exist on this machine protect nothing. */
 const PERSONAL_SECRETS = [
+  ".hattera", ".openmausbot",
   ".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker", ".netrc", ".git-credentials", ".npmrc", ".pypirc",
   ".claude", ".claude.json", ".codex", ".mozilla", ".local/share/keyrings", ".local/bin",
   ".config/gh", ".config/gcloud", ".config/op", ".config/git", ".config/fish", ".config/autostart", ".config/systemd",

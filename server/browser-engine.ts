@@ -346,7 +346,7 @@ interface BrowserLookupOptions {
   platform?: NodeJS.Platform;
   arch?: string;
   exists?: (p: string) => boolean;
-  /** Count only the runtimes OpenMausBot itself configured (the explicit
+  /** Count only the runtimes Hattera itself configured (the explicit
    * override, the desktop bundle) or downloaded (the pinned asset). The
    * ambient PATH is skipped: whatever it turns up — a repo's
    * node_modules/.bin, a dev machine's global wrapper — is not the engine
@@ -543,7 +543,7 @@ export function browserEngineStatus(options: BrowserLookupOptions = {}): Browser
     return { kind: "ready", binaryPath, version, ...(warning ? { warning } : {}) };
   }
   if (bundle && (options.exists ?? existsSync)(bundle.directory)) {
-    return { kind: "unavailable", reason: "The desktop browser bundle is incomplete. Reinstall or update OpenMausBot to repair it.", installable: false };
+    return { kind: "unavailable", reason: "The desktop browser bundle is incomplete. Reinstall or update Hattera to repair it.", installable: false };
   }
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;

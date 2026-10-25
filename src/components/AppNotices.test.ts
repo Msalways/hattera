@@ -17,7 +17,7 @@ vi.mock("@/state/store", () => ({ useStore: () => ({ state: f.state, dispatch: f
   CLOUD_LINK_SETTINGS: { type: "toggleAppSettings", open: true, section: "cloudAccount", cloudLink: true } }));
 vi.mock("@/lib/analytics", () => ({ emailGateDone: () => false, track: vi.fn() }));
 vi.mock("@/lib/updater", () => ({ useUpdaterState: () => f.updater }));
-vi.mock("@/lib/brand", () => ({ brandStatus: () => ({ brand: { name: "OpenMausBot" }, source: f.brand, file: "" }) }));
+vi.mock("@/lib/brand", () => ({ brandStatus: () => ({ brand: { name: "Hattera" }, source: f.brand, file: "" }) }));
 vi.mock("@/components/EngineLibrary", () => ({ engineReady: (instance: { snapshot: { state: string; authenticated?: boolean } }) =>
   instance.snapshot.state === "available" && instance.snapshot.authenticated !== false }));
 import { AppNotices } from "./AppNotices";
@@ -35,7 +35,7 @@ const plans = [
 const TRIAL_OFFER: CloudOffer = { plans, recommended: "pro", creditUsd: 5, refundDays: 14 };
 const PLAIN_OFFER: CloudOffer = { plans: plans.map(({ trialDays: _days, ...plan }) => plan), recommended: "pro", refundDays: 14 };
 const INTRO = "Keep your bots working when this computer is off";
-const STAR = "Enjoying OpenMausBot?";
+const STAR = "Enjoying Hattera?";
 const signedOut: CloudAccountState = { status: "signed-out" };
 const free: CloudAccountState = { status: "connected", account: { id: "a", email: "person@example.test" }, entitlement: { plan: "free", status: "inactive", expiresAt: null, version: 1 } };
 const paid = (extra: Partial<CloudAccountState> = {}): CloudAccountState => ({ ...free, entitlement: { plan: "pro", tier: "pro", status: "active", expiresAt: NOW + 30 * DAY, version: 2 }, ...extra });
@@ -98,7 +98,7 @@ describe("the card after the update", () => {
   it("offers the free trial to someone signed out who has used the app before, in the Admin's numbers, with Start free trial and Show me how", async () => {
     returning();
     const html = await launch();
-    const words = [INTRO, "Free for 7 days", "MausBot Cloud is your own always-on computer in the cloud.", "Routines run on time, day and night",
+    const words = [INTRO, "Free for 7 days", "Hattera Cloud is your own always-on computer in the cloud.", "Routines run on time, day and night",
       "Reach your bots from your phone, even with this computer off", "$5 of Claude credit to start", "Then from $29/month + tax. Cancel any time.",
       "14-day money-back on every plan.", "Start free trial", "Show me how", "Sign in to your Cloud plan", "Not now"];
     for (const text of words) expect(html).toContain(text);

@@ -381,6 +381,13 @@ describe("PiDriver turns (fake CLI)", () => {
     await instance?.dispose();
   });
 
+  it("keeps a missing native token field incomplete", async () => {
+    await create(undefined, { FAKE_PI_USAGE: JSON.stringify({ input: 12 }) });
+    await instance.adapter.sendTurn({ threadId: "partial-pi", text: "Hello" });
+    const done = await recorder.until(e => e.type === "turn.completed");
+    expect(done).toMatchObject({ usage: { input: 12, output: 0, tokensReported: false } });
+  });
+
   it("normalizes a full turn into the canonical event sequence", async () => {
     await create();
     const { turnId } = await instance.adapter.sendTurn({
@@ -512,7 +519,7 @@ describe("PiDriver turns (fake CLI)", () => {
     // A changed volatile half rides the next prompt as a labelled note.
     const third = await send("third", "Memory: moved to Toronto.", first.cursor);
     expect(third.message)
-      .toBe("Context from OpenMausBot updated since this conversation started; it replaces any earlier copy:\n\nMemory: moved to Toronto.\n\nthird");
+      .toBe("Context from Hattera updated since this conversation started; it replaces any earlier copy:\n\nMemory: moved to Toronto.\n\nthird");
   });
 
   it("re-establishes the full prompt after pi compaction summarizes the session", async () => {

@@ -58,7 +58,7 @@ describe("the update button", () => {
   });
 
   it("says what it holds", () => {
-    expect(updateIndicatorLabel({ status: "downloaded", version: "0.2.0" })).toBe("Update ready: OpenMausBot 0.2.0");
+    expect(updateIndicatorLabel({ status: "downloaded", version: "0.2.0" })).toBe("Update ready: Hattera 0.2.0");
     expect(updateIndicatorLabel({ status: "downloading", percent: 41.6 })).toBe("Downloading an update, 42%");
     expect(updateIndicatorLabel({ status: "downloading" })).toBe("Downloading an update");
   });
@@ -91,7 +91,7 @@ describe("the update card", () => {
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(dialog.parentElement!.className).toContain("items-center");
     expect(dialog.className).toContain("max-w-[420px]");
-    expect(dialog.textContent).toContain("OpenMausBot 0.2.0");
+    expect(dialog.textContent).toContain("Hattera 0.2.0");
     expect([...dialog.querySelectorAll("li")].map((item) => item.textContent)).toEqual([
       "Faster start.",
       "Rooms keep actions.",

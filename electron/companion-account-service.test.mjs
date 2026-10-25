@@ -106,10 +106,11 @@ function signedCredentials(overrides = {}) {
 }
 
 describe("Companion account service", () => {
-  it("uses the packaged hosted default and only explicit safe development origins", () => {
+  it("requires an explicitly configured safe control plane in every build", () => {
     expect(resolveCompanionControlPlaneURL({ isPackaged: true, environment: {} })).toBe(
-      "https://accounts.openmausbot.com",
+      "",
     );
+    expect(resolveCompanionControlPlaneURL({isPackaged:true,environment:{HATTERA_CONTROL_PLANE_URL:"https://accounts.example.test",OMB_CONTROL_PLANE_URL:"https://legacy.example.test"}})).toBe("https://accounts.example.test");
     expect(resolveCompanionControlPlaneURL({
       isPackaged: false,
       environment: { OMB_CONTROL_PLANE_URL: "http://127.0.0.1:8787/" },

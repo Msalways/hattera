@@ -110,7 +110,7 @@ function planAllowances(input) {
   return { cpus: input.cpus, memoryMb: input.memoryMb, diskGb: input.diskGb, maxDiskGb: Math.max(input.maxDiskGb, input.diskGb),
     computers: input.computers, computerHours: input.computerHours, voiceCharacters: input.voiceCharacters };
 }
-/** One plan OpenMausBot Cloud sells (its catalog: the public config's
+/** One plan Hattera Cloud sells (its catalog: the public config's
  * `plans`, the session's `offer.plans`): its tier and name, its monthly price
  * before tax in US cents, what it includes when the Admin says, and its free
  * trial's days when it comes with one. Without a monthly price in US dollars
@@ -161,7 +161,7 @@ export function parseCloudOffer(input) {
   return { ...offer, ...(open ? { checkout: open } : {}) };
 }
 
-/** What OpenMausBot Cloud's public config says it sells to anyone (`plans`,
+/** What Hattera Cloud's public config says it sells to anyone (`plans`,
  * and the additive `trial` and `refundDays`): the offer for someone signed
  * out. Its trial is for new customers; checkout decides who gets it. */
 export function parsePublicOffer(config) {
@@ -193,7 +193,7 @@ export function cloudPlanDisk(state) {
 }
 
 /** The person's Cloud address, remembered for their account while a check
- * with OpenMausBot Cloud is pending or has failed, or the sign-in has ended,
+ * with Hattera Cloud is pending or has failed, or the sign-in has ended,
  * so the Server menu still knows "My Cloud" is theirs. Forgotten on sign-out,
  * another account, or a check that names no machine for this account (a
  * machine named without its address, stopped, keeps it). */

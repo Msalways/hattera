@@ -1,8 +1,8 @@
-// Real model acceptance through the full, isolated OpenMausBot server.
+// Real model acceptance through the full, isolated Hattera server.
 // The prompts contain goals only, never tool names or execution advice.
 import { copyFileSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { launchVerificationServer, runControlOmb } from "./control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "./control-hattera.ts";
 import { fixtureApi } from "./testing/preview-fixture.ts";
 
 const cli = process.env.OMB_VERIFY_CODEX_CLI;

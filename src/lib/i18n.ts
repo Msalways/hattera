@@ -82,7 +82,7 @@ export function t(key: LocaleKey, params?: Record<string, string | number>): str
   // browser deployment uses the served brand; desktop releases and the
   // distinct upstream Cloud service keep their own identity.
   const displayed = typeof document !== "undefined" && document.documentElement?.dataset?.browserBrand === "hattera"
-    ? template.replace(/OpenMausBot(?! Cloud)/g, brand().name)
+    ? template.replace(/Hattera(?! Cloud)/g, brand().name)
     : template;
   if (!params) return displayed;
   return displayed.replace(/\{(\w+)\}/g, (match, name: string) =>

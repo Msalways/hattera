@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 
 it("pins an explicitly chosen new-thread folder without moving existing sessions or the bot default", async () => {
   const fixture = await launchVerificationServer();

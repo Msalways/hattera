@@ -1,4 +1,4 @@
-// `openmausbot serve --domain maus.example.com`: HTTPS on your own domain
+// `hattera serve --domain maus.example.com`: HTTPS on your own domain
 // with nothing to configure. The server downloads a pinned Caddy once into
 // the data dir (the same way it fetches cloudflared and the browser engine),
 // writes the Caddyfile the Docker stack ships, and runs Caddy as its child:
@@ -111,7 +111,7 @@ export async function ensureCaddy(options: {
  * state live under the data dir so they survive restarts and upgrades. */
 export function caddyfileFor(input: { domain: string; appPort: number; webhookPort: number }): string {
   return [
-    "# Written by openmausbot serve --domain. Edit the command, not this file.",
+    "# Written by hattera serve --domain. Edit the command, not this file.",
     "{",
     "\tadmin off",
     "\tlog {",

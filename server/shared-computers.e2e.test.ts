@@ -6,7 +6,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, realpathSync, rmSyn
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { launchVerificationServer, type VerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer, type VerificationServer } from "../scripts/control-hattera.ts";
 import { createComputerSharing, type SharedFolder } from "../electron/computer-sharing.mjs";
 import { sessionCookieName } from "./request-auth.ts";
 

@@ -82,7 +82,7 @@ if (typeof sdk.EmbeddedCuaDriverHost !== "function") {
 async function checkProxy(socketPath) {
   const child = spawn(binary, ["mcp", "--embedded", "--socket", socketPath], {
     windowsHide: true, stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, CUA_DRIVER_EMBEDDED: "1", CUA_DRIVER_HOST_BUNDLE_ID: "com.openmausbot.app" },
+    env: { ...process.env, CUA_DRIVER_EMBEDDED: "1", CUA_DRIVER_HOST_BUNDLE_ID: "com.hattera.app" },
   });
   const lines = createInterface({ input: child.stdout });
   let stderr = "";
@@ -126,7 +126,7 @@ async function checkProxy(socketPath) {
   }
 }
 
-const host = new sdk.EmbeddedCuaDriverHost(background, "com.openmausbot.app");
+const host = new sdk.EmbeddedCuaDriverHost(background, "com.hattera.app");
 try {
   const conn = await host.start({ signal: AbortSignal.timeout(15_000) });
   if (!conn?.socketPath) throw new Error("embedded host reported no socketPath");

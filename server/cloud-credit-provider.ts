@@ -1,8 +1,8 @@
-// The free trial's Claude credit on an OpenMausBot Cloud home (docs/cloud-pro.md,
+// The free trial's Claude credit on an Hattera Cloud home (docs/cloud-pro.md,
 // "Trial Claude credit"): while the person has no AI of their own here, bots
 // run on Claude through the Admin's relay, paid from the credit the trial
 // came with. The relay is an OpenAI-compatible API (chat completions and its
-// model list) and the engine is OpenMausBot's own chat engine on it (the
+// model list) and the engine is Hattera's own chat engine on it (the
 // OpenAI-compatible driver), never Claude Code or Codex: the platform's key is
 // never used to run another product's agent for anyone. The Admin holds that
 // key and meters the credit; this machine holds only the relay's address and
@@ -61,7 +61,7 @@ export function parseCreditModels(body: unknown): CreditModel[] {
   return models;
 }
 
-/** The engine: OpenMausBot's own chat engine (the OpenAI-compatible driver)
+/** The engine: Hattera's own chat engine (the OpenAI-compatible driver)
  * on the relay, with this machine's token as its key and only the relay's
  * models. The relay's address is an OpenAI base URL, `/v1` included (the
  * Admin sends `…/api/cloud/services/ai/v1`), so the engine adds only

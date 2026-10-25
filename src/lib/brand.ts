@@ -1,6 +1,6 @@
 // The deployment's brand (name, tagline, accent, logo, support link) — served
 // by GET /api/brand from a brand.json on the server, applied once before the
-// first paint so the window never shows "OpenMausBot" and then renames itself.
+// first paint so the window never shows "Hattera" and then renames itself.
 // Pure helpers live here so they can be unit-tested without a DOM.
 
 export interface Brand {
@@ -30,7 +30,7 @@ export function brand(): Brand {
 
 /** Keep the desktop release identity while using the active server brand in a browser. */
 export function appDisplayName(): string {
-  return typeof window !== "undefined" && window.ogb?.platform ? "OpenMausBot" : brand().name;
+  return typeof window !== "undefined" && window.ogb?.platform ? "Hattera" : brand().name;
 }
 
 export function brandStatus(): BrandStatus {

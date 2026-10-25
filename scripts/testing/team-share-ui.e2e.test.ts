@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { resolveAgentBrowserBinary } from "../../server/browser-engine.ts";
 import { waitForExit } from "../../server/testing/cleanup.ts";
-import { runControlOmb } from "../control-omb.ts";
+import { runControlOmb } from "../control-hattera.ts";
 import { request } from "../mcp-server.ts";
-import { UI_TOOLS_DIR } from "./control-omb-ui.ts";
+import { UI_TOOLS_DIR } from "./control-hattera-ui.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const binary = resolveAgentBrowserBinary({ dataDir: UI_TOOLS_DIR, env: process.env });
@@ -23,7 +23,7 @@ describe("Share team in the real renderer", () => {
     let stdout = "";
     let stderr = "";
     let info: { ui: string; url: string; botId: string; logPath: string };
-    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-omb.ts"), "ui", "launch"], {
+    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-hattera.ts"), "ui", "launch"], {
       cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"],
     });
     child.stdout!.on("data", (chunk: Buffer) => { stdout += String(chunk); });

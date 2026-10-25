@@ -6,7 +6,33 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { launchVerificationServer, runControlOmb, type VerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb, type VerificationServer } from "../scripts/control-hattera.ts";
+
+it("keeps partial native usage incomplete through a real turn, ledger, API and CSV", async () => {
+  const fixture = await launchVerificationServer({ ...process.env, FAKE_CLAUDE_TURN_USAGE: JSON.stringify({ input_tokens: 10 }) });
+  const control = (args: string[]) => runControlOmb([...args, "--url", fixture.info.url]) as Promise<any>;
+  try {
+    const { bot } = await control(["new-bot", "--name", "Partial usage"]);
+    await control(["send", "--bot", bot.id, "--text", "Check telemetry"]);
+    await control(["wait", "--bot", bot.id, "--timeout", "30"]);
+    const file = join(fixture.info.dataDir, "usage", `${new Date().toISOString().slice(0, 7)}.jsonl`);
+    await expect.poll(() => existsSync(file), { timeout: 10_000 }).toBe(true);
+    const row = JSON.parse(readFileSync(file, "utf8").trim().split("\n")[0]);
+    expect(row).toMatchObject({ tokensReported: false, input: 10, output: 0, costUsd: 0.01 });
+    const report = await (await fetch(`${fixture.info.url}/api/usage?groupBy=account`)).json() as any;
+    expect(report.total).toMatchObject({ unreportedTokens: 1 });
+    const bots = await (await fetch(`${fixture.info.url}/api/bots`)).json() as any;
+    const liveBot = bots.bots.find((entry: any) => entry.id === bot.id);
+    expect(liveBot).toBeDefined();
+    const task = liveBot.tasks.find((entry: any) => entry.threadId === liveBot.threadId);
+    expect(task).toBeDefined();
+    expect(task.usage).toMatchObject({ tokensReported: false, input: 10, output: 0 });
+    const csv = await (await fetch(`${fixture.info.url}/api/usage.csv`)).text();
+    const [header, data] = csv.trim().split("\n").map(line => line.trim().split(","));
+    expect(data[header.indexOf("input_tokens")]).toBe("");
+    expect(data[header.indexOf("tokens_reported")]).toBe("false");
+  } finally { await fixture.close(); }
+}, 120_000);
 
 describe("usage ledger through real turns", () => {
   let session: VerificationServer;

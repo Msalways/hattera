@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 import { resolveAgentBrowserBinary } from "../../server/browser-engine.ts";
 import { waitForExit } from "../../server/testing/cleanup.ts";
-import { runControlOmb } from "../control-omb.ts";
-import { agentBrowser, sessionEnv, UI_TOOLS_DIR, type UiHandle } from "./control-omb-ui.ts";
+import { runControlOmb } from "../control-hattera.ts";
+import { agentBrowser, sessionEnv, UI_TOOLS_DIR, type UiHandle } from "./control-hattera-ui.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const enabled = process.env.OMB_UI_E2E === "1" || Boolean(resolveAgentBrowserBinary({ dataDir: UI_TOOLS_DIR, env: process.env }));
@@ -17,7 +17,7 @@ if (!enabled) console.log("skipping usage details UI: set OMB_UI_E2E=1 to instal
   let info: { ui: string; url: string; botId: string; logPath: string } | undefined;
   try {
     let stdout = "", stderr = "";
-    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-omb.ts"), "ui", "launch"], {
+    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-hattera.ts"), "ui", "launch"], {
       cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"],
     });
     child.stdout!.on("data", chunk => { stdout += String(chunk); });

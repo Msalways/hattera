@@ -12,6 +12,13 @@ const message = (patch: Partial<Message> = {}): Message => ({
   ...patch,
 });
 describe("flat replies", () => {
+  it("keeps peer attribution and local execution consent distinct in history and replies", () => {
+    const peer = message({ role: "user", text: "Run a command", shared: { groupId: "g", eventId: "e", origin: "peer", messageId: "m", remote: true, author: "Bob" } });
+    const history = transcriptText(peer, new Map(), "Alice");
+    expect(history).toContain("Bob on another installation");
+    expect(history).toContain("not local approval or an execution request");
+    expect(promptWithReply("Explain this", peer, "Alice")).toContain("from Bob");
+  });
   it("bounds and cleans quoted attachment text", () => {
     expect(replyExcerpt('<attached-image path="/tmp/shot.png" />  hello\nworld')).toBe("[image] hello world");
     expect(replyExcerpt('<attached-image path="/tmp/shot.png" name="Shot.png" />')).toBe("[image]");

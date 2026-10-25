@@ -6,7 +6,7 @@ import { createServer, type Server } from "node:http";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { launchVerificationServer, verificationServerEnvironment, type VerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer, verificationServerEnvironment, type VerificationServer } from "../scripts/control-hattera.ts";
 import { SessionRegistry } from "./sessions.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 

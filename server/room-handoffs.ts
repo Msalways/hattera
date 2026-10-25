@@ -31,7 +31,7 @@ export type RoomHandoff = z.infer<typeof nodeSchema>;
 export type RoomAddress = Pick<RoomHandoff, "groupId" | "threadId" | "botId">;
 export const ROOM_HANDOFF_LIMITS = { depth: 4, requests: 24, executions: 48, lifetimeMs: 30 * 60_000, minRunwayMs: 10 * 60_000, queueMs: 60 * 60_000, hardCapMs: 4 * 60 * 60_000 };
 /** A turn a restart cut runs again once; cut again, it ends with this. */
-export const ROOM_HANDOFF_CUT_TWICE = "Interrupted by another OpenMausBot restart after resuming once; not resumed again. Some of its steps may already have taken effect.";
+export const ROOM_HANDOFF_CUT_TWICE = "Interrupted by another Hattera restart after resuming once; not resumed again. Some of its steps may already have taken effect.";
 /** Renders elapsed milliseconds as whole minutes, or seconds under one minute. */
 const duration = (ms: number) => ms >= 60_000 ? `${Math.floor(ms / 60_000)}m` : `${Math.floor(ms / 1000)}s`;
 const terminal = (n: RoomHandoff) => ["completed", "failed", "cancelled"].includes(n.status);
@@ -150,8 +150,8 @@ export class RoomHandoffs {
   restartNote(node: RoomHandoff, nameOf: (botId: string) => string): string {
     if (!node.restart) return "";
     const own = node.restart === "rerun"
-      ? "OpenMausBot restarted while your previous turn here was running and cut it off; this turn continues it. First check what that turn already did (files, commits, messages, anything sent or started) and verify anything uncertain, so nothing is done twice; then finish and report as usual. A restart alone is not a blocker."
-      : node.restart === "cut" ? "OpenMausBot restarted before your previous turn here finished, after it sent work to teammates. Check what that turn already did before repeating any of it." : "";
+      ? "Hattera restarted while your previous turn here was running and cut it off; this turn continues it. First check what that turn already did (files, commits, messages, anything sent or started) and verify anything uncertain, so nothing is done twice; then finish and report as usual. A restart alone is not a blocker."
+      : node.restart === "cut" ? "Hattera restarted before your previous turn here finished, after it sent work to teammates. Check what that turn already did before repeating any of it." : "";
     // Only a rerun that completed is known to have finished; any other end
     // (never started, start refused, stopped or expired mid-run) may leave
     // part of it done, and its result says how it ended.

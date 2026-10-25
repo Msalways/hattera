@@ -1,5 +1,5 @@
 // Full built app against a disposable fake-engine server with an explicit native browser.
-// No real provider account, browser profile, or OpenMausBot home is imported.
+// No real provider account, browser profile, or Hattera home is imported.
 import { createServer, request } from "node:http";
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 import { transformSync } from "esbuild";
-import { launchVerificationServer } from "./control-omb.ts";
+import { launchVerificationServer } from "./control-hattera.ts";
 import { waitForExit } from "../server/testing/cleanup.ts";
 import { browserSessionId, closeBrowserSession } from "../server/browser-engine.ts";
 import { activeEngineBinDir } from "../server/engine-install.ts";

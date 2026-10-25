@@ -63,7 +63,7 @@ it("offers the three ways in and says plainly whose plan limits apply", () => {
   expect(html).toContain("data-cloud-sign-in");
   for (const label of ["Claude", "Use your Claude subscription.", "ChatGPT", "Use your ChatGPT plan with Codex.", "Use an API key"]) expect(html).toContain(label);
   expect(html).toContain("plan&#x27;s limits apply to bots that work around the clock");
-  // OpenMausBot Cloud sells a plan called Max too: the recommendation names Anthropic's.
+  // Hattera Cloud sells a plan called Max too: the recommendation names Anthropic's.
   expect(html).toContain("Anthropic&#x27;s Claude Max plan or an API key works best");
   expect(html).not.toMatch(/included/i);
   // nothing is opened on the person's behalf

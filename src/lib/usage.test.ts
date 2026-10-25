@@ -1,8 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { botUsage, cachedInput, cachedUsageNote, headlineTokens, tokensColumnLabel, contextChip, contextDetail, contextShare, costCaption, formatTaskTokens, formatTokens, formatUsd, uncachedInput, lastTurnDetail, sumUsage, usageChip, usageDetail } from "./usage";
+import { botUsage, cachedInput, cachedUsageNote, headlineTokens, tokensColumnLabel, contextChip, contextDetail, contextShare, costCaption, formatTaskTokens, formatTokens, formatUsageTokens, formatUsd, uncachedInput, lastTurnDetail, sumUsage, usageChip, usageDetail } from "./usage";
 
 describe("usage formatting", () => {
+  it("does not treat a cached subtotal as a complete cache split", () => {
+    const usage = { input: 100, output: 10, cachedInput: 80, cachedInputReported: false, costUsd: null, turns: 2 };
+    expect(headlineTokens(usage)).toBe(110);
+    expect(usageDetail(usage)).toContain("100 input (cached + uncached)");
+    expect(cachedUsageNote(usage)).toBeNull();
+    expect(sumUsage([usage]).cachedInput).toBeUndefined();
+  });
+  it("labels incomplete reports as subtotals rather than exact or zero usage", () => {
+    const partial = { input: 12, output: 0, tokensReported: false, costUsd: null, turns: 1 };
+    const total = sumUsage([partial, { input: 8, output: 2, costUsd: null, turns: 1 }]);
+    expect(total.tokensReported).toBe(false);
+    expect(formatUsageTokens(total)).toBe("22+");
+    expect(tokensColumnLabel(total)).toBe("Reported tokens");
+    expect(usageChip(partial)).toBe("Usage incomplete");
+    expect(usageDetail(partial)).toContain("Some token usage was not reported");
+    expect(formatUsageTokens({ ...partial, input: 0 })).toBe("—");
+    expect(usageDetail({ ...partial, input: 0 })).toBe("Token usage was not reported.");
+  });
   it("keeps output independent of the input headline, including a fully cached turn", () => {
     const usage = { input: 2048, cachedInput: 2048, output: 3, turns: 1, costUsd: null };
     expect(usageChip(usage)).toBe("0 uncached");

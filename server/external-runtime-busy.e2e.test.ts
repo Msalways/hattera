@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb, type VerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb, type VerificationServer } from "../scripts/control-hattera.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 
 const TOKEN = "external-runtime-busy-fixture-0123456789abcdef";

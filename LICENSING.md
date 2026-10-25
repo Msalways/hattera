@@ -1,5 +1,12 @@
 # Licensing
 
+Hattera is a fork of OpenMausBot. Hattera's own product name, CLI and assets do
+not replace upstream attribution or grant additional rights to third-party
+components. The upstream licensing explanation below is retained; the original
+license texts in `LICENSE`, `enterprise/LICENSE` and third-party notices govern
+their respective code. Upstream contribution and partnership guidance describes
+the upstream project, not a change to the Apache license for this fork.
+
 OpenMausBot is open source under the [Apache License 2.0](LICENSE), with one
 carve-out and a few notes.
 

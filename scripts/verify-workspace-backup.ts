@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { launchVerificationServer, runControlOmb, type VerificationServer } from "./control-omb.ts";
+import { launchVerificationServer, runControlOmb, type VerificationServer } from "./control-hattera.ts";
 import { waitForExit } from "../server/testing/cleanup.ts";
 import { escapeAttribute } from "../src/lib/composer-attachments.ts";
 

@@ -5,7 +5,7 @@
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import { fixtureApi } from "../scripts/testing/preview-fixture.ts";
 import { openSse } from "./testing/sse.ts";
 

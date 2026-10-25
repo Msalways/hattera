@@ -105,7 +105,7 @@ pnpm test:packaged-server
 ```
 
 The search fixture uses the standard isolated launcher, seeds only its new
-database, sends two real fake-engine turns through `control:omb`, performs
+database, sends two real fake-engine turns through `control:hattera`, performs
 sixteen HTTP searches, waits for a queue-full 503 proving eight were admitted,
 then checks a health response arrives before the accepted scans all finish,
 and verifies both settled replies and scoped active-branch search results.

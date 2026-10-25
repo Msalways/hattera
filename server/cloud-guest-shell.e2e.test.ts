@@ -50,7 +50,7 @@ async function api(method: string, path: string, options: { body?: unknown; toke
 
 /** The Admin's signed pairing: it only works when the server got the secret. */
 async function adminPairing(): Promise<string> {
-  const body = JSON.stringify({ label: "OpenMausBot app (Cloud)", ttlSeconds: 300 });
+  const body = JSON.stringify({ label: "Hattera app (Cloud)", ttlSeconds: 300 });
   const timestamp = String(Math.floor(Date.now() / 1000)), nonce = randomBytes(16).toString("base64url");
   const response = await fetch(`${base}/api/cloud/pairing`, { method: "POST", headers: {
     host: HOST, "x-forwarded-for": "203.0.113.9", "x-forwarded-proto": "https", "content-type": "application/json",
@@ -300,7 +300,7 @@ it("work a guest's turn hands a teammate is the guest's too: the teammate runs c
   // Nor is it handed on as the owner's request, though the owner typed the
   // line: a conversation a guest left behind is not the owner's to quote.
   const assigned = JSON.stringify(teammateTurn.prompt);
-  expect(assigned).toContain("OpenMausBot cannot trace this work to the user's own request");
+  expect(assigned).toContain("Hattera cannot trace this work to the user's own request");
   expect(assigned).not.toMatch(/for the user's request|Ask Delegate to read/);
   // Settle the held turns and the hand-off they belong to: a later test's
   // restart would cut a turn still running, and a cut teammate turn runs

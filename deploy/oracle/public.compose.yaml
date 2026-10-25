@@ -9,6 +9,6 @@ services:
   caddy:
     environment:
       OMB_HTTPS_HOST: ""
-      OMB_PUBLIC_HOST: ${OMB_PUBLIC_HOST:?Set OMB_PUBLIC_HOST to your DNS hostname}
+      OMB_PUBLIC_HOST: ${HATTERA_PUBLIC_HOST:-${OMB_PUBLIC_HOST:?Set OMB_PUBLIC_HOST to your DNS hostname}}
     volumes:
       - ./deploy/oracle/Caddyfile.public:/etc/caddy/Caddyfile:ro

@@ -2,7 +2,7 @@ import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb, type VerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb, type VerificationServer } from "../scripts/control-hattera.ts";
 import { DELEGATION_WAKE_MAX_PER_WINDOW } from "./delegations.ts";
 
 describe("routine delegation through the isolated harness", () => {

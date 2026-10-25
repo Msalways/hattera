@@ -2,6 +2,8 @@ node_modules
 **/node_modules
 dist
 dist-server
+dist-native
+output
 dist-electron
 release
 .git

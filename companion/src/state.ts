@@ -5,10 +5,12 @@
 // ~/.openmausbot would be reaching into somebody else's data layout — the
 // exact coupling this design exists to avoid. If the harness reorganises its
 // files tomorrow, nothing here notices.
+import "../../shared/product-compat.mjs";
 import { randomUUID } from "node:crypto";
 import {
   chmodSync,
   closeSync,
+  existsSync,
   fsyncSync,
   mkdirSync,
   openSync,
@@ -20,7 +22,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 /** OMB_COMPANION_DIR isolates a test rig from a real paired fleet. */
-export const DATA_DIR = process.env.OMB_COMPANION_DIR ?? join(homedir(), ".openmausbot-companion");
+export const DATA_DIR = process.env.OMB_COMPANION_DIR ?? join(homedir(), existsSync(join(homedir(),".openmausbot-companion")) ? ".openmausbot-companion" : ".hattera-companion");
 
 /** 0700 on the directory, 0600 on the files it holds.
  *

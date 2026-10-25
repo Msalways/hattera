@@ -118,7 +118,7 @@ export function createWorkspaceBackupRoutes(options: {
       if (method === "POST" && path === `${PREFIX}/client-state`) {
         const body = z.object({ restoreId: z.string().uuid() }).parse(await options.readBody(req));
         check(req, auth);
-        if (!options.restored.restored || body.restoreId !== options.restored.id) throw failure("This restore has not completed. Restart OpenMausBot first.", 409);
+        if (!options.restored.restored || body.restoreId !== options.restored.id) throw failure("This restore has not completed. Restart Hattera first.", 409);
         json(res, 200, { clientState: options.restored.clientState ?? {} });
         return true;
       }
@@ -146,7 +146,7 @@ export function createWorkspaceBackupRoutes(options: {
           artifacts.set(archive.id, { owner: owner(auth), kind: "download", path: archive.path, summary: archive.summary, expires: Date.now() + EXPIRES_MS });
           return archive;
         });
-        json(res, 200, { id: result.id, filename: `OpenMausBot-${result.summary.createdAt.slice(0, 10)}.ombbackup`, bytes: statSync(result.path).size, summary: result.summary });
+        json(res, 200, { id: result.id, filename: `Hattera-${result.summary.createdAt.slice(0, 10)}.ombbackup`, bytes: statSync(result.path).size, summary: result.summary });
         return true;
       }
       const download = /^\/api\/workspace-backup\/download\/([\w-]+)$/.exec(path);
@@ -156,7 +156,7 @@ export function createWorkspaceBackupRoutes(options: {
         res.writeHead(200, {
           "content-type": "application/octet-stream",
           "content-length": statSync(file).size,
-          "content-disposition": `attachment; filename="OpenMausBot-${artifact.summary!.createdAt.slice(0, 10)}.ombbackup"`,
+          "content-disposition": `attachment; filename="Hattera-${artifact.summary!.createdAt.slice(0, 10)}.ombbackup"`,
           "x-content-type-options": "nosniff",
         });
         await pipeline(createReadStream(file), res);

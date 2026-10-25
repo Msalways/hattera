@@ -222,7 +222,7 @@ it("a downloaded update installs when the app quits, except a system package, wh
     for (const [os, marker, image, installsOnQuit] of [
       ["darwin", null, null, true],
       ["win32", null, null, true],
-      ["linux", null, "/home/a/OpenMausBot.AppImage", true],
+      ["linux", null, "/home/a/Hattera.AppImage", true],
       ["linux", "deb", null, false],
       ["linux", "rpm", null, false],
     ]) {

@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 
 // Deliberate opt-in: never discover the user's CLI or install a dependency.

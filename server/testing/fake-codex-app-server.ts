@@ -401,6 +401,15 @@ process.stdin.on("data", (chunk) => {
         experimentalApi = msg.params?.capabilities?.experimentalApi === true;
         out({ jsonrpc: "2.0", id: msg.id, result: { ok: true } });
         break;
+      case "account/rateLimits/read":
+        dump();
+        if (mode === "logged-out") { out({ jsonrpc: "2.0", id: msg.id, error: { code: -32001, message: "Fixture account is signed out" } }); break; }
+        out({ jsonrpc: "2.0", id: msg.id, result: { rateLimits: { primary: { usedPercent: 25, windowDurationMins: 480, resetsAt: 1900000000 } } } });
+        break;
+      case "account/usage/read":
+        dump();
+        out({ jsonrpc: "2.0", id: msg.id, result: { summary: { lifetimeTokens: 12345, peakDailyTokens: null }, dailyUsageBuckets: null } });
+        break;
       case "account/read": {
         dump();
         const accountMode = process.env.FAKE_CODEX_ACCOUNT_MODE;
@@ -787,7 +796,7 @@ process.stdin.on("data", (chunk) => {
             ].join(" ")
           : "ls -la";
         notify("item/started", { item: { id: "i1", type: "commandExecution", command } });
-        notify("item/started", { item: { id: "w1", type: "webSearch", query: "OpenMausBot" } });
+        notify("item/started", { item: { id: "w1", type: "webSearch", query: "Hattera" } });
         const reviewOnce = process.env.FAKE_CODEX_REVIEW_ONCE_FILE;
         if (process.env.FAKE_CODEX_REVIEW_EVENTS && (!reviewOnce || !existsSync(reviewOnce))) {
           if (reviewOnce) writeFileSync(reviewOnce, "1");

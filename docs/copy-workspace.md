@@ -1,7 +1,7 @@
 # Copy this computer here
 
 One action in the desktop app copies this computer's workspace to a server the
-person owns and added in the app: a VPS or home server running `openmausbot
+person owns and added in the app: a VPS or home server running `hattera
 serve`, a `service install`, Docker or Podman install, another desktop reached
 through its Remote access, or their OMB Cloud. Every destination goes through
 the same code (`electron/cloud-move.mjs` on the desktop,
@@ -35,7 +35,7 @@ and keep their swap back in those folders.
   the person starts the copy there (Security, below); on the person's own
   OMB Cloud, verified through the Admin, it starts the copy at once.
 - **Settings → Servers → Copy this computer here**, on every saved server's
-  row (not This computer), and **Settings → MausBot Cloud** under My Cloud once
+  row (not This computer), and **Settings → Hattera Cloud** under My Cloud once
   it is Ready. Both open the same panel: the size and counts
   (`GET /api/cloud-move/estimate` on this computer's own server), that API keys
   and sign-ins stay on this computer, and **Copy to {server}**. When the server
@@ -70,16 +70,16 @@ the same.
 | Running | Uploading to {server}… and so on, with bytes | Stop the copy (until it starts replacing) |
 | Done | Copied to {server}: N bots and M chats… | Done |
 | Ready, on the server's own page | (what comes, its size, what stays here) | Copy: opens this computer's panel for it (the verified Cloud's starts the copy) |
-| Not signed in as the owner (client-scope pairing) | This app isn't signed in to {server} as its owner. Pair it again with an owner code (`openmausbot pair`), then copy. | Open {server} |
+| Not signed in as the owner (client-scope pairing) | This app isn't signed in to {server} as its owner. Pair it again with an owner code (`hattera pair`), then copy. | Open {server} |
 | Shared with other people | {server} is shared with other people, so it can't receive this computer's bots and chats. Copy to a server only you use. | none |
 | This computer's own server | {server} is this computer's own server. | none |
 | Older than this computer (`outdated`) | {server} runs X; this computer runs Y. Update {server}, then copy again. | Check again |
-| From before any server could receive one | Update OpenMausBot on {server}, then copy again. | Check again |
+| From before any server could receive one | Update Hattera on {server}, then copy again. | Check again |
 | Not answering | {server} didn't answer. Check that it's running, then try again. | Check again |
 | A copy elsewhere is running | A copy to {other} is running. Wait for it to finish. | none |
 | The Cloud has work, on its own page | My Cloud already has bots and chats of its own… open Settings → Servers in this computer's window… | none |
 | A proxy refuses even 512 KB parts (`proxy_limit`) | A proxy in front of {server} refused a 512 KB upload. Raise its request size limit (nginx: client_max_body_size 64m), then copy again. | Continue the copy |
-| Not back after the restart | {server} hasn't come back yet. If it doesn't start again on its own, start OpenMausBot there; it finishes installing the copy when it starts. | Open {server} |
+| Not back after the restart | {server} hasn't come back yet. If it doesn't start again on its own, start Hattera there; it finishes installing the copy when it starts. | Open {server} |
 | Other failures | what happened | Copy again / Continue the copy |
 
 ## What moves, and what stays
@@ -182,8 +182,8 @@ that stays up a minute resets the count).
 |---|---|
 | OMB Cloud (`server/cloud-home-start.ts`) | starts only the server again |
 | The desktop app's own server (`electron/server-supervisor.mjs`) | starts it again after any exit |
-| `openmausbot serve` / `npx openmausbot` in a terminal (`serveUntilStopped`, `server/cli.ts`) | runs `serve` again in the same process, without a new pairing code or browser tab; a tunnel, Tailscale or domain address stays the same |
-| systemd `service install`, fleet, launchd | they run `openmausbot serve`, so the same loop |
+| `hattera serve` / `npx openmausbot` in a terminal (`serveUntilStopped`, `server/cli.ts`) | runs `serve` again in the same process, without a new pairing code or browser tab; a tunnel, Tailscale or domain address stays the same |
+| systemd `service install`, fleet, launchd | they run `hattera serve`, so the same loop |
 | Docker (`Dockerfile`), Podman (`deploy/podman/Containerfile`) | `node dist-server/server-launcher.js` (`server/server-launcher.ts`) starts `index.js` again and passes SIGTERM on, so the container, and a Caddy sharing its network, never goes down |
 | Anything else (`node dist-server/index.js` by hand, a custom manager) | stays down; the restore is committed and installs at the next start |
 
@@ -231,7 +231,7 @@ computer's work is sent:
   member, a second admin address, or a whole `@domain`: `sharedSignIn`,
   `workspaceShared`), refuses every receiving route (403
   `shared_workspace`): a replace would wipe their work. The owner's own address
-  alone (`openmausbot access add you@example.com`, to sign in from a browser)
+  alone (`hattera access add you@example.com`, to sign in from a browser)
   is not shared.
 - The upload is bounded by its declared size, the per-part limit and the
   backup's own limits. The bundle is the workspace backup: credentials are left

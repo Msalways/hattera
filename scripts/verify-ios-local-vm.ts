@@ -7,7 +7,7 @@
 // up until Ctrl-C. The synthetic `docker` answers only inspection and the two
 // screenshot execs; each capture returns the captured desktop with another
 // character typed at its prompt, so a refresh is visible on the phone. It never reaches a real container runtime,
-// VM, or the user's OpenMausBot data.
+// VM, or the user's Hattera data.
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
-import { launchVerificationServer, type VerificationServer } from "./control-omb.ts";
+import { launchVerificationServer, type VerificationServer } from "./control-hattera.ts";
 import { fixtureApi } from "./testing/preview-fixture.ts";
 import { fakeVncDesktop } from "./testing/fake-vnc-desktop.ts";
 import { decodePng } from "./testing/png.ts";

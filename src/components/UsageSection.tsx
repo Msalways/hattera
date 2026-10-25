@@ -6,7 +6,7 @@ import { useStore } from "@/state/store";
 import { BotAvatar } from "./Avatar";
 import { Card } from "./SettingsPrimitives";
 import { t } from "@/lib/i18n";
-import { botUsage, cachedUsageNote, costCaption, formatTokens, formatUsd, hasFiniteCost, headlineTokens, sumUsage, tokensColumnLabel, usageDetail } from "@/lib/usage";
+import { botUsage, cachedUsageNote, costCaption, formatUsageTokens, formatUsd, hasFiniteCost, headlineTokens, sumUsage, tokensColumnLabel, usageDetail } from "@/lib/usage";
 import { UsageHistory } from "./UsageHistory";
 import { PlanUsage } from "./PlanUsage";
 
@@ -52,7 +52,7 @@ export function UsageSection() {
               </span>
               <span className="text-right tabular-nums text-ink-secondary">{usage.turns}</span>
               <span className="text-right tabular-nums text-ink" title={usageDetail(usage)}>
-                {formatTokens(headlineTokens(usage))}
+                {formatUsageTokens(usage)}
               </span>
               <span className="text-right tabular-nums text-ink">{hasFiniteCost(usage.costUsd) ? formatUsd(usage.costUsd) : <span className="text-ink-secondary">—</span>}</span>
             </div>
@@ -60,12 +60,13 @@ export function UsageSection() {
           <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-5 pt-2.5 text-[13px] font-medium text-ink">
             <span>{t("usage.allBots")}</span>
             <span className="text-right tabular-nums">{total.turns}</span>
-            <span className="text-right tabular-nums" title={usageDetail(total)}>{formatTokens(headlineTokens(total))}</span>
+            <span className="text-right tabular-nums" title={usageDetail(total)}>{formatUsageTokens(total)}</span>
             <span className="text-right tabular-nums">{hasFiniteCost(total.costUsd) ? formatUsd(total.costUsd) : "—"}</span>
           </div>
           {cachedNote && (
             <div className="mt-3 text-[12px] leading-relaxed text-ink-secondary">{cachedNote}</div>
           )}
+          {total.tokensReported === false && <p className="mt-3 text-[12px] text-ink-secondary">{usageDetail(total)}</p>}
           {hasFiniteCost(total.costUsd) && (
             <div className="mt-3 text-[12px] leading-relaxed text-ink-secondary">
               {t("usage.costLine", {

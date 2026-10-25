@@ -100,7 +100,7 @@ Later cleanup failure is reported distinctly from a failed/unapplied setup.
 
 ## Recorded app and real-model checks — 2026-09-13
 
-The real renderer was driven through `control:omb ui` in an isolated fixture:
+The real renderer was driven through `control:hattera ui` in an isolated fixture:
 Clive's pending card displayed the exact Research/Mira setup and scope grant;
 Cancel received initial focus, Apply setup was the sole positive action, and
 no Always allow option appeared. Clicking Apply setup created Mira, cleared

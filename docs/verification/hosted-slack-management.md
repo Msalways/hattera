@@ -44,7 +44,7 @@ member's write and an unauthenticated read, and withholds the link in local
 membership mode. The helper tests cover incomplete or invalid configuration
 and URL parameter boundaries.
 
-The UI test launches `control-omb ui` with the real renderer and a disposable
+The UI test launches `control-hattera ui` with the real renderer and a disposable
 fake-engine workspace. It checks that the real API answers `{available:false}`
 and that the settings rail has no Slack row, then supplies synthetic Admin
 responses only inside that browser page. It checks the row, its copy and the

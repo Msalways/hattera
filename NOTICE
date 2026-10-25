@@ -1,5 +1,13 @@
+Hattera is a modified distribution of OpenMausBot.
+Fork source: https://github.com/Msalways/hattera
+Original attribution and dependency notices follow.
+
 OpenMausBot
 Copyright 2026 Milind Soni and OpenMausBot contributors
+
+Hattera's optional private network component links Tailscale (BSD 3-Clause) and
+other Go modules. Each packaged component includes THIRD_PARTY_NOTICES.txt with
+the licenses of its linked dependencies and the Go standard library.
 
 OpenMausBot was relicensed from the MIT License to the Apache License,
 Version 2.0, with the consent of all contributors whose copyright was

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { runControlOmb } from "../../scripts/control-omb.ts";
+import { runControlOmb } from "../../scripts/control-hattera.ts";
 import type { Scenario, Step } from "../types.ts";
 import { BaseWorld, type WorldContext } from "../runners/base-world.ts";
 import { waitUntil } from "../runners/api.ts";

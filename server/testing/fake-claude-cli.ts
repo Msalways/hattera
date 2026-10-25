@@ -290,7 +290,13 @@ const argAfter = (flag: string): string | null => {
   return i === -1 ? null : (argv[i + 1] ?? null);
 };
 
-const out = (obj: unknown) => process.stdout.write(JSON.stringify(obj) + "\n");
+const out = (obj: unknown) => {
+  // Verification can model a partial provider result without changing the live app.
+  if (process.env.FAKE_CLAUDE_TURN_USAGE && obj && typeof obj === "object" && "type" in obj && obj.type === "result") {
+    obj = { ...obj, usage: JSON.parse(process.env.FAKE_CLAUDE_TURN_USAGE) };
+  }
+  return process.stdout.write(JSON.stringify(obj) + "\n");
+};
 
 // Snapshot probes: each answers on argv alone and exits without reading stdin.
 const probe = argv[0] === "--version" ? "version" : argv[0] === "--help" ? "help" : argv[0] === "auth" && argv[1] === "status" ? "auth" : null;

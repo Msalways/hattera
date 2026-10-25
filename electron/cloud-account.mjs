@@ -19,7 +19,7 @@ const SETUP_REFRESH_MS = 15_000;
 const CHECKING_AFTER = 2;
 /** The longest sign-in window accepted from the Admin (it may allow 15 minutes). */
 const MAX_ENROLL_SECONDS = 1800;
-/** What OpenMausBot Cloud sells (its public config) is asked again this often, or after a failed ask this soon. */
+/** What Hattera Cloud sells (its public config) is asked again this often, or after a failed ask this soon. */
 const OFFER_MS = 10 * 60_000, OFFER_RETRY_MS = 30_000;
 /** A checkout this app opened: while it may still be paid, the session is
  * asked every 15 seconds for this long; it is remembered this long, so the
@@ -45,7 +45,7 @@ export function checkoutDestination(value, { fixture = false } = {}) {
 export function cloudOrigin(value = CLOUD_ORIGIN, fixture = false) {
   const url = new URL(value);
   if (value !== url.origin || (value !== CLOUD_ORIGIN && !(fixture && url.protocol === "http:" && ["127.0.0.1", "[::1]"].includes(url.hostname)))) {
-    throw new Error("Invalid MausBot Cloud address.");
+    throw new Error("Invalid Hattera Cloud address.");
   }
   return value;
 }
@@ -333,7 +333,7 @@ export function createCloudAccountClient({ store, openBrowser, platform, deviceN
     if (typeof plan !== "string" || !TIER.test(plan) || !CHECKOUT_SOURCES.includes(source)) throw new Error("Invalid Cloud checkout.");
     const current = state();
     if (current.status === "signed-out" && !grant) return { outcome: "signing-in", state: await begin({ plan, source }) };
-    if (current.status !== "connected" || !grant) throw new Error("Sign in to MausBot Cloud before choosing a plan.");
+    if (current.status !== "connected" || !grant) throw new Error("Sign in to Hattera Cloud before choosing a plan.");
     const signedIn = grant;
     let destination;
     try {
@@ -398,7 +398,7 @@ export function createCloudAccountClient({ store, openBrowser, platform, deviceN
      * removed): forget it and start a new sign-in in one step, never showing
      * "signed out" in between. */
     async signInAgain() {
-      if (state().status !== "reauth-required") throw new Error("This computer is still signed in to MausBot Cloud.");
+      if (state().status !== "reauth-required") throw new Error("This computer is still signed in to Hattera Cloud.");
       publish({ status: "connecting" });
       const forgotten = await forget({ quiet: true });
       if (forgotten.status === "unavailable") return forgotten;
@@ -413,7 +413,7 @@ export function createCloudAccountClient({ store, openBrowser, platform, deviceN
     async openDashboard() { await openBrowser(`${origin}/cloud`); return state(); },
     /** What this person may buy now, for wording an offer: signed in, the
      * session's own `offer` (this account's trial, credit and money-back);
-     * otherwise OpenMausBot Cloud's public config, asked with no sign-in or
+     * otherwise Hattera Cloud's public config, asked with no sign-in or
      * cookie only when an offer is about to be shown, at most every 10
      * minutes (30 seconds after a failed ask). An Admin that sends no session
      * offer gets the public plans, never a trial: whether this account may
@@ -436,7 +436,7 @@ export function createCloudAccountClient({ store, openBrowser, platform, deviceN
     async interest(kind) {
       if (kind !== "another_cloud") throw new Error("Invalid Cloud interest.");
       const signedIn = grant;
-      if (!signedIn || state().status !== "connected") throw new Error("Sign in to MausBot Cloud first.");
+      if (!signedIn || state().status !== "connected") throw new Error("Sign in to Hattera Cloud first.");
       const result = await request("interest", { method: "POST", body: { kind }, token: signedIn.token });
       if (result?.ok !== true) throw new Error("Invalid Cloud response.");
     },

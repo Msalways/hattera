@@ -67,7 +67,7 @@ export const CONTROL_BUSY =
   `to keep waiting, take a screenshot (each computer call waits up to ${WAIT_WORDS}) instead of ending your turn.`;
 /** The check itself failed: timed out, refused, or answered nonsense. */
 export const CONTROL_UNCONFIRMED =
-  "OpenMausBot could not confirm that this computer is free, so this call was NOT performed and nothing happened on the screen. " +
+  "Hattera could not confirm that this computer is free, so this call was NOT performed and nothing happened on the screen. " +
   "Retry in a few seconds.";
 
 export interface ControlState {

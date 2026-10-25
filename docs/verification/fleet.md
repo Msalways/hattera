@@ -92,8 +92,8 @@ Linux recipe below remains required before a production deployment.
 Dry-run on any machine, to read what a real run would do:
 
 ```sh
-openmausbot fleet init --domain example.test --dry-run
-openmausbot fleet create acme --admin owner@acme.test --dry-run
+hattera fleet init --domain example.test --dry-run
+hattera fleet create acme --admin owner@acme.test --dry-run
 ```
 
 ## A real server
@@ -104,9 +104,9 @@ record):
 
 1. Fresh Ubuntu 24.04 or newer, Caddy from apt, `npm install -g openmausbot`,
    Claude Code installed once as root, a wildcard DNS record at the server.
-2. `openmausbot fleet init --domain <domain>`; check `systemctl status
+2. `hattera fleet init --domain <domain>`; check `systemctl status
    openmausbot-fence` and `nft list table inet openmausbot`.
-3. `openmausbot fleet create alpha --admin you@example.test --cap 1` and the
+3. `hattera fleet create alpha --admin you@example.test --cap 1` and the
    same for `beta`; both `https://alpha.<domain>` and `https://beta.<domain>`
    must show the pair page with a certificate.
 4. Isolation: as `omb-alpha` (`runuser -u omb-alpha -- curl -s

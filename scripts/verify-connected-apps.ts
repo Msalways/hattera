@@ -5,8 +5,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:https";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { launchVerificationServer, runControlOmb } from "./control-omb.ts";
-import { agentBrowser, ensureUiBrowser, sessionEnv } from "./testing/control-omb-ui.ts";
+import { launchVerificationServer, runControlOmb } from "./control-hattera.ts";
+import { agentBrowser, ensureUiBrowser, sessionEnv } from "./testing/control-hattera-ui.ts";
 import { mountPreview, type MountedPreview } from "./testing/preview-fixture.ts";
 
 const fixture = await launchVerificationServer();

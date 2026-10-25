@@ -166,7 +166,7 @@ export function CloudPlanOnCloud({ bridge, onConnectPhone }: { bridge: CloudPlan
     </Card>;
   }
   const label = cloudPlanLabel(plan?.tier);
-  const line = plan?.status === "paid" ? t(trialRunning(plan.trial) ? "cloudAccount.trialPlan" : "cloudAccount.pro", { plan: label }) : plan?.status === "attention" ? t("cloudAccount.inactive", { plan: plan.tier ? label : "MausBot Cloud" })
+  const line = plan?.status === "paid" ? t(trialRunning(plan.trial) ? "cloudAccount.trialPlan" : "cloudAccount.pro", { plan: label }) : plan?.status === "attention" ? t("cloudAccount.inactive", { plan: plan.tier ? label : "Hattera Cloud" })
     : plan?.status === "checking" ? t("cloudAccount.lastPlan", { plan: label }) : plan?.status === "signin" ? (plan.tier ? t("cloudAccount.planName", { plan: label }) : null)
       : plan ? t("cloudAccount.onCloudNone") : null;
   const act = (action: () => Promise<void>) => { setFailed(false); void action().catch(() => setFailed(true)); };
@@ -246,7 +246,7 @@ export function CloudAccountSettings({ linkRequest = 0, cloudHome = false, onCon
     if (action === "sign-in") void perform(() => bridge.begin());
     if (action === "connect") { link.current.connected = true; connectHome(); }
   }, [bridge, linkRequest, account, busy]);
-  // Signed out or with no plan: what OpenMausBot Cloud offers, for the button's words and money-back.
+  // Signed out or with no plan: what Hattera Cloud offers, for the button's words and money-back.
   const offer = useCloudOffer(Boolean(account) && buyOfferAllowed(cloudPlanView(account)), account?.offer);
   if (!bridge) {
     // Only on an OMB Cloud home: any other server open in this window (a VPS,

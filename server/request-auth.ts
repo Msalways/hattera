@@ -17,7 +17,7 @@ import { denyReason as companionDenial, isCompanionNotice } from "../companion/s
 
 /** How much a loopback request without a session is trusted.
  *
- * `owner`: the machine's owner (a desktop, a one-person headless server).
+ * `owner`: the machine's owner (desktop or explicit local CLI launcher).
  * `service`: a shared server where every bot's shell is also a loopback
  * caller, so "local" no longer means "the owner". Loopback may then use
  * only SERVICE_ALLOW below: health, the Slack worker's guarded routes, the
@@ -94,7 +94,8 @@ export function serviceAllowed(method: string, path: string): boolean {
  * operator may set OMB_LOOPBACK_TRUST=owner|service. Without it a hosted
  * workspace (any OMB_ADMIN_* setting, even an incomplete one) defaults to
  * `service` — shared-workspace Full access is only honoured there, so it needs
- * no rule of its own — and a headless self-hosted server keeps `owner`. A
+ * no rule of its own. Self-hosting also defaults to `service`; only the local
+ * web CLI launcher opts into owner access. A
  * value that is neither fails closed. */
 export function resolveLoopbackTrust(input: {
   env?: NodeJS.ProcessEnv;
@@ -105,7 +106,8 @@ export function resolveLoopbackTrust(input: {
    * machine (a bot's shell). Always `service`, whatever the setting. */
   cloudHome?: boolean;
 }): { trust: LoopbackTrust; reason: string; warning?: string } {
-  const raw = (input.env ?? process.env).OMB_LOOPBACK_TRUST;
+  const env = input.env ?? process.env;
+  const raw = env.OMB_LOOPBACK_TRUST;
   const requested = raw?.trim().toLowerCase();
   if (input.cloudHome) {
     return { trust: "service", reason: "OMB Cloud home", ...(raw !== undefined && requested !== "service" ? { warning: "OMB_LOOPBACK_TRUST is ignored on an OMB Cloud home: a local request is always a service" } : {}) };
@@ -113,6 +115,9 @@ export function resolveLoopbackTrust(input: {
   if (input.desktopManaged) {
     return { trust: "owner", reason: "desktop app", ...(raw !== undefined ? { warning: "OMB_LOOPBACK_TRUST is ignored in the desktop app" } : {}) };
   }
+  // GitHub is the entry gate for a self-hosted installation, including requests
+  // from its own host. Only an explicit local CLI launch skips that gate.
+  if (env.GITHUB_CLIENT_ID?.trim() && env.OMB_LOCAL_CLI !== "1") return { trust: "service", reason: "GitHub sign-in" };
   if (requested === "owner" || requested === "service") {
     return {
       trust: requested,
@@ -126,7 +131,9 @@ export function resolveLoopbackTrust(input: {
     return { trust: "service", reason: "OMB_LOOPBACK_TRUST", warning: `OMB_LOOPBACK_TRUST="${raw.replace(/[^\w.-]/g, "").slice(0, 40)}" is not owner or service; using service` };
   }
   if (input.hostedWorkspace) return { trust: "service", reason: "hosted workspace" };
-  return { trust: "owner", reason: "self-hosted default" };
+  return env.OMB_LOCAL_CLI === "1"
+    ? { trust: "owner", reason: "local CLI launcher" }
+    : { trust: "service", reason: "self-hosted default" };
 }
 
 export function isLoopbackHost(host: string | undefined): boolean {
@@ -188,7 +195,7 @@ export function isProxied(req: IncomingMessage): boolean {
 
 /** A request over an IPC listener (a unix socket or a named pipe) has no peer
  * address. Only a gateway on this machine can reach such a listener, and it
- * is there to forward traffic from elsewhere (`openmausbot serve --tunnel`),
+ * is there to forward traffic from elsewhere (`hattera serve --tunnel`),
  * so the request is remote by construction: whatever headers it carries or
  * lacks, it never gets loopback trust. */
 export function ipcPeer(req: IncomingMessage): boolean {
@@ -415,7 +422,7 @@ export interface ResolveOptions {
   /** See LoopbackTrust. Absent is `owner`, the historical behaviour. Ignored
    * while a desktop capability is in force (loopbackMutationToken). */
   loopbackTrust?: LoopbackTrust;
-  /** Under `service`: a per-launch secret the `openmausbot serve` process
+  /** Under `service`: a per-launch secret the `hattera serve` process
    * that started this server handed it over the child's stdin (never the
    * environment, which the server's other children could read). It lets that
    * CLI, and nothing else, mint and list pairing codes. */

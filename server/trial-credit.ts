@@ -1,7 +1,7 @@
 // The free trial's Claude credit refusing a call (docs/cloud-pro.md, "Trial
 // Claude credit"): what the Admin's relay, an OpenAI-compatible API, answers
 // when it will not run one, and the words a person reads instead of the raw
-// API error. The credit's engine (cloud-credit-provider.ts), OpenMausBot's own
+// API error. The credit's engine (cloud-credit-provider.ts), Hattera's own
 // chat engine, reads it.
 
 import type { TrialCreditRefusal } from "../shared/trial-credit.ts";

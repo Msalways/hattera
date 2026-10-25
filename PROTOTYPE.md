@@ -24,7 +24,7 @@ $env:OMB_PORT = '20701'
 corepack pnpm dev
 ```
 
-Open <http://127.0.0.1:5199/>. The starter script keeps MausBot data in
+Open <http://127.0.0.1:5199/>. The starter script keeps Hattera data in
 `../mausbot-real-prototype`, uses a separate OpenCode home, and removes
 provider-key variables from the server process. It does not need a CopilotKit
 key. The OpenCode model `opencode/space-bunny-free` completed a real turn from

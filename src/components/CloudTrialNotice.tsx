@@ -27,7 +27,7 @@ export function useCloudPlanSnapshot(bridge: CloudPlanBridge | undefined): Cloud
     const stop = () => { active = false; unsubscribe?.(); clearInterval(timer); window.removeEventListener?.("focus", read); };
     // Refused (a page main does not answer): no plan to show, and nothing more asked.
     const read = () => { void bridge.state().then(next => { if (active) setPlan(next); }, () => { if (active) setPlan({ status: "none" }); stop(); }); };
-    // This computer's page hears each verified check with OpenMausBot Cloud.
+    // This computer's page hears each verified check with Hattera Cloud.
     const unsubscribe = window.ogb?.cloudAccount?.onState(read);
     const timer = setInterval(read, CLOUD_PLAN_REFRESH_MS);
     window.addEventListener?.("focus", read);

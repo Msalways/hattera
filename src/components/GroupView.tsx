@@ -49,6 +49,8 @@ import { ChatFindBar } from "./ChatFindBar";
 import { ConversationTurnLimit } from "./ConversationTurnLimit";
 import { GroupTaskPicker } from "./TaskPicker";
 import { GroupUsageChip } from "./GroupUsageChip";
+import { GroupSharing } from "./GroupSharing";
+import { GroupExecution } from "./GroupExecution";
 import { isPureLeakedSystemHarnessMessage, stripLeakedSystemHarnessMessages } from "../../shared/system-message-guard.ts";
 import { ExportTranscriptMenu } from "./ExportTranscriptMenu";
 import { ReplyQuote } from "./ReplyQuote";
@@ -199,8 +201,8 @@ function RoomTextMessage({
   const { state, dispatch } = useStore();
   const user = m.role === "user";
   const rawText = user ? (m.text ?? "") : stripLeakedSystemHarnessMessages(m.text ?? "");
-  const cited = user && m.text ? splitTranscriptCitations(m.text) : null;
-  const attachments = user && m.text ? splitTranscriptAttachments(cited?.display ?? m.text) : null;
+  const cited = user && m.text && !m.shared?.remote ? splitTranscriptCitations(m.text) : null;
+  const attachments = user && m.text && !m.shared?.remote ? splitTranscriptAttachments(cited?.display ?? m.text) : null;
   const display = attachments?.display ?? rawText;
   const [expanded, setExpanded] = useState(false);
   const [viewRaw, setViewRaw] = useState(false);
@@ -228,7 +230,7 @@ function RoomTextMessage({
     pin,
   });
   // a reply with text lists its files under the text, without the ones it links inline
-  const replyGroup = useMemo(() => !user && botText.trim() ? replyAttachmentGroup(botText, m.attachments) : null, [user, botText, m.attachments]);
+  const replyGroup = useMemo(() => !user && !m.shared?.remote && botText.trim() ? replyAttachmentGroup(botText, m.attachments) : null, [user, botText, m.attachments, m.shared?.remote]);
   return (
     <div {...{ [MESSAGE_ROW]: "" }} className={cn("group flex w-full flex-col", user ? "items-end" : "items-start")}>
       <div className={cn("flex w-full items-end gap-1.5", user ? "justify-end" : "justify-start")}>
@@ -311,7 +313,7 @@ function RoomTextMessage({
               {viewRaw && botText ? (
                 <div data-citation-source={m.id} data-citation-owner-type="group" data-citation-owner={group.id} data-citation-thread={group.threadId}><RawMarkdownView text={botText} /></div>
               ) : botText ? (
-                <div data-citation-source={m.id} data-citation-owner-type="group" data-citation-owner={group.id} data-citation-thread={group.threadId}><ChatMarkdown text={botText} mentionPeers={members} everyone={!group.dm} message={{ threadId: group.threadId, messageId: m.id }} delivered={replyGroup?.delivered} /></div>
+                <div data-citation-source={m.id} data-citation-owner-type="group" data-citation-owner={group.id} data-citation-thread={group.threadId}><ChatMarkdown text={botText} portable={m.shared?.remote} mentionPeers={members} everyone={!group.dm} message={{ threadId: group.threadId, messageId: m.id }} delivered={replyGroup?.delivered} /></div>
               ) : null}
               {replyGroup && <AttachmentGallery images={replyGroup.images} files={replyGroup.files} message={{ threadId: group.threadId, messageId: m.id }} eager={eager} beneath />}
             </MessageBoundary>
@@ -530,6 +532,7 @@ export const Transcript = memo(function Transcript({
               </div>
             )}
             {divider}
+            {user && m.shared?.remote && <div className="mt-1 text-right text-[11px] font-medium text-ink-secondary">{m.shared.author}</div>}
             {!user && m.from && newCluster && !(m.kind === "activity" && m.comm) && (
               <ClusterLabel bot={memberOf(m.from.botId)} name={m.from.name} color={m.from.color} />
             )}
@@ -1124,6 +1127,7 @@ export function GroupView({ group }: { group: Group }) {
   const [bulletinDraft, setBulletinDraft] = useState(group.bulletin);
   const [folderOpen, setFolderOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [remoteExecutionComposer, setRemoteExecutionComposer] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
   const { replyTo, selectReply, clearReply, consumeReply, restoreReply } = useReplyDraft(
     group.threadId,
@@ -1345,6 +1349,7 @@ export function GroupView({ group }: { group: Group }) {
           {!setupPending && <ConversationTurnLimit group={group} />}
           <GroupCallButton group={group} members={members} />
           <GroupUsageChip usage={group.usage} />
+          {!remoteClient && !group.dm && <GroupSharing group={group} />}
           {!remoteClient && !setupPending && !group.dm && <RoomWorkingFolderChip group={group} onToggle={() => setFolderOpen((open) => !open)} />}
           {!remoteClient && !setupPending && !group.dm && <DefaultResponderSelect group={group} members={members} />}
           {group.dm || remoteClient ? (
@@ -1581,7 +1586,8 @@ export function GroupView({ group }: { group: Group }) {
       )}
 
       <div ref={composerDockRef} className="absolute inset-x-0 bottom-0 z-[2]">
-      <Composer
+      {group.sharedGroupId && <GroupExecution key={group.id} group={group} onRemote={setRemoteExecutionComposer} />}
+      {!remoteExecutionComposer && <Composer
         key={group.threadId}
         group={group}
         members={members}
@@ -1590,7 +1596,7 @@ export function GroupView({ group }: { group: Group }) {
         onClearReply={clearReply}
         onConsumeReply={consumeReply}
         onRestoreReply={restoreReply}
-      />
+      />}
       <CitationSelectionToolbar
         key={`${group.id}:${group.threadId}`}
         viewportRef={scrollRef}

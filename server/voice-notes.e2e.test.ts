@@ -7,7 +7,7 @@ import { createServer, type Server } from "node:http";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import { request } from "../scripts/mcp-server.ts";
 
 const MP3 = Buffer.from("ID3 fake mp3 for the voice note fixture");

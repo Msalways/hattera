@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 
 it("Clive reviews multi-provider teams once, continues after each decision, and preserves existing threads through setup and deletion", async () => {
@@ -35,7 +35,7 @@ it("Clive reviews multi-provider teams once, continues after each decision, and 
     // Choosing Codex on a bot authorizes that exact model for Chief setup.
     await api("POST", "/api/bots", { name: "Configured Codex", section: "Operations", modelSelection: selection(codex) }, 201);
     const state = async () => (await api("GET", "/api/bots")).bots;
-    // The fixture pins its starter's name (control-omb.ts), but identity is
+    // The fixture pins its starter's name (control-hattera.ts), but identity is
     // still the honest comparison: "Quill" once collided with a randomly
     // named starter and looked like a leaked planned bot (#1257).
     const initialBotIds = new Set((await state()).map((bot: any) => bot.id));

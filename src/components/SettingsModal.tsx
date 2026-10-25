@@ -35,6 +35,8 @@ import { effortLabel } from "./ModelPicker";
 import { EFFORT_LEVELS, isEffortLevel } from "../../shared/wire";
 import { shortcutLabel } from "./ShortcutHint";
 import { UsageSection } from "./UsageSection";
+import { PrivateNetworkSettings } from "./PrivateNetworkSettings";
+import { LocalRuntimeSettings } from "./LocalRuntimeSettings";
 import { SkillsSection } from "./SkillsSection";
 import { LicenseExpiryBanner } from "./LicenseExpiryBanner";
 import { WorkspacesSection, workspacesAvailable } from "./WorkspacesSection";
@@ -115,12 +117,12 @@ export const SIMPLE_PAGES: SimpleSettingsPage[] = [
   { id: "appearance", labelKey: "settings.section.appearance", icon: Palette, sections: ["appearance"] },
   { id: "ai", labelKey: "settings.group.ai", icon: Sparkles, sections: ["engines", "connections", "decisionModel"] },
   { id: "computers", labelKey: "settings.group.computers", icon: Monitor, sections: ["companion", "desktopWorkspaces", "computer"] },
-  { id: "account", labelKey: "settings.group.account", icon: CircleUser, sections: ["cloudAccount", "organization", "people", "activity"] },
+  { id: "account", labelKey: "settings.group.account", icon: CircleUser, sections: ["cloudAccount", "organization", "people", "activity", "usage"] },
 ];
 
 /** Advanced-only pages. A deep link to one still opens it in Simple mode, as
  * a page of its own for as long as it is the open one. */
-export const SIMPLE_HIDDEN_SECTIONS: readonly AppSettingsSection[] = ["usage", "backups", "experimental", "workspaces", "skills"];
+export const SIMPLE_HIDDEN_SECTIONS: readonly AppSettingsSection[] = ["backups", "experimental", "workspaces", "skills"];
 
 /** The Simple pages to draw, given the sections the filters allow and the
  * one that is open. Each page keeps only its allowed sections, in order. */
@@ -952,6 +954,7 @@ export function SettingsModal() {
 
             {!remoteActive && <ReplayTourRow />}
             <UpdatesRow />
+            <LocalRuntimeSettings />
             <DiagnosticsRow />
           </>
         );
@@ -1045,9 +1048,10 @@ export function SettingsModal() {
         return (
           <>
             <RemoteComputerSection />
+            <PrivateNetworkSettings />
             {!remoteActive && <CustomDomainSettings />}
             {/* mints an admin/client session token for anything that isn't the phone companion
-                flow (MCP clients, `openmausbot pair`, a second desktop app), and pairs phones to a
+                flow (MCP clients, `hattera pair`, a second desktop app), and pairs phones to a
                 hosted server. Shown for the desktop app's own server (#950) AND when this desktop is
                 a remote client of a hosted workspace: its requests carry that server's session, and
                 Settings there is the only place that server's phones can be paired from (MOCA-84).

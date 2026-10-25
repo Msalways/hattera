@@ -3,6 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { GroupUsageChip } from "./GroupUsageChip";
 
+it("makes missing group telemetry visible without inventing zero output", () => {
+  const html = renderToStaticMarkup(createElement(GroupUsageChip, { usage: { input: 12, output: 0, tokensReported: false, turns: 1, costUsd: null } }));
+  expect(html).toContain("Usage incomplete");
+  expect(html).toContain("Some token usage was not reported");
+  expect(html).not.toContain("0 output");
+});
+
 it("separates output from input in both the chip and the latest speaker detail", () => {
   const html = renderToStaticMarkup(createElement(GroupUsageChip, { usage: {
     input: 100, cachedInput: 80, output: 10, turns: 1, costUsd: null,

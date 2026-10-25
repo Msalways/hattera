@@ -3,7 +3,7 @@ import { closeSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import type { RoutineRun } from "./routines.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 

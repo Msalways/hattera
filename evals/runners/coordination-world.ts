@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { launchVerificationServer, runControlOmb, type VerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb, type VerificationServer } from "../../scripts/control-hattera.ts";
 import type { Scenario, Step } from "../types.ts";
 import { buildScriptedPlan } from "../providers/mock/scripted-plan.ts";
 import { BaseWorld, type WorldContext } from "./base-world.ts";

@@ -1,11 +1,11 @@
 // The Add a Cloud dialog (docs/cloud-pro.md, "Add a Cloud"): the one way to
-// buy OpenMausBot Cloud in the app, opened from the card after the update,
+// buy Hattera Cloud in the app, opened from the card after the update,
 // Show me how, the server menu, Settings and the routine screen. It covers the
 // buying journey only, one view per state from lib/cloud-plan cloudAddView:
 // the offer (the Admin's plans, trial, credit and money-back, nothing
 // hardcoded), signing in, the checkout open in the browser, the payment
 // received, My Cloud starting, and My Cloud ready. A payment problem, an ended
-// sign-in or a Cloud that can't be reached go to Settings → OpenMausBot Cloud.
+// sign-in or a Cloud that can't be reached go to Settings → Hattera Cloud.
 // Checkout never runs in the app: main opens Dodo's own checkout page in the
 // default browser, and the app follows its own session, never the return.
 import { useEffect, useState } from "react";
@@ -173,8 +173,8 @@ export function CloudAddPanel({ view, chosen, offerShown, now, busy = false, ope
       const trial = view.trial;
       const terms = trial ? [
         trial.amount !== null
-          ? t("cloudAdd.trialTerms", { date: shortDate(trial.endsAt), plan: trial.tier ? cloudPlanLabel(trial.tier) : "MausBot Cloud", price: t("cloudAdd.perMonth", { price: usd(trial.amount / 100) }) })
-          : t("cloudAdd.trialTermsNoPrice", { date: shortDate(trial.endsAt), plan: trial.tier ? cloudPlanLabel(trial.tier) : "MausBot Cloud" }),
+          ? t("cloudAdd.trialTerms", { date: shortDate(trial.endsAt), plan: trial.tier ? cloudPlanLabel(trial.tier) : "Hattera Cloud", price: t("cloudAdd.perMonth", { price: usd(trial.amount / 100) }) })
+          : t("cloudAdd.trialTermsNoPrice", { date: shortDate(trial.endsAt), plan: trial.tier ? cloudPlanLabel(trial.tier) : "Hattera Cloud" }),
         offerShown?.reminderDays ? t("cloudAdd.reminderTerms", { days: offerShown.reminderDays }) : null,
         t("cloudAdd.cancelAnyTime"),
       ].filter(Boolean).join(" ") : null;

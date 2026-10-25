@@ -8,37 +8,37 @@ services:
       target: server
       args:
         ENGINES: ${ENGINES-@anthropic-ai/claude-code @openai/codex opencode-ai cline}
-    image: ${OMB_LOCAL_IMAGE:-openmausbot-local:latest}
+    image: ${HATTERA_LOCAL_IMAGE:-${OMB_LOCAL_IMAGE:-hattera-local:latest}}
     restart: unless-stopped
     volumes:
       - data:/data
     ports:
-      - "${OMB_BIND_ADDRESS:-127.0.0.1}:${OMB_HTTP_PORT:-8080}:80"
+      - "${HATTERA_BIND_ADDRESS:-${OMB_BIND_ADDRESS:-127.0.0.1}}:${HATTERA_HTTP_PORT:-${OMB_HTTP_PORT:-8080}}:80"
       # Codex OAuth redirects to this fixed loopback port. Caddy forwards it
       # from the Docker host to the CLI's loopback listener in this namespace.
       - "127.0.0.1:1455:1455"
     environment:
       OMB_PORT: "8799"
       OMB_WEBHOOK_PORT: "8800"
-      OMB_ENVIRONMENT_LABEL: ${OMB_ENVIRONMENT_LABEL:-Hattera server}
-      OMB_PUBLIC_URL: ${OMB_PUBLIC_URL:-http://localhost:${OMB_HTTP_PORT:-8080}}
-      OMB_WEBHOOK_PUBLIC_URL: ${OMB_WEBHOOK_PUBLIC_URL:-${OMB_PUBLIC_URL:-http://localhost:${OMB_HTTP_PORT:-8080}}}
+      OMB_ENVIRONMENT_LABEL: ${HATTERA_ENVIRONMENT_LABEL:-${OMB_ENVIRONMENT_LABEL:-Hattera server}}
+      OMB_PUBLIC_URL: ${HATTERA_PUBLIC_URL:-${OMB_PUBLIC_URL:-http://localhost:${HATTERA_HTTP_PORT:-${OMB_HTTP_PORT:-8080}}}}
+      OMB_WEBHOOK_PUBLIC_URL: ${HATTERA_WEBHOOK_PUBLIC_URL:-${OMB_WEBHOOK_PUBLIC_URL:-${HATTERA_PUBLIC_URL:-${OMB_PUBLIC_URL:-http://localhost:${HATTERA_HTTP_PORT:-${OMB_HTTP_PORT:-8080}}}}}}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
       GITHUB_OWNER_ID: ${GITHUB_OWNER_ID:-}
       GITHUB_REDIRECT_URI: ${GITHUB_REDIRECT_URI:-}
-      OMB_POSTGRES_ENABLED: ${OMB_POSTGRES_ENABLED:-false}
+      OMB_POSTGRES_ENABLED: ${HATTERA_POSTGRES_ENABLED:-${OMB_POSTGRES_ENABLED:-false}}
       DATABASE_URL: ${DATABASE_URL:-}
-      OMB_POSTGRES_FILES_DIR: ${OMB_POSTGRES_FILES_DIR:-/data/.openmausbot-postgres}
-      OMB_OBJECT_STORAGE_KIND: ${OMB_OBJECT_STORAGE_KIND:-local}
-      OMB_S3_BUCKET: ${OMB_S3_BUCKET:-}
-      OMB_S3_REGION: ${OMB_S3_REGION:-}
-      OMB_S3_ENDPOINT: ${OMB_S3_ENDPOINT:-}
-      OMB_S3_PREFIX: ${OMB_S3_PREFIX:-}
-      OMB_S3_FORCE_PATH_STYLE: ${OMB_S3_FORCE_PATH_STYLE:-true}
-      OMB_S3_ACCESS_KEY_ID: ${OMB_S3_ACCESS_KEY_ID:-}
-      OMB_S3_SECRET_ACCESS_KEY: ${OMB_S3_SECRET_ACCESS_KEY:-}
+      OMB_POSTGRES_FILES_DIR: ${HATTERA_POSTGRES_FILES_DIR:-${OMB_POSTGRES_FILES_DIR:-/data/.openmausbot-postgres}}
+      OMB_OBJECT_STORAGE_KIND: ${HATTERA_OBJECT_STORAGE_KIND:-${OMB_OBJECT_STORAGE_KIND:-local}}
+      OMB_S3_BUCKET: ${HATTERA_S3_BUCKET:-${OMB_S3_BUCKET:-}}
+      OMB_S3_REGION: ${HATTERA_S3_REGION:-${OMB_S3_REGION:-}}
+      OMB_S3_ENDPOINT: ${HATTERA_S3_ENDPOINT:-${OMB_S3_ENDPOINT:-}}
+      OMB_S3_PREFIX: ${HATTERA_S3_PREFIX:-${OMB_S3_PREFIX:-}}
+      OMB_S3_FORCE_PATH_STYLE: ${HATTERA_S3_FORCE_PATH_STYLE:-${OMB_S3_FORCE_PATH_STYLE:-true}}
+      OMB_S3_ACCESS_KEY_ID: ${HATTERA_S3_ACCESS_KEY_ID:-${OMB_S3_ACCESS_KEY_ID:-}}
+      OMB_S3_SECRET_ACCESS_KEY: ${HATTERA_S3_SECRET_ACCESS_KEY:-${OMB_S3_SECRET_ACCESS_KEY:-}}
     healthcheck:
       test:
         - CMD
@@ -54,8 +54,8 @@ services:
     restart: unless-stopped
     network_mode: service:omb
     environment:
-      OMB_HTTPS_HOST: ${OMB_HTTPS_HOST:-}
-      OMB_BIND_ADDRESS: ${OMB_BIND_ADDRESS:-127.0.0.1}
+      OMB_HTTPS_HOST: ${HATTERA_HTTPS_HOST:-${OMB_HTTPS_HOST:-}}
+      OMB_BIND_ADDRESS: ${HATTERA_BIND_ADDRESS:-${OMB_BIND_ADDRESS:-127.0.0.1}}
     command:
       - /bin/sh
       - -ec
@@ -92,7 +92,7 @@ services:
       - caddy_config:/config
 volumes:
   data:
-    external: ${OMB_DATA_EXTERNAL:-false}
-    name: ${OMB_DATA_VOLUME:-${COMPOSE_PROJECT_NAME:-openmausbot}_data}
+    external: ${HATTERA_DATA_EXTERNAL:-${OMB_DATA_EXTERNAL:-false}}
+    name: ${HATTERA_DATA_VOLUME:-${OMB_DATA_VOLUME:-${COMPOSE_PROJECT_NAME:-openmausbot}_data}}
   caddy_data:
   caddy_config:

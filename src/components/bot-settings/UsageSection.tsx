@@ -9,7 +9,7 @@
 // short placeholder line is added for that case.
 import { useStore, type Bot } from "@/state/store";
 import { t } from "@/lib/i18n";
-import { botUsage, costCaption, formatTokens, formatUsd, hasFiniteCost, headlineTokens, tokensColumnLabel, usageDetail } from "@/lib/usage";
+import { botUsage, costCaption, formatUsageTokens, formatUsd, hasFiniteCost, tokensColumnLabel, usageDetail } from "@/lib/usage";
 
 export function UsageSection({ bot }: { bot: Bot }) {
   const { state, dispatch } = useStore();
@@ -46,7 +46,7 @@ export function UsageSection({ bot }: { bot: Bot }) {
             className="mt-0.5 tabular-nums text-ink"
             title={usageDetail(usage)}
           >
-            {formatTokens(headlineTokens(usage))}
+            {formatUsageTokens(usage)}
           </div>
         </div>
         <div>

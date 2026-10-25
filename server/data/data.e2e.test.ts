@@ -10,7 +10,7 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "../../scripts/control-hattera.ts";
 import { DATA_ROUTES, DATA_TOOL_NAMES, type DataCard, type DataSheet } from "../../shared/data-surface.ts";
 import { waitForExit } from "../testing/cleanup.ts";
 

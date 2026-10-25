@@ -1,7 +1,7 @@
 // Golden freeze of M2's drain-coalescing rule (the L2 ordering/batching
 // layer in admission.ts): a sender's CONTIGUOUS burst inside a short window
 // is one drained item; senders never merge; provenance kind is part of the
-// sender identity (Team incidents reports are all OpenMausBot's, whichever
+// sender identity (Team incidents reports are all Hattera's, whichever
 // bot broke); rooms drain one coalesced item per turn. A failing row
 // means the drain batching changed; pair any intentional change with an
 // update here so the diff says so out loud.

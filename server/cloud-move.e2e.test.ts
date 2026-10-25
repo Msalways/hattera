@@ -26,7 +26,7 @@ import { freePortBlock } from "./testing/ports.ts";
 const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
 const HOST = "omb-t-0123456789ab.fly.dev";
 const ORIGIN = `https://${HOST}`;
-// A self-hosted server the person added in the desktop app (`openmausbot serve`).
+// A self-hosted server the person added in the desktop app (`hattera serve`).
 const SERVER_HOST = "bots.example.test";
 const SERVER_ORIGIN = `https://${SERVER_HOST}`;
 const bootstrapSecret = randomBytes(32).toString("base64url");
@@ -158,7 +158,7 @@ async function api(fixture: Fixture, method: string, path: string, options: { bo
 
 /** The Admin's signed request: one single-use pairing window on the Cloud. */
 async function cloudGrant(): Promise<{ origin: string; code: string; expiresAt: number }> {
-  const body = JSON.stringify({ label: "OpenMausBot app (Cloud)", ttlSeconds: 300 });
+  const body = JSON.stringify({ label: "Hattera app (Cloud)", ttlSeconds: 300 });
   const timestamp = String(Math.floor(Date.now() / 1000)), nonce = randomBytes(16).toString("base64url");
   const response = await fetch(`${cloud.base}/api/cloud/pairing`, { method: "POST", body, headers: {
     ...forwarded, "content-type": "application/json", "x-omb-cloud-timestamp": timestamp, "x-omb-cloud-nonce": nonce,
@@ -241,11 +241,11 @@ beforeAll(async () => {
   expect(paired.status, JSON.stringify(paired.body)).toBe(200);
   windowToken = paired.body.token;
   // …and on the self-hosted server, from Connect to a server with an owner
-  // code (`openmausbot pair`): its /pair page sets this window's cookie.
+  // code (`hattera pair`): its /pair page sets this window's cookie.
   const owner = await api(server, "POST", "/api/auth/pairing", { body: { scopes: ["admin", "client"], label: "Owner code" } });
   expect(owner.status, JSON.stringify(owner.body)).toBe(200);
   const pairPage = await viaEdge(`${server.base}/api/auth/pair`, { method: "POST", headers: { ...edge(server), "content-type": "application/json", origin: SERVER_ORIGIN },
-    body: JSON.stringify({ code: owner.body.code, cookie: true, label: "OpenMausBot desktop" }) });
+    body: JSON.stringify({ code: owner.body.code, cookie: true, label: "Hattera desktop" }) });
   expect(pairPage.status).toBe(200);
   serverCookie = (pairPage.headers.get("set-cookie") ?? "").split(";")[0]!;
   expect(serverCookie).toMatch(/^omb_session_\d+_\w+=omb_sess_/);
@@ -460,10 +460,10 @@ it("a self-hosted server whose email sign-in lets other people in never receives
     server.closing = false;
     await boot(server);
   };
-  // `openmausbot access add me@example.test`: only its owner signs in, from a browser too. Still theirs alone.
+  // `hattera access add me@example.test`: only its owner signs in, from a browser too. Still theirs alone.
   await signIn({ admins: ["me@example.test"] });
   expect((await api(server, "GET", "/api/cloud-move", { cookie: serverCookie })).status).toBe(200);
-  // `openmausbot access add` lets someone else sign in: the server is shared now.
+  // `hattera access add` lets someone else sign in: the server is shared now.
   await signIn({ admins: ["me@example.test"], members: ["colleague@example.test"] });
   const refused = await api(server, "GET", "/api/cloud-move", { cookie: serverCookie });
   expect(refused).toMatchObject({ status: 403, body: { code: "shared_workspace" } });

@@ -514,9 +514,8 @@ const support: AcpSupport = {
     signedIn: (env) => existsSync(credentialsPath(env)),
   },
 
-  // Official installers put the binary on PATH without requiring an existing
-  // Node install. Keep the commands platform-specific so Windows never gets a
-  // POSIX-only curl|bash instruction.
+  // Official npm installation works across supported platforms. The app's
+  // managed installer supplies Node/npm when needed.
   install: {
     command: {
       darwin: "npm install -g @moonshot-ai/kimi-code",

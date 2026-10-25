@@ -1,7 +1,7 @@
-// Run against a fresh, owned `control-omb ui launch` handle, never the live app:
+// Run against a fresh, owned `control-hattera ui launch` handle, never the live app:
 // node --experimental-strip-types scripts/testing/modal-dialog-focus-check.ts UI_HANDLE
 import assert from "node:assert/strict";
-import { runControlOmb } from "../control-omb.ts";
+import { runControlOmb } from "../control-hattera.ts";
 
 const handle = process.argv[2];
 assert(handle, "Pass the isolated ui launch handle.");

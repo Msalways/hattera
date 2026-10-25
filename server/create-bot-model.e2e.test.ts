@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer } from "../scripts/control-hattera.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 
 it("Chief creation uses the workspace default or a validated explicit model without inheriting permissions", async () => {

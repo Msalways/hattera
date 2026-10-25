@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { removeTempDir } from "../testing/cleanup.ts";
-import { codexAccountEmail, codexHome } from "./codex-identity.ts";
+import { codexAccountEmail, codexHome, codexAccountRequest } from "./codex-identity.ts";
 
 const FAKE_CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "testing", "fake-codex-app-server.ts");
 const BELL = String.fromCharCode(7);
@@ -43,6 +43,14 @@ describe("Codex account identity", () => {
       { method: "account/read", params: { refreshToken: false } },
     ]);
     expect(calls().env.CODEX_HOME).toBe(join(home, ".codex"));
+    expectStopped();
+  });
+
+  it("reads native quota and account usage without starting a thread or model call", async () => {
+    expect(await codexAccountRequest(FAKE_CLI, env(), "account/rateLimits/read")).toMatchObject({ rateLimits: { primary: { usedPercent: 25, windowDurationMins: 480 } } });
+    expect(calls().calls.map((call: { method: string }) => call.method)).toEqual(["initialize", "initialized", "account/rateLimits/read"]);
+    expectStopped();
+    expect(await codexAccountRequest(FAKE_CLI, env(), "account/usage/read")).toMatchObject({ summary: { lifetimeTokens: 12345, peakDailyTokens: null } });
     expectStopped();
   });
 

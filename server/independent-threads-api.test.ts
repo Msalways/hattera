@@ -7,7 +7,7 @@ import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { launchVerificationServer, runControlOmb, type VerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb, type VerificationServer } from "../scripts/control-hattera.ts";
 import { handleToolCall, request } from "../scripts/mcp-server.ts";
 import { memoryDate } from "./workspace.ts";
 
@@ -256,7 +256,7 @@ describe("independent bot tasks through the isolated control surface", () => {
     writeFileSync(modelFile(models[1], "gate"), "finish");
     await expect.poll(() => handoff()?.status, { timeout: 20_000 }).toBe("completed");
     const result: string = handoff().result;
-    expect(result.startsWith("[OpenMausBot: nobody answered the approval for “Bash: npm run release-check” in time, so it did not run. Do not report it as done;")).toBe(true);
+    expect(result.startsWith("[Hattera: nobody answered the approval for “Bash: npm run release-check” in time, so it did not run. Do not report it as done;")).toBe(true);
     expect(result).toContain("reply to:");
     expect(result).not.toContain("git push");
     expect(result).not.toContain("npm run lint");
@@ -302,7 +302,7 @@ describe("independent bot tasks through the isolated control surface", () => {
     // whole, so the engine never reads the gate half-written
     writeFileSync(`${modelFile(models[1], "gate")}.tmp`, ending);
     renameSync(`${modelFile(models[1], "gate")}.tmp`, modelFile(models[1], "gate"));
-    const note = "[OpenMausBot: nobody answered the approval for “Bash: npm run release-check” in time, so it did not run.";
+    const note = "[Hattera: nobody answered the approval for “Bash: npm run release-check” in time, so it did not run.";
     const runMessages = async () => (await api("GET", `/api/threads/${await runThread()}/messages?limit=100`)).body.messages as any[];
     if (ending === "finish") {
       const replied = async () => (await runMessages())
@@ -350,7 +350,7 @@ describe("independent bot tasks through the isolated control surface", () => {
     rmSync(expiry, { force: true });
     writeFileSync(modelFile(models[1], "gate"), "finish");
     await expect.poll(() => handoff()?.status, { timeout: 20_000 }).toBe("completed");
-    expect(handoff().result.startsWith("[OpenMausBot: nobody answered the approval for “Bash: npm run release-check” in time, so it did not run.")).toBe(true);
+    expect(handoff().result.startsWith("[Hattera: nobody answered the approval for “Bash: npm run release-check” in time, so it did not run.")).toBe(true);
   }, 60_000);
 
   it("reports a deleted one-way recipient thread in its surviving source without restarting the sender", async () => {
@@ -663,7 +663,7 @@ describe("independent bot tasks through the isolated control surface", () => {
   it.skipIf(process.platform !== "darwin")("claims the shared computer only on first use and keeps a sibling stop from releasing it", async () => {
     // The fake provider only receives this inert descriptor; no UI driver is
     // launched and the descriptor lives inside the fixture's disposable home.
-    const descriptorDir = join(session.info.dataDir, "Library", "Application Support", "OpenMausBot");
+    const descriptorDir = join(session.info.dataDir, "Library", "Application Support", "Hattera");
     mkdirSync(descriptorDir, { recursive: true });
     writeFileSync(join(descriptorDir, "cua-connection.json"), JSON.stringify({
       mode: "embedded", socketPath: join(session.info.dataDir, "never-used.sock"),

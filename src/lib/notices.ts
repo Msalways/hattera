@@ -12,7 +12,7 @@
 // days; they are entries here so that they never share the corner.
 import { hintSeen, hintSeenPatch, type OnboardingStatus } from "@/lib/onboarding";
 
-/** The card after the update that introduces OpenMausBot Cloud's free trial
+/** The card after the update that introduces Hattera Cloud's free trial
  * (CloudTrialIntro). Showing it again some day is a new id here. */
 export const CLOUD_INTRO = "cloud-trial-intro-v1";
 /** The free trial's notice on the person's own Cloud (CloudTrialNotice). */

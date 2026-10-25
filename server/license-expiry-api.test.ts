@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { launchVerificationServer, type VerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer, type VerificationServer } from "../scripts/control-hattera.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 
 const DAY_MS = 24 * 60 * 60_000;

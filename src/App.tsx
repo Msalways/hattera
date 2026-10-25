@@ -74,7 +74,7 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
       window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
       if (requestedSettings === "organization") dispatch({ type: "toggleAppSettings", open: true, section: "organization" });
       else if (requestedSettings === "cloud") dispatch(CLOUD_LINK_SETTINGS);
-      // The lending menu-bar item: Settings → OpenMausBot Cloud, with no automatic action.
+      // The lending menu-bar item: Settings → Hattera Cloud, with no automatic action.
       else if (requestedSettings === "cloud-settings") dispatch({ type: "toggleAppSettings", open: true, section: "cloudAccount" });
       // Add a Cloud… in the server menu, plain or reached through Show me how.
       else if (requestedSettings === "cloud-add" || requestedSettings === "cloud-add-howto") dispatch({ type: "openCloudAdd", source: requestedSettings === "cloud-add" ? "app_menu" : "app_howto" });

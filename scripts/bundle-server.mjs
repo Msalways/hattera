@@ -45,9 +45,10 @@ const ENTRY_POINTS = [
   "index.ts",
   "message-search.worker.ts",
   "postgres-sync.worker.ts",
-  // the `openmausbot` command (serve/pair/sessions/status) for the npm
+  // the `hattera` command (serve/pair/sessions/status) for the npm
   // package, the container image and checkouts; pair-cli.ts stays as an alias
-  "openmausbot.ts",
+  "hattera.ts",
+  "legacy-cli.ts", // source for the generated legacy command alias
   "pair-cli.ts",
   "workspace-backup.worker.ts",
   // the OMB Cloud Pro home image's entry point (Dockerfile, cloud-home): it
@@ -65,7 +66,7 @@ const ENTRY_POINTS = [
   "local-computer.ts",
   "local-computer-proxy.ts",
   // the hook helper Claude Code runs at PostToolUse/PreCompact/SessionStart/Stop
-  "hooks/omb-hook.ts",
+  "hooks/hattera-hook.ts",
   "container-mcp.ts",
   "vps-container-mcp.ts",
   "permission-proxy.ts",
@@ -94,6 +95,11 @@ await build({
   banner: { js: knexRequireBanner },
   external: knexOptionalDrivers,
 });
+
+// Existing installations may still launch these filenames. Generate aliases
+// from the renamed sources rather than keeping upstream-named source files.
+copyFileSync(join(root, "dist-server", "legacy-cli.js"), join(root, "dist-server", "openmausbot.js"));
+copyFileSync(join(root, "dist-server", "hooks", "hattera-hook.js"), join(root, "dist-server", "hooks", "omb-hook.js"));
 
 // Knex's CommonJS internals require Node built-ins dynamically.
 await build({
@@ -124,7 +130,7 @@ await build({
   logLevel: "info",
 });
 
-// `openmausbot serve --tunnel` (server/tunnel.ts) spawns the connector guardian
+// `hattera serve --tunnel` (server/tunnel.ts) spawns the connector guardian
 // as its own process, so it has to exist as a file beside the server, not only
 // as code inlined into the bundle that imports its neighbours. Bundled under
 // its own name: the same code the desktop app runs from

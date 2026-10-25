@@ -39,6 +39,8 @@ export interface EnvironmentDescriptor {
     /** Whether /pair offers "sign in with your email" (an allow-list is set). */
     emailSignIn?: boolean;
     githubSignIn?: true;
+    /** Explicit local CLI launcher; never inferred from a browser URL. */
+    localCli?: true;
   };
 }
 
@@ -124,7 +126,7 @@ export function serverVersion(): string {
   return "unknown";
 }
 
-export function environmentDescriptor(input: { environmentId: string; desktopManaged: boolean; emailSignIn?: boolean; githubSignInOrigin?: string; sharedComputers?: boolean; cloudHome?: boolean }): EnvironmentDescriptor {
+export function environmentDescriptor(input: { environmentId: string; desktopManaged: boolean; emailSignIn?: boolean; githubSignInOrigin?: string; sharedComputers?: boolean; cloudHome?: boolean; localCli?: boolean }): EnvironmentDescriptor {
   return {
     environmentId: input.environmentId,
     label: process.env.OMB_ENVIRONMENT_LABEL?.trim() || hostname(),
@@ -133,6 +135,7 @@ export function environmentDescriptor(input: { environmentId: string; desktopMan
     ...(input.githubSignInOrigin ? { githubSignInOrigin: input.githubSignInOrigin } : {}),
     capabilities: {
       remoteSessions: true,
+      ...(input.localCli === true && !input.cloudHome ? { localCli: true as const } : {}),
       // Never advertise a protocol this server would refuse: the routes are
       // gone unless features.sharedComputers is on, so the capability is too.
       ...(input.sharedComputers === true ? { sharedComputers: true as const } : {}),

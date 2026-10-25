@@ -54,7 +54,7 @@ function harness(label: string, serverEnv: Record<string, string>, instanceEnv: 
   };
   beforeAll(async () => {
     chmodSync(FAKE_CLAUDE, 0o755);
-    home = mkdtempSync(join(tmpdir(), `omb-hooks-${label}-`));
+    home = mkdtempSync(join(tmpdir(), `hattera-hooks-${label}-`));
     mkdirSync(join(home, ".openmausbot"), { recursive: true });
     writeFileSync(join(home, ".openmausbot", "config.json"), JSON.stringify({
       instances: {

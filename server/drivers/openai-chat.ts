@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { observeRateHeaders } from "../account-metrics.ts";
+import { apiAccountUsage } from "../api-account-usage.ts";
+import { tokenUsage as normalizedUsage, tokenCount, type TokenUsage } from "../../shared/token-usage.ts";
 import type {
   DriverCreateInput,
   ModelCatalog,
@@ -33,10 +36,7 @@ export interface OpenAIChatMessage {
   reasoning_details?: Record<string, unknown>[];
 }
 
-interface Usage {
-  input: number;
-  output: number;
-}
+type Usage = TokenUsage & { costUsd?: number };
 
 interface Completion {
   text: string;
@@ -139,10 +139,15 @@ interface RuntimeOptions<Config> {
   nudgeAnnouncedAction?: boolean;
 }
 
-const usageFrom = (usage: CompletionJson["usage"]): Usage | null =>
-  usage
-    ? { input: usage.prompt_tokens ?? 0, output: usage.completion_tokens ?? 0 }
-    : null;
+const usageFrom = (usage: CompletionJson["usage"]): Usage | null => {
+  const tokens = normalizedUsage(usage?.prompt_tokens, usage?.completion_tokens);
+  const costUsd = tokenCount(usage?.cost), cached = tokenCount(usage?.prompt_tokens_details?.cached_tokens);
+  if (!tokens && costUsd === undefined) return null;
+  return { ...tokens ?? { input: 0, output: 0, tokensReported: false },
+    ...(cached !== undefined && tokens ? { cachedInput: Math.min(cached, tokens.input) } : {}),
+    ...(costUsd !== undefined ? { costUsd } : {}),
+  };
+};
 
 const completionUsage = (json: CompletionJson) => json.usage ?? json.x_groq?.usage;
 
@@ -390,6 +395,7 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
         }),
         signal: activeSignal,
       });
+      observeRateHeaders(options.input.instanceId, model, response.headers);
       if (!response.ok) {
         const body = await response.text().catch(() => "");
         if (rejectsKey(response.status, body)) noteKeyRejected(options.apiUrl, options.apiKey);
@@ -658,8 +664,9 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
 
     void (async () => {
       let tools: ChatToolSession | undefined;
-      const usage: Usage = { input: 0, output: 0 };
+      const usage: TokenUsage = { input: 0, output: 0 };
       let hasUsage = false;
+      let reportedCost = 0, hasReportedCost = false, completeCost = true;
       let ok = false;
       let stopReason: string | null = null;
       let failure: string | undefined;
@@ -724,6 +731,10 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
               delta("", "reasoning_text", true);
               break;
             } catch (value) {
+              // A failed attempt can consume inference without returning telemetry.
+              // Keep subsequent known subtotals, without calling them the full bill.
+              usage.tokensReported = false;
+              completeCost = false;
               const error = asError(value);
               const verdict = classifyError(error);
               // A schema rejection of the echoed reasoning executed nothing
@@ -767,12 +778,17 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
             }
           }
           native("in", options.nativeLog.incoming(completion));
+          if (completion.usage?.costUsd !== undefined) { reportedCost += completion.usage.costUsd; hasReportedCost = true; }
+          else completeCost = false;
           if (completion.usage) {
             usage.input += completion.usage.input;
             usage.output += completion.usage.output;
+            if (completion.usage.cachedInput !== undefined) usage.cachedInput = (usage.cachedInput ?? 0) + completion.usage.cachedInput;
+            if (completion.usage.tokensReported === false) usage.tokensReported = false;
             hasUsage = true;
-            emit({ ...base(turn.threadId, turnId), type: "thread.token-usage.updated", ...usage });
-          }
+          } else usage.tokensReported = false;
+          // A later unreported tool round must not leave an earlier complete total.
+          if (hasUsage) emit({ ...base(turn.threadId, turnId), type: "thread.token-usage.updated", ...usage });
           // Reasoning on a tool-call round belongs to the protocol, not a final reply.
           const reply = completion.text.trim() ? completion.text : completion.toolCalls.length ? "" : completion.reasoning;
           if (reply.trim()) emit({ ...base(turn.threadId, turnId), type: "item.completed", itemType: "assistant_text", text: safeText(reply) });
@@ -947,7 +963,7 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
           }
         }
         active.delete(turn.threadId);
-        emit({ ...base(turn.threadId, turnId), type: "turn.completed", ok, stopReason, cost: null,
+        emit({ ...base(turn.threadId, turnId), type: "turn.completed", ok, stopReason, cost: hasReportedCost && completeCost ? reportedCost : null,
           ...(hasUsage && (options.includeUsageInCompleted || seenCalls.size) ? { usage } : {}),
           ...(denials.length ? { denials } : {}),
         });
@@ -959,6 +975,8 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
 
   return {
     instanceId: input.instanceId,
+    accountUsage: apiAccountUsage(options.apiUrl, options.apiKey),
+    accountUsageTransport: "http",
     driverKind: options.driverKind,
     displayName: input.displayName,
     enabled: input.enabled,

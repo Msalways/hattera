@@ -19,7 +19,7 @@ At the next start (`reconcileRestart` in `server/room-handoffs.ts`):
   cut review, "Resumed with … results after a restart, reviewing"), and a
   direct requester's chat shows "Mira was cut off by a restart; resuming".
 - Never a second automatic run. A restart that cuts that rerun too ends it,
-  failed: "Interrupted by another OpenMausBot restart after resuming once; not
+  failed: "Interrupted by another Hattera restart after resuming once; not
   resumed again. Some of its steps may already have taken effect." The
   requester gets that result like any other; a Chief's own review ended that
   way says so in the Chief's conversation.
@@ -42,13 +42,13 @@ At the next start (`reconcileRestart` in `server/room-handoffs.ts`):
   rerun already running is left alone like any teammate mid-turn, and so is
   one the person left working by a Stop before the restart.
 - A routine run still going at a restart fails, as before, and its
-  teammates' work ends with it, "OpenMausBot restarted while this routine was
+  teammates' work ends with it, "Hattera restarted while this routine was
   running": none of it runs again, so no result lands after the person was
   told the routine failed.
 - On a quit or update, shutdown dispatches nothing more and leaves the turns
   it tears down cut for the next start, so a quit ends where a crash does,
   whatever the engine. Each conversation with a turn still running gets
-  "error: turn interrupted — OpenMausBot restarted", as a provider reload's
+  "error: turn interrupted — Hattera restarted", as a provider reload's
   does, and nothing more (no unread mark, no notification), unless the next
   start goes on with that turn: a cut teammate turn, or a requester's turn
   that had sent work, says what happened when it resumes instead (a failed
@@ -179,7 +179,7 @@ queued work starts prevents dispatch.
 pnpm exec vitest run server/peer-roster.test.ts server/post-to-room.test.ts server/room-coordination.e2e.test.ts server/direct-coordination.e2e.test.ts server/room-handoffs.test.ts server/peer-allowlist.e2e.test.ts
 ```
 
-The coordination suites use `launchVerificationServer`, `control-omb`, and the
+The coordination suites use `launchVerificationServer`, `control-hattera`, and the
 actual agents MCP proxy with a scripted provider and disposable HOME/data.
 They assert discovered targets, accepted or refused tool calls, durable
 handoff state, the destination conversation, and absence of dispatch after
@@ -262,7 +262,7 @@ routine back to a normal user conversation.
 
 Use an isolated home and data directory, never the running app. Create Maya,
 Eli (developer) and Nora (reviewer), set an explicit shared working folder, and
-create Launch and Delivery rooms through `control-omb`. Send through
+create Launch and Delivery rooms through `control-hattera`. Send through
 `send-channel`, wait on the source channel, and retain `messages` plus the
 actual files and executed tool evidence. Follow [channels](channels.md) and
 [chat UI](chat-ui.md) for the common launch/control paths.

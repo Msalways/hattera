@@ -1,4 +1,4 @@
-// The Cloud card in Settings → General: OpenMausBot Cloud for someone who may
+// The Cloud card in Settings → General: Hattera Cloud for someone who may
 // buy (what it does, the Admin's lowest price and money-back, Start free
 // trial or Add a Cloud, which open the Add a Cloud dialog), or, for someone
 // with a plan, that plan and the way to it. The card after the update is the

@@ -6,6 +6,8 @@ import { api } from "@/state/store";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import { Card } from "./SettingsPrimitives";
+import type { AccountReporting } from "../../shared/account-usage";
+import { AccountReportingView } from "./AccountReporting";
 
 interface PlanWindow {
   available: boolean;
@@ -27,6 +29,7 @@ interface PlanModelUsage {
 }
 
 interface PlanProvider {
+  reporting?: AccountReporting;
   id: string;
   name: string;
   driver: string;
@@ -40,6 +43,7 @@ interface PlanProvider {
 }
 
 interface PlanUsageReport {
+  refreshing?: boolean;
   fetchedAt: string;
   providers: PlanProvider[];
 }
@@ -63,6 +67,7 @@ function dueResetDeadlines(report: PlanUsageReport, now: number, seen: Set<strin
   for (const provider of report.providers) {
     if (!provider.ok) continue;
     const stamps = [
+      ...(provider.reporting?.metrics.map(entry => entry.resetsAt) ?? []),
       provider.fiveHour.available ? provider.fiveHour.resetsAt : null,
       provider.weekly.available ? provider.weekly.resetsAt : null,
       ...provider.extra.map((extra) => extra.resetsAt),
@@ -155,12 +160,22 @@ export function PlanUsage() {
 
   useEffect(() => {
     void load(false);
+    const refreshVisible = () => { if (document.visibilityState === "visible") void load(false); };
+    const poll = window.setInterval(refreshVisible, 60_000);
+    window.addEventListener("focus", refreshVisible);
+    return () => { window.clearInterval(poll); window.removeEventListener("focus", refreshVisible); };
   }, [load]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!report?.refreshing) return;
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(false); }, 3000);
+    return () => window.clearInterval(timer);
+  }, [report?.refreshing, load]);
 
   useEffect(() => {
     if (!report) return;
@@ -171,7 +186,7 @@ export function PlanUsage() {
   }, [report, now, load]);
 
   return (
-    <Card title={t("planUsage.title")} subtitle={t("planUsage.subtitle")}>
+    <Card title={t("planUsage.title")} subtitle={t("accountUsage.subtitle")}>
       <div className="mb-3 flex justify-end">
         <button
           type="button"
@@ -185,19 +200,20 @@ export function PlanUsage() {
         </button>
       </div>
       {loading && !report && <p role="status" className="text-[13px] text-ink-secondary">{t("planUsage.loading")}</p>}
+      {report?.refreshing && <p role="status" className="mb-3 text-[12px] text-ink-secondary">{t("accountUsage.refreshing")}</p>}
       {error && <p role="alert" className="mb-3 text-[13px] text-danger">{error}</p>}
       {report && report.providers.length === 0 && (
-        <p className="text-[13px] text-ink-secondary">{t("planUsage.empty")}</p>
+        <p className="text-[13px] text-ink-secondary">{t("accountUsage.empty")}</p>
       )}
       {report && report.providers.length > 0 && (
         <div className="flex flex-col gap-4">
           {report.providers.map((provider) => (
-            <div key={provider.id} className="border-t border-hairline/30 pt-3 first:border-t-0 first:pt-0">
+            <div key={provider.id} data-account-usage={provider.id} className="border-t border-hairline/30 pt-3 first:border-t-0 first:pt-0">
               <div className="mb-2 flex min-w-0 items-baseline gap-2">
                 <span className="truncate text-[14px] font-medium text-ink">{provider.name}</span>
                 {provider.plan && <span className="truncate text-[12px] text-ink-secondary">{provider.plan}</span>}
               </div>
-              {provider.ok ? (
+              {provider.reporting ? <AccountReportingView reporting={provider.reporting} now={now} /> : provider.ok ? (
                 <div className="flex flex-col gap-2">
                   <WindowRow label={t("planUsage.fiveHour")} window={provider.fiveHour} now={now} />
                   <WindowRow label={t("planUsage.weekly")} window={provider.weekly} now={now} />

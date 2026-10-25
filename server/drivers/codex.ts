@@ -12,6 +12,7 @@ import { codexToolSurfaceArgs } from "./codex-tool-surface.ts";
 // and preserves that history or reports a failed resume.
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { tokenUsage, tokenCount, type TokenUsage } from "../../shared/token-usage.ts";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { codexConfigMcpServerNames, mountedMcpServerName } from "./codex-mcp-names.ts";
@@ -49,7 +50,8 @@ import { codexDeveloperInstructions, syncCodexInstructions } from "./codex-instr
 import { volatileContextNote, withContextNote } from "./prompt-split.ts";
 import type { ApprovalMode } from "../../shared/approval-mode.ts";
 import { CodexBrowserAuthController, CodexDeviceAuthController } from "./codex-device-auth.ts";
-import { codexAccountEmail, codexHome } from "./codex-identity.ts";
+import { codexAccountEmail, codexHome, codexAccountRequests } from "./codex-identity.ts";
+import { codexActivityMetrics, codexMetrics, observeMetrics } from "../account-metrics.ts";
 import { keyRejected, noteKeyAccepted, noteKeyRejected } from "../key-rejections.ts";
 import { classifyResumeFailure, mayReplay, rebuiltSessionNotice, recoveryPromptFor } from "../resume-recovery.ts";
 import { extractMcpImages } from "../mcp-tool-images.ts";
@@ -120,7 +122,7 @@ function missingNativeCodexThread(error: unknown, cursor: string): boolean {
 
 /** Ask the configured executable to update itself. This matters when the user
  * selected a non-PATH Codex: installing a second global copy would leave
- * OpenMausBot pointing at the old binary. */
+ * Hattera pointing at the old binary. */
 export function codexUpdateCommand(cli: string, platform: NodeJS.Platform = process.platform): string {
   if (cli === "codex") return "codex update";
   const trimmed = cli.trim();
@@ -227,7 +229,7 @@ const PROXY_LITERAL_ENV = ["NODE_USE_ENV_PROXY", "NO_PROXY", "no_proxy"];
 const SHELL_ESSENTIALS = new Set(["PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "TERM", "LANG", "TZ"]);
 
 const DENY_TIMEOUT_NOTE =
-  "OpenMausBot: nobody answered this permission request in time. Skip this action and finish what you can without it.";
+  "Hattera: nobody answered this permission request in time. Skip this action and finish what you can without it.";
 
 const renamedMcpServers = new Set<string>();
 /** Logged once per name: the rename is deliberate, not a lost server. */
@@ -617,7 +619,7 @@ export function codexNativeIncomingLogMessage(
 type McpApprovalMode = "approve" | "auto" | "prompt";
 
 /** Every mount is a command Codex starts: URL servers arrive here already
- * behind OpenMausBot's remote proxy (see scopedServer in sendTurn). */
+ * behind Hattera's remote proxy (see scopedServer in sendTurn). */
 function mountMcpServer(
   appServerArgs: string[],
   env: Record<string, string | undefined>,
@@ -739,7 +741,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
         },
       }))?.pending ?? null;
     }
-    // Codex's own ChatGPT login (not ChatGPT plan, whose tokens OpenMausBot
+    // Codex's own ChatGPT login (not ChatGPT plan, whose tokens Hattera
     // holds, nor Company routing) can be refused by OpenAI while `codex login
     // status` still reports it. A refusal marks it the way a rejected API key
     // is marked (key-rejections.ts): its credential home, plus the stored
@@ -889,7 +891,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
         const literalEnvs = new Map<string, Record<string, string>>();
         const scopedServer = (name: string, mountName: string, server: McpServerSpec): StdioMcpSpec | null => {
           if (!canUseMcpServer(turn.toolScope, name)) return null;
-          // Every URL server is reached through OpenMausBot's remote proxy,
+          // Every URL server is reached through Hattera's remote proxy,
           // on every Codex login, never by Codex's own MCP client: the proxy
           // opens the connection with the same minimal handshake as Settings
           // → Test (mcp-http.ts). Codex's own client adds capability fields
@@ -938,7 +940,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
           mountSelected("composio", "openmausbot_connectors", turn.integrations.composio);
         }
         if (turn.integrations?.agents) {
-          // OpenMausBot's own coordination tools never ask, as on Claude
+          // Hattera's own coordination tools never ask, as on Claude
           // (mcp__agents is pre-allowed): "auto" quiets only read-only tools,
           // so coordinate_bots raised a card on every hand-off and an
           // unattended Chief's job died when the card timed out. A teammate's
@@ -1046,8 +1048,8 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
         // process. The harness wants this turn's figure: the total minus
         // whatever the process already carried before turn/start (a resumed
         // thread may restore earlier usage), banked on settle.
-        usage: undefined as { input: number; output: number; cachedInput?: number } | undefined,
-        usageBaseline: undefined as { input: number; output: number; cachedInput: number } | undefined,
+        usage: undefined as TokenUsage | undefined,
+        usageBaseline: undefined as (TokenUsage & { cachedInput: number }) | undefined,
       };
 
       const asks = new Map<string, (behavior: "allow" | "deny" | "answer", message?: string, source?: "user" | "timeout" | "system") => void>();
@@ -1155,7 +1157,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
       const settle = async (ok: boolean, stopReason: string | null) => {
         if (state.settled) return;
         state.settled = true;
-        for (const finish of Array.from(asks.values())) finish("deny", "OpenMausBot: the turn ended", "system");
+        for (const finish of Array.from(asks.values())) finish("deny", "Hattera: the turn ended", "system");
         for (const p of rpcPending.values()) p.reject(new Error("turn settled"));
         rpcPending.clear();
         const complete = () => {
@@ -1411,6 +1413,10 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
       };
       const handleNotification = (msg: any) => {
         const p = msg.params ?? {};
+        if (msg.method === "account/rateLimits/updated") {
+          observeMetrics(instanceId, "Codex native account event", codexMetrics(p));
+          return;
+        }
         // An app-server also emits notifications for native helper threads.
         // Only this request's parent may write its transcript/usage or settle
         // its run. Requests still use the approval broker above, including
@@ -1427,7 +1433,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
             // turn before any model call, so a genuine first reading cannot
             // land here.)
             const t = p.tokenUsage.total;
-            state.usageBaseline = { input: t.inputTokens ?? 0, output: t.outputTokens ?? 0, cachedInput: t.cachedInputTokens ?? 0 };
+            state.usageBaseline = { ...tokenUsage(t.inputTokens, t.outputTokens) ?? { input: 0, output: 0, tokensReported: false }, cachedInput: tokenCount(t.cachedInputTokens) ?? 0 };
             return;
           }
           if (!codexTurnId) {
@@ -1567,7 +1573,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
             const t = p.tokenUsage?.total;
             const last = p.tokenUsage?.last;
             const shape = (u: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }) => ({
-              input: u.inputTokens ?? 0, output: u.outputTokens ?? 0, cachedInput: u.cachedInputTokens ?? 0,
+              ...tokenUsage(u.inputTokens, u.outputTokens) ?? { input: 0, output: 0, tokensReported: false }, cachedInput: tokenCount(u.cachedInputTokens) ?? 0,
             });
             // (A total that arrived before this turn was named became the
             // baseline upstream and never reaches this switch.)
@@ -1577,18 +1583,19 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
               state.usage = {
                 input: Math.max(0, now.input - b.input),
                 output: Math.max(0, now.output - b.output),
+                ...(now.tokensReported === false || "tokensReported" in b && b.tokensReported === false ? { tokensReported: false } : {}),
                 ...(typeof t.cachedInputTokens === "number" ? { cachedInput: Math.max(0, now.cachedInput - b.cachedInput) } : {}),
               };
             } else if (last) {
-              state.usage = { input: last.inputTokens ?? 0, output: last.outputTokens ?? 0, ...(typeof last.cachedInputTokens === "number" ? { cachedInput: last.cachedInputTokens } : {}) };
+              const usage = tokenUsage(last.inputTokens, last.outputTokens);
+              state.usage = usage && { ...usage, ...(tokenCount(last.cachedInputTokens) !== undefined ? { cachedInput: last.cachedInputTokens } : {}) };
             }
             if (t) {
               const window = p.tokenUsage?.modelContextWindow;
               emit({
                 ...base(threadId, turnId),
                 type: "thread.token-usage.updated",
-                input: t.inputTokens ?? 0,
-                output: t.outputTokens ?? 0,
+                ...tokenUsage(t.inputTokens, t.outputTokens) ?? { input: 0, output: 0, tokensReported: false },
                 ...(typeof t.cachedInputTokens === "number" ? { cachedInput: t.cachedInputTokens } : {}),
                 // the last call's prompt is what fills the window
                 ...(last && typeof last.inputTokens === "number" ? { contextTokens: last.inputTokens } : {}),
@@ -1782,7 +1789,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
       // nothing streamed yet, and never for auth/shape errors or interrupts
       try {
         await request("initialize", {
-          clientInfo: { name: "openmausbot", title: "OpenMausBot", version: serverVersion() },
+          clientInfo: { name: "openmausbot", title: "Hattera", version: serverVersion() },
           // Named permission profiles are an experimental app-server field in
           // Codex 0.151. Negotiate them explicitly; older servers ignore this
           // capability and remain on the legacy Custom fallback below.
@@ -1877,7 +1884,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
           approvalParams = namedApprovalParams(approvalMode);
         }
         // Codex's `never` means "do not ask to escalate", not "grant every
-        // requested permission". Only the user's explicit OpenMausBot Full
+        // requested permission". Only the user's explicit Hattera Full
         // mode may synthesize approvals; Custom must preserve the sandbox
         // boundary from config.toml (for example never + read-only).
         autoAcceptPermissions = approvalMode === "full";
@@ -2121,6 +2128,15 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
       return models;
     },
     refreshModels,
+    accountUsage: async () => {
+      if (planUnavailable || planSigningOut || disposed || config.managed || planAuth) return { metrics: [], source: "Codex account reporting is unavailable for this connection" };
+      const env = childEnv();
+      const result = await codexAccountRequests(config.cli, env, ["account/rateLimits/read", "account/usage/read"]);
+      const limits = result?.["account/rateLimits/read"];
+      if (!limits) throw new Error("Codex could not report account allowances. Check its account connection.");
+      const activity = result?.["account/usage/read"];
+      return { metrics: [...codexMetrics(limits), ...codexActivityMetrics(activity)], source: "Codex app-server" };
+    },
     ...(startupModelRefresh ? { startupModelRefresh } : {}),
     authenticationMethod: "browser-pkce" as const,
     ...(!plan ? { authenticationMethods: ["device-code", "browser-pkce"] as const } : {}),

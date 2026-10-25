@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import { rebuiltSessionNotice } from "./resume-recovery.ts";
 
 /** Pesto's account, as the CLI's rate_limit_event reported it on Oct 9. */

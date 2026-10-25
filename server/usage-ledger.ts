@@ -24,6 +24,8 @@ export type UsageTrigger =
   | { kind: "bot"; botId?: string };
 
 export interface UsageRow {
+  /** False means token telemetry was incomplete; zeroes are not proof of zero usage. */
+  tokensReported?: boolean;
   at: string;
   botId: string;
   botName: string;
@@ -50,10 +52,11 @@ export interface UsageRow {
   trigger: UsageTrigger;
 }
 
-export type UsageGroupBy = "bot" | "model" | "user" | "day" | "engine" | "routine";
-export const USAGE_GROUPINGS: readonly UsageGroupBy[] = ["bot", "model", "user", "day", "engine", "routine"];
+export type UsageGroupBy = "bot" | "model" | "user" | "day" | "engine" | "routine" | "account";
+export const USAGE_GROUPINGS: readonly UsageGroupBy[] = ["bot", "model", "user", "day", "engine", "routine", "account"];
 
 export interface UsageGroup {
+  unreportedTokens?: number;
   key: string;
   label: string;
   turns: number;
@@ -253,6 +256,8 @@ export function triggerLabel(trigger: UsageTrigger): string {
 
 function groupOf(row: UsageRow, groupBy: UsageGroupBy): { key: string; label: string } {
   switch (groupBy) {
+    case "account":
+      return { key: `account:${row.instanceId}`, label: row.instanceId };
     case "bot":
       return { key: `bot:${row.botId}`, label: row.botName || row.botId };
     case "model":
@@ -284,6 +289,7 @@ export function costSourceOf(row: Pick<UsageRow, "costUsd" | "costSource">): Cos
 
 function add(group: UsageGroup, row: UsageRow, prices: PriceList | null): void {
   group.turns += 1;
+  if (row.tokensReported === false) group.unreportedTokens = (group.unreportedTokens ?? 0) + 1;
   group.input += clean(row.input);
   group.output += clean(row.output);
   group.cachedInput += clean(row.cachedInput);
@@ -293,7 +299,7 @@ function add(group: UsageGroup, row: UsageRow, prices: PriceList | null): void {
     group.costUsd = (group.costUsd ?? 0) + cost;
     if (costSourceOf(row) === "estimated") group.estimatedUsd = (group.estimatedUsd ?? 0) + cost;
   }
-  const billable = prices ? billableFor(row, prices) : null;
+  const billable = prices && row.tokensReported !== false ? billableFor(row, prices) : null;
   if (billable !== null) group.billableUsd = (group.billableUsd ?? 0) + billable;
 }
 
@@ -334,7 +340,7 @@ export function csvCell(value: string | number | null): string {
 
 /** One line per turn, spreadsheet-ready; a billable column when a price list is given. */
 export function usageCsv(rows: UsageRow[], prices: PriceList | null = null): string {
-  const header = ["time", "bot", "model", "engine", "triggered_by", "input_tokens", "output_tokens", "cached_input_tokens", "cost_usd", "cost_source", ...(prices ? ["billable_usd"] : []), "thread"];
+  const header = ["time", "bot", "model", "engine", "triggered_by", "input_tokens", "output_tokens", "cached_input_tokens", "cost_usd", "cost_source", ...(prices ? ["billable_usd"] : []), "thread", "account", "tokens_reported"];
   const lines = [header.join(",")];
   for (const row of rows) {
     lines.push([
@@ -343,13 +349,15 @@ export function usageCsv(rows: UsageRow[], prices: PriceList | null = null): str
       row.model,
       row.driverKind,
       triggerLabel(row.trigger),
-      clean(row.input),
-      clean(row.output),
-      clean(row.cachedInput),
+      row.tokensReported === false ? null : clean(row.input),
+      row.tokensReported === false ? null : clean(row.output),
+      row.tokensReported === false ? null : clean(row.cachedInput),
       finiteOrNull(row.costUsd),
       costSourceOf(row),
-      ...(prices ? [billableFor(row, prices)] : []),
+      ...(prices ? [row.tokensReported === false ? null : billableFor(row, prices)] : []),
       row.threadId,
+      row.instanceId,
+      row.tokensReported === undefined ? null : String(row.tokensReported),
     ].map(csvCell).join(","));
   }
   return lines.join("\n") + "\n";

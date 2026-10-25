@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { HELP } from "../control-omb.ts";
+import { HELP } from "../control-hattera.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const DOCS = join(ROOT, "docs", "verification");
@@ -22,17 +22,19 @@ const cited = (pattern: RegExp) => {
   return hits;
 };
 const target = (hit: string) => hit.slice(hit.indexOf(": ") + 2);
+const citationExists = (hit: string) => existsSync(resolve(target(hit).startsWith(".") ? DOCS : ROOT, target(hit)));
 
 // The verbs `help` prints, minus the shell line under "isolated fixture".
 const helpVerbs = new Set([...HELP.matchAll(/^ {2}([a-z][\w-]*)(?= |$)/gm)].map((match) => match[1]!).filter((verb) => verb !== "node"));
 helpVerbs.add("help");
 
-// Routes are registered in server/index.ts and, for anything newer, in the
+// The entry bootstraps server/runtime.ts, which owns the main router. Newer
+// routes are registered in the
 // modules under server/routes (server/routes/README.md). Tests there quote
 // paths without registering them, so they do not count.
 const ROUTES_DIR = join(ROOT, "server", "routes");
 const routeModules = readdirSync(ROUTES_DIR).filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts")).sort();
-const serverSource = [join(ROOT, "server", "index.ts"), ...routeModules.map((name) => join(ROUTES_DIR, name))]
+const serverSource = [join(ROOT, "server", "index.ts"), join(ROOT, "server", "runtime.ts"), ...routeModules.map((name) => join(ROUTES_DIR, name))]
   .map((file) => readFileSync(file, "utf8")).join("\n");
 const hooksSource = readFileSync(join(ROOT, "server", "webhook-ingress.ts"), "utf8");
 const hostedSource = readFileSync(join(ROOT, "enterprise", "server", "workspace-access.ts"), "utf8");
@@ -49,25 +51,25 @@ const PLACEHOLDER = /^(ID|:[\w-]+|<[^>]+>|\{[^}]+\})$/;
 const slug = (heading: string) => heading.trim().toLowerCase().replace(/[^\w\- ]/g, "").replace(/\s+/g, "-");
 
 describe("docs/verification recipes cite things that exist", () => {
-  it("use control:omb verbs that help lists", () => {
-    const used = cited(/pnpm control:omb ([a-z][\w-]*)/g);
+  it("use control:hattera verbs that help lists", () => {
+    const used = cited(/pnpm control:hattera ([a-z][\w-]*)/g);
     expect(used.length).toBeGreaterThan(0);
     expect(used.filter((hit) => !helpVerbs.has(target(hit)))).toEqual([]);
     // the launcher form may also name `launch`, which pnpm cannot run
-    const direct = cited(/scripts\/control-omb\.ts ([a-z][\w-]*)/g);
+    const direct = cited(/scripts\/control-hattera\.ts ([a-z][\w-]*)/g);
     expect(direct.filter((hit) => target(hit) !== "launch" && !helpVerbs.has(target(hit)))).toEqual([]);
   });
 
   it("cite source files that exist", () => {
     const refs = cited(/(?<![\w/.-])((?:scripts|server|src|shared|electron|companion|enterprise)\/[\w./-]+\.(?:ts|tsx|mjs|cjs|py))(?![\w/])/g);
     expect(refs.length).toBeGreaterThan(50);
-    expect([...new Set(refs.filter((hit) => !existsSync(join(ROOT, target(hit)))))]).toEqual([]);
+    expect([...new Set(refs.filter((hit) => !citationExists(hit)))]).toEqual([]);
   });
 
   it("cite test files that exist", () => {
     const refs = cited(/(?<![\w/.-])([\w./-]+\.test\.(?:ts|mjs))(?![\w/])/g);
     expect(refs.length).toBeGreaterThan(20);
-    expect([...new Set(refs.filter((hit) => !existsSync(join(ROOT, target(hit)))))]).toEqual([]);
+    expect([...new Set(refs.filter((hit) => !citationExists(hit)))]).toEqual([]);
   });
 
   it("cite API routes the server registers", () => {

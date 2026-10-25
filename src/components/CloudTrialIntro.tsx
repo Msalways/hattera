@@ -1,4 +1,4 @@
-// The card after the update (docs/cloud-pro.md, "Add a Cloud"): OpenMausBot
+// The card after the update (docs/cloud-pro.md, "Add a Cloud"): Hattera
 // Cloud's free trial, for someone with no plan, in the words the Admin's
 // numbers allow (lib/cloud-plan cloudIntroView). Start free trial opens the
 // Add a Cloud dialog; Show me how points at the menu that keeps it. Its days

@@ -294,7 +294,7 @@ if (process.versions.electron && process.argv.includes(fixtureFlag)) {
   const { createServer } = await import("vite");
   const { default: react } = await import("@vitejs/plugin-react");
   const { default: tailwindcss } = await import("@tailwindcss/vite");
-  const { launchVerificationServer } = await import("./control-omb.ts");
+  const { launchVerificationServer } = await import("./control-hattera.ts");
   const fixture = await launchVerificationServer();
   const output = mkdtempSync(join(tmpdir(), "omb-server-connection-"));
   for (const dir of ["home", "user-data"]) mkdirSync(join(output, dir));

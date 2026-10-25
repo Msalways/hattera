@@ -226,7 +226,7 @@ export function decodeLinuxDescriptor(value: LinuxConnectionDescriptor): LocalCo
       ...(wayland ? ["CUA_DRIVER_RS_ENABLE_WAYLAND"] : []),
     ]) ||
     (mcp.env as Record<string, unknown>).CUA_DRIVER_EMBEDDED !== "1" ||
-    (mcp.env as Record<string, unknown>).CUA_DRIVER_HOST_BUNDLE_ID !== "com.openmausbot.app" ||
+    (mcp.env as Record<string, unknown>).CUA_DRIVER_HOST_BUNDLE_ID !== "com.hattera.app" ||
     (mcp.env as Record<string, unknown>).CUA_DRIVER_RS_UPDATE_CHECK !== "false" ||
     (mcp.env as Record<string, unknown>).CUA_DRIVER_RS_TELEMETRY_ENABLED !== "false" ||
     (wayland && (mcp.env as Record<string, unknown>).CUA_DRIVER_RS_ENABLE_WAYLAND !== "1")
@@ -386,7 +386,7 @@ export function readCuaConnection({
   const candidates = userData ? [join(userData, "cua-connection.json")] : [];
   if (platform === "darwin" && !userData) {
     // Legacy/dev fallback only when Electron did not provide its exact path.
-    for (const directory of ["OpenMausBot", "openmausbot", "OpenGrokBot", "opengrokbot"]) {
+    for (const directory of ["Hattera", "openmausbot", "OpenGrokBot", "opengrokbot"]) {
       candidates.push(join(home, "Library", "Application Support", directory, "cua-connection.json"));
     }
   }
@@ -422,7 +422,7 @@ export function readCuaUnavailableReason({
   if (!legacyPlatform(platform)) return null;
   const candidates = userData ? [join(userData, "cua-connection.json")] : [];
   if (platform === "darwin" && !userData) {
-    for (const directory of ["OpenMausBot", "openmausbot", "OpenGrokBot", "opengrokbot"]) {
+    for (const directory of ["Hattera", "openmausbot", "OpenGrokBot", "opengrokbot"]) {
       candidates.push(join(home, "Library", "Application Support", directory, "cua-connection.json"));
     }
   }

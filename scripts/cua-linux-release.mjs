@@ -428,7 +428,7 @@ async function readVerifiedArchive({
   let bytes;
   try {
     const response = await fetchImpl(LINUX_CUA_RELEASE.url, {
-      headers: { "user-agent": "OpenMausBot-packager" },
+      headers: { "user-agent": "Hattera-packager" },
       signal: controller.signal,
     });
     if (!response?.ok) {

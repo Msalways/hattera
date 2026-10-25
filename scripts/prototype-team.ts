@@ -3,7 +3,7 @@
 // using a provider account; replace it with a signed-in engine for live work.
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { launchVerificationServer, runControlOmb } from "./control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "./control-hattera.ts";
 import { request } from "./mcp-server.ts";
 
 const launch = () => launchVerificationServer(process.env, undefined, undefined, undefined, undefined, { scripted: true });

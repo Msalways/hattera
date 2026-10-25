@@ -73,6 +73,8 @@ jobs:
         run: pnpm exec vitest run scripts/ci-scope.test.ts scripts/ci-workflow.test.ts scripts/testing/verification-docs.test.ts
       - name: Validate locale catalogs
         run: pnpm i18n:check
+      - name: Validate Hattera identity and legacy compatibility
+        run: pnpm check:brand && node --test shared/product-compat.node-test.mjs
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm check:electron
@@ -414,7 +416,7 @@ jobs:
     # docs/verification/chat-ui.md run by a machine. It downloads the pinned
     # agent-browser release (digest verified) and its Chrome, drives the real
     # <App/> against the isolated fake-engine fixture, and keeps the screenshot.
-    name: renderer smoke (control-omb ui, Ubuntu 24.04)
+    name: renderer smoke (control-hattera ui, Ubuntu 24.04)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -433,16 +435,16 @@ jobs:
         # This is Chrome's own documented fix for 23.10+; a developer machine
         # needs nothing, and the sandbox itself stays on.
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - name: Drive the real renderer through control-omb ui
+      - name: Drive the real renderer through control-hattera ui
         env:
           OMB_UI_E2E: "1"
           OMB_UI_EVIDENCE_DIR: .omb-scratch/verify-evidence
-        run: pnpm exec vitest run scripts/testing/control-omb-ui.e2e.test.ts scripts/testing/bot-tools-ui.e2e.test.ts scripts/testing/thinking-timer-ui.e2e.test.ts scripts/testing/team-share-ui.e2e.test.ts scripts/testing/org-library-ui.e2e.test.ts scripts/testing/presets-ui.e2e.test.ts
+        run: pnpm exec vitest run scripts/testing/control-hattera-ui.e2e.test.ts scripts/testing/bot-tools-ui.e2e.test.ts scripts/testing/thinking-timer-ui.e2e.test.ts scripts/testing/team-share-ui.e2e.test.ts scripts/testing/org-library-ui.e2e.test.ts scripts/testing/presets-ui.e2e.test.ts
       - name: Upload the renderer screenshot
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: control-omb-ui-chat-screenshot
+          name: control-hattera-ui-chat-screenshot
           path: |
             .omb-scratch/verify-evidence/chat-ui.png
             .omb-scratch/verify-evidence/thinking-timer-anchored.png
@@ -498,7 +500,7 @@ jobs:
           sudo chmod 4755 release/linux-unpacked/chrome-sandbox
           test "$(stat -c '%U:%G %a' release/linux-unpacked/chrome-sandbox)" = "root:root 4755"
       - name: Verify the installed browser with Ubuntu sandbox restrictions
-        run: node scripts/smoke-browser-bundle.mjs --resources /opt/OpenMausBot/resources
+        run: node scripts/smoke-browser-bundle.mjs --resources /opt/Hattera/resources
       - name: Launch packaged app and verify lifecycle
         env:
           OMB_KEEP_SMOKE_DIR: "1"
@@ -506,12 +508,12 @@ jobs:
         run: pnpm smoke:linux-package
       - name: Remove the installed upgrade fixture
         if: always()
-        run: sudo dpkg --purge openmausbot || true
+        run: sudo dpkg --purge hattera || true
       - name: Upload smoke diagnostics on failure
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
-          name: openmausbot-ubuntu-smoke-diagnostics
+          name: hattera-ubuntu-smoke-diagnostics
           path: |
             /tmp/omb-linux-smoke-*
             /tmp/omb-linux-smoke-runtime-*

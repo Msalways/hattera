@@ -28,7 +28,7 @@ a period, group it, or **Export CSV**.
 pnpm exec vitest run --no-file-parallelism server/usage-ledger-api.test.ts server/usage-attribution.e2e.test.ts
 ```
 
-The test launches a fresh `control-omb` fixture with the repository's fake
+The test launches a fresh `control-hattera` fixture with the repository's fake
 engine, creates a bot, sends one turn as the owner through the control surface
 and one as a paired device with a label, waits for both to settle, then checks
 the month file has exactly two rows with the right triggers and no message
@@ -52,10 +52,10 @@ second turn's result says 0.02, and both rows must still read 0.01.
 For the same by hand:
 
 ```sh
-node --experimental-strip-types scripts/control-omb.ts launch
-pnpm control:omb new-bot --name Probe --url http://127.0.0.1:PORT
-pnpm control:omb send --bot BOT_ID --text "hello" --url http://127.0.0.1:PORT
-pnpm control:omb wait --bot BOT_ID --timeout 30 --url http://127.0.0.1:PORT
+node --experimental-strip-types scripts/control-hattera.ts launch
+pnpm control:hattera new-bot --name Probe --url http://127.0.0.1:PORT
+pnpm control:hattera send --bot BOT_ID --text "hello" --url http://127.0.0.1:PORT
+pnpm control:hattera wait --bot BOT_ID --timeout 30 --url http://127.0.0.1:PORT
 cat DATA_DIR/usage/$(date -u +%Y-%m).jsonl
 ```
 

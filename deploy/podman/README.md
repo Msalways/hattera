@@ -1,12 +1,12 @@
 # Self-host the full stack with rootless Podman
 
-Run the OpenMausBot server, Caddy, and per-bot Linux desktops with one Podman
+Run the Hattera server, Caddy, and per-bot Linux desktops with one Podman
 engine. Docker Engine, Docker Desktop, and Docker Compose are not required;
 `podman-compose` provides the Compose commands. The existing
 [`deploy/docker-compose.yml`](../docker-compose.yml) remains an independent option.
 
 ```text
-Browser -> loopback Caddy :8080 -> OpenMausBot :8799
+Browser -> loopback Caddy :8080 -> Hattera :8799
                                     |
                              rootless Podman socket
                                     |
@@ -92,7 +92,7 @@ existing data.
 Caddy listens on loopback only. To use Tailscale Serve, route the tailnet HTTPS
 endpoint to `http://127.0.0.1:8080`, set `OMB_PUBLIC_URL` to that HTTPS URL and
 `OMB_HTTPS_HOST` to its hostname, then recreate the services with `up -d`.
-Mint a pairing code with `maus.ps1 exec omb node dist-server/openmausbot.js pair`.
+Mint a pairing code with `maus.ps1 exec omb node dist-server/hattera.js pair`.
 The proxy forwards the client address and scheme so the server's pairing checks
 remain in force. Do not publish the server, webhook listener, or Podman socket
 directly. For public-domain HTTPS, use the existing Docker deployment or design

@@ -106,7 +106,7 @@ it("offers the built-in browser and cloud computers, never this computer or a Lo
 
 it("refuses the places it never offers with what is true there, not a setup step", () => {
   const local = cloudHomePlaceRefusal("local")!, vm = cloudHomePlaceRefusal("vm")!;
-  expect(local).toBe("This computer isn't a place on My Cloud. Set Works on to Auto, Cloud computer or Browser, or lend your Mac under Settings → MausBot Cloud.");
+  expect(local).toBe("This computer isn't a place on My Cloud. Set Works on to Auto, Cloud computer or Browser, or lend your Mac under Settings → Hattera Cloud.");
   expect(vm).toBe("Bots on My Cloud can't use a Local VM. Set Works on to Auto, Cloud computer or Browser.");
   for (const text of [local, vm]) {
     expect(text).not.toMatch(/configure|Computer panel|install|set (?:it|one) up/i);
@@ -123,7 +123,7 @@ function fixture() {
   const sessions = new SessionRegistry({ file: join(root, "sessions.json"), now: () => now });
   const pairing = createCloudPairing({ secret, sessions, now: () => now });
   let counter = 0;
-  const sign = (body = JSON.stringify({ label: "OpenMausBot app (Cloud)", ttlSeconds: 300 }), options: { key?: string; at?: number; nonce?: string } = {}) => {
+  const sign = (body = JSON.stringify({ label: "Hattera app (Cloud)", ttlSeconds: 300 }), options: { key?: string; at?: number; nonce?: string } = {}) => {
     const timestamp = String(Math.floor((options.at ?? now) / 1000)), nonce = options.nonce ?? `nonce-${String(++counter).padStart(12, "0")}`;
     return { timestamp, nonce, signature: `v1=${cloudPairingSignature(options.key ?? secret, timestamp, nonce, body)}`, body: Buffer.from(body) };
   };
@@ -141,7 +141,7 @@ it("opens one ordinary pairing window for a correctly signed request", () => {
   expect(granted.body.credential).toMatch(/^omb_pair_[A-Za-z0-9_-]{43}$/);
   expect(granted.body.expiresAt).toBe(f.now() + 300_000);
   const paired = f.exchange(granted.body.code as string);
-  expect(paired).toMatchObject({ ok: true, session: { label: "OpenMausBot app (Cloud)", scopes: ["admin", "client"] } });
+  expect(paired).toMatchObject({ ok: true, session: { label: "Hattera app (Cloud)", scopes: ["admin", "client"] } });
 });
 
 it("matches the Admin's signature byte for byte", () => {
@@ -155,7 +155,7 @@ it("refuses a wrong key, a tampered request or a malformed signature, and counts
   const good = f.sign();
   const variants = [
     f.sign(undefined, { key: "W".repeat(43) }),
-    { ...good, body: Buffer.from(JSON.stringify({ label: "OpenMausBot app (Cloud)", ttlSeconds: 600 })) },
+    { ...good, body: Buffer.from(JSON.stringify({ label: "Hattera app (Cloud)", ttlSeconds: 600 })) },
     { ...good, nonce: "nonce-tampered-000" },
     { ...good, timestamp: String(Number(good.timestamp) + 1) },
     { ...good, signature: good.signature.slice(3) },
@@ -209,7 +209,7 @@ it("keeps every window single use and short lived, capping what the Admin asks f
   expect(f.exchange(long.body.code as string).ok).toBe(false);
   const plain = f.mint(f.sign("{}"));
   expect(plain.body.expiresAt).toBe(f.now() + 300_000);
-  expect(f.exchange(plain.body.code as string)).toMatchObject({ ok: true, session: { label: "MausBot Cloud" } });
+  expect(f.exchange(plain.body.code as string)).toMatchObject({ ok: true, session: { label: "Hattera Cloud" } });
 });
 
 it("opens a browser sign-in only a browser redeems, by credential alone, for at most two minutes", () => {

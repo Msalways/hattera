@@ -40,7 +40,7 @@ const base: FleetInput = {
 const registryFile = "/etc/openmausbot/fleet.json";
 const withRegistry = (workspaces = {}) => ({ [registryFile]: JSON.stringify({ ...emptyRegistry("agentada.cc"), workspaces }) });
 
-describe("openmausbot fleet", () => {
+describe("hattera fleet", () => {
   it("updates only managed OpenRouter models and rejects missing, malformed or redirected config", async () => {
     const workspace: FleetWorkspace = { slug: "acme", host: "acme.agentada.cc", port: 8810, webhookPort: 8811, status: "running", createdAt: "" };
     const path = "/var/lib/openmausbot/acme/.config/opencode/opencode.json";

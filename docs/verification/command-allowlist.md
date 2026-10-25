@@ -14,13 +14,13 @@ and requests to widen a provider sandbox cannot acquire a command rule. Only
 owners/admins manage bot-wide rules. Rules stay on this installation; templates,
 copies and workspace backups do not carry them to another bot or machine.
 
-Use the disposable server and browser from `control-omb ui`; this recipe never
+Use the disposable server and browser from `control-hattera ui`; this recipe never
 opens the user's desktop app or writes to the user's workspace data.
 
 ## Launch and drive
 
 ```sh
-node --experimental-strip-types scripts/control-omb.ts ui launch
+node --experimental-strip-types scripts/control-hattera.ts ui launch
 ```
 
 Keep the launcher running. In a second terminal, pass the exact `ui.json` path

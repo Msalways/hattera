@@ -1,3 +1,4 @@
+import productCompatibility from "../shared/product-compat.mjs";
 import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, Tray, WebContentsView, clipboard, desktopCapturer, dialog, ipcMain, Menu, nativeImage, Notification, powerMonitor, powerSaveBlocker, safeStorage, screen, session, shell, systemPreferences, utilityProcess } from "electron";
 import { createRequire } from "node:module";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -96,6 +97,11 @@ import { createCompanyBackupSchedule } from "./company-backup-schedule.mjs";
 const { desktopCapabilities, nativeDesktopActions } = capabilitiesModule;
 const nativeActions = nativeDesktopActions(process.platform);
 const require = createRequire(import.meta.url);
+app.setName("Hattera");
+if (process.platform === "win32") app.setAppUserModelId("com.hattera.app");
+// Retain Chromium cookies and encrypted account state from existing installs.
+const legacyUserData = path.join(app.getPath("appData"), "OpenMausBot");
+if (fs.existsSync(legacyUserData)) app.setPath("userData", legacyUserData);
 const { createDisplayMediaGuard, invokeDisplayMediaCallback, selectCaptureSource } = require(
   "./screen-preview.cjs",
 );
@@ -110,7 +116,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // 127.0.0.1 explicitly — vite binds IPv4; a bare "localhost" here can
 // resolve to ::1 and paint a black window
 const DEV_URL = process.env.ELECTRON_START_URL ?? "http://127.0.0.1:5199";
-const DEFAULT_COMPOSIO_BROKER_URL = "https://openmausbot-composio.milindsoni201.workers.dev";
+const DEFAULT_COMPOSIO_BROKER_URL = "";
 let SERVER_PORT = 8799;
 const APP_ICON = path.join(__dirname, "resources/app-icon.png");
 let desktopViewerWindow = null;
@@ -219,14 +225,14 @@ function applyUnreadBadge(win = mainWindow) {
 // intercepting input. This app is not graphics-heavy, so reliability wins.
 if (process.platform === "linux") {
   app.disableHardwareAcceleration();
-  app.setDesktopName("com.openmausbot.app.desktop");
+  app.setDesktopName("com.hattera.app.desktop");
 }
 
 // One instance per user: without this lock a second launch forks a second
 // harness server on a fallback port and splits data dirs in two. The loser
 // exits before any child or window exists; the winner surfaces itself.
 if (!app.requestSingleInstanceLock()) {
-  console.log("[desktop] OpenMausBot is already running — focusing that window");
+  console.log("[desktop] Hattera is already running — focusing that window");
   process.exit(0);
 }
 
@@ -342,7 +348,7 @@ let cloudAccountRestoring = false;
 // Until it has finished, which Cloud is the person's is only a hint (updaterPageOffered).
 let cloudSignInRestored = false;
 /** Wait for a saved Cloud sign-in to finish restoring (a local read and one
- * check with OpenMausBot Cloud), at most 5 s: Settings → OpenMausBot Cloud must not take it
+ * check with Hattera Cloud), at most 5 s: Settings → Hattera Cloud must not take it
  * for signed out, nor the microphone refuse My Cloud for asking early. */
 function cloudAccountRestored() {
   return Promise.race([cloudAccountStarted, new Promise(resolve => setTimeout(resolve, 5_000).unref?.())]);
@@ -400,7 +406,7 @@ const serverSupervisor = createServerSupervisor({
     slog("server recovery paused after repeated failures; quit and reopen to retry");
     dialog.showErrorBox(
       "The bot server stopped",
-      "Automatic recovery could not restart the background server. Quit and reopen OpenMausBot to try again. Interrupted chat turns were not resent.\n\n" +
+      "Automatic recovery could not restart the background server. Quit and reopen Hattera to try again. Interrupted chat turns were not resent.\n\n" +
         `Server log: ${path.join(LOG_DIR, "server.log")}`,
     );
   },
@@ -412,7 +418,7 @@ function desktopDataDir() {
   // then pass this exact resolved path to the utility child. server/config.ts
   // intentionally treats an empty OMB_DATA_DIR differently, so inheriting it
   // without normalization would lease one directory and write another.
-  return process.env.OMB_DATA_DIR || path.join(app.getPath("home"), ".openmausbot");
+  return process.env.OMB_DATA_DIR || productCompatibility.defaultDataDirectory(app.getPath("home"));
 }
 
 async function stopUtilityServer(proc, timeoutMs = UTILITY_SERVER_STOP_TIMEOUT_MS) {
@@ -550,8 +556,8 @@ function composioBrokerUrl() {
 }
 
 // The packaged app has no terminal: everything about the server child's life
-// goes to server.log in the OS log dir (~/Library/Logs/OpenMausBot on macOS,
-// Console.app-visible; %APPDATA%\OpenMausBot\logs on Windows), which is also
+// goes to server.log in the OS log dir (~/Library/Logs/Hattera on macOS,
+// Console.app-visible; %APPDATA%\Hattera\logs on Windows), which is also
 // why stdio is piped, not inherited — under a Finder/Explorer launch the
 // parent's stdio leads nowhere and a failed boot is otherwise undiagnosable.
 const LOG_DIR = app.getPath("logs");
@@ -1055,7 +1061,7 @@ function syncPhoneSecretKey(proc) {
 
 function ensureCloudAccount() {
   if (cloudAccount) return cloudAccount;
-  if (!app.isPackaged || desktopRemoteAccess) throw new Error("MausBot Cloud sign-in requires the local desktop app.");
+  if (!app.isPackaged || desktopRemoteAccess) throw new Error("Hattera Cloud sign-in requires the local desktop app.");
   cloudAccount = createCloudAccountClient({
     store: createCloudAccountStore({ file: path.join(app.getPath("userData"), "cloud-account.bin"), encryption: {
       available: async () => (await safeStorage.isAsyncEncryptionAvailable()) &&
@@ -1106,13 +1112,13 @@ async function readCloudOfferBrand() {
   brandedBuild = status.source === "file";
   refreshApplicationMenu();
 }
-/** OpenMausBot Cloud is offered (Add a Cloud…, the card after an update)
+/** Hattera Cloud is offered (Add a Cloud…, the card after an update)
  * only by the installed app on this computer: never a dev build, companion
  * mode, or a branded build, whose desktop is not ours to advertise on. Until
  * the local server has said which build this is, nothing is offered; a
  * failed read is tried again the next time an offer could show. */
 function cloudOffersAllowed() {
-  return app.isPackaged && !desktopRemoteAccess && brandedBuild === false;
+  return app.isPackaged && !desktopRemoteAccess && brandedBuild === false && Boolean(process.env.OMB_CONTROL_PLANE_URL);
 }
 async function cloudOffersReady() {
   if (brandedBuild === null && serverReady) await readCloudOfferBrand();
@@ -1129,7 +1135,7 @@ function cloudMenuSublabels() {
   const line = entry ? cloudMenuSublabel(cloudAccount?.state(), menuDate) : null;
   return entry && line ? { [entry.id]: line } : {};
 }
-/** What both server menus add for OpenMausBot Cloud. `source`: how the
+/** What both server menus add for Hattera Cloud. `source`: how the
  * Add a Cloud dialog was reached, for the Admin's counts. */
 function cloudMenuOptions(source = "app_menu") {
   return { sublabels: cloudMenuSublabels(), ...(cloudOffersAllowed() ? { onAddCloud: () => void workspaceMenuAction(() => openCloudAdd(source)) } : {}) };
@@ -1179,7 +1185,7 @@ async function anotherCloudBox(state) {
     await ensureCloudAccount().interest("another_cloud");
     await dialog.showMessageBox({ type: "info", message: "Thanks. We’ll email you when you can add another Cloud." });
   } catch {
-    await dialog.showMessageBox({ type: "error", message: "Could not reach MausBot Cloud", detail: "Nothing was saved. Check your connection and try again." });
+    await dialog.showMessageBox({ type: "error", message: "Could not reach Hattera Cloud", detail: "Nothing was saved. Check your connection and try again." });
   }
 }
 /** Once, when a Cloud this app checked out for is ready and the window is
@@ -1376,7 +1382,7 @@ async function runCompanyBackup(kind, input, scheduled = null) {
     const status = await localBackupStatus(proc);
     if (status.pendingRestore) {
       publishCompanyBackupState({ busy: false, pendingRestore: true });
-      throw new Error("Restart OpenMausBot to finish the pending restore before starting another backup operation.");
+      throw new Error("Restart Hattera to finish the pending restore before starting another backup operation.");
     }
     if (status.busy) throw companyBackupDeferred();
     const transfers = createCompanyBackups({
@@ -1622,8 +1628,8 @@ function buildErrorPage({ allPortsOccupied }) {
   const serverLogPath = path.join(LOG_DIR, "server.log");
   const serverLogHref = pathToFileURL(serverLogPath).href;
   const reason = allPortsOccupied
-    ? "Every OpenMausBot port answered health checks from another process — likely a second copy of the app, or another program on ports 8799–28799. Quit that program, then quit and reopen OpenMausBot."
-    : "The background server didn't come up in time — this is usually slow startup, not a port conflict. Quit and reopen OpenMausBot.";
+    ? "Every Hattera port answered health checks from another process — likely a second copy of the app, or another program on ports 8799–28799. Quit that program, then quit and reopen Hattera."
+    : "The background server didn't come up in time — this is usually slow startup, not a port conflict. Quit and reopen Hattera.";
   return (
     "data:text/html;charset=utf-8," +
     encodeURIComponent(
@@ -1686,7 +1692,7 @@ function desktopViewerErrorPage(message, retryUrl) {
 }
 
 function openDesktopViewer(owner, rawUrl, rawTitle, contextId) {
-  if (!owner || owner.isDestroyed()) throw new Error("The OpenMausBot window is unavailable");
+  if (!owner || owner.isDestroyed()) throw new Error("The Hattera window is unavailable");
   const url = desktopViewerUrl(rawUrl);
   const titleCandidate = Object.prototype.toString.call(rawTitle) === "[object String]" ? rawTitle.trim() : "";
   const title = titleCandidate ? titleCandidate.slice(0, 80) : "Live desktop";
@@ -1804,7 +1810,7 @@ function openDesktopViewer(owner, rawUrl, rawTitle, contextId) {
 }
 
 function ensureDesktopWorkspace(owner) {
-  if (!owner || owner.isDestroyed()) throw new Error("The OpenMausBot window is unavailable");
+  if (!owner || owner.isDestroyed()) throw new Error("The Hattera window is unavailable");
   if (desktopWorkspaceManager) {
     if (desktopWorkspaceOwner !== owner) {
       throw new Error("The two-desktop view belongs to another app window");
@@ -2068,7 +2074,7 @@ function navigateMainWindow(url) {
 }
 
 /** The person's Cloud address for their account, kept while a check with
- * OpenMausBot Cloud is pending or failed, or the sign-in has ended
+ * Hattera Cloud is pending or failed, or the sign-in has ended
  * (cloud-home.mjs rememberedCloudHome). */
 let rememberedHome = null;
 
@@ -2151,8 +2157,8 @@ async function deliverOrganizationEntry() {
  * My Cloud by itself (CloudAccountSettings). No prompt: a hosted server left
  * for it stays saved under Servers, and the Cloud replaces it anyway. */
 async function openCloudEntry() {
-  if (!app.isPackaged) throw new Error("MausBot Cloud requires the installed desktop app.");
-  if (desktopRemoteAccess) throw new Error("This app is connected to another computer. Disconnect it to use MausBot Cloud on this computer.");
+  if (!app.isPackaged) throw new Error("Hattera Cloud requires the installed desktop app.");
+  if (desktopRemoteAccess) throw new Error("This app is connected to another computer. Disconnect it to use Hattera Cloud on this computer.");
   if (!serverReady) throw new Error("This installation is unavailable. Restart the app and open My Cloud again.");
   // Let a saved sign-in finish restoring first: the view must not take it for
   // signed out and start another.
@@ -2724,7 +2730,7 @@ ipcMain.handle("desktop:export-diagnostics", localOnly("desktop:export-diagnosti
   return result.filePath;
 }));
 
-// Bots hand users files as markdown links to paths inside the OpenMausBot
+// Bots hand users files as markdown links to paths inside the Hattera
 // home (workspaces, attachments). As plain anchors those resolved against the
 // page origin, so the click opened http://127.0.0.1:8799<path> in the default
 // browser and the server's SPA fallback answered with index.html — a second
@@ -2802,7 +2808,7 @@ ipcMain.handle("desktop:open-external", localOnly("desktop:open-external", async
 
 // The Boat VNC viewer must be a top-level page for its token exchange. A
 // sandboxed modal BrowserWindow satisfies that requirement while keeping the
-// live desktop inside OpenMausBot instead of sending the person to a browser.
+// live desktop inside Hattera instead of sending the person to a browser.
 ipcMain.handle("desktop-viewer:open", localOnly("desktop-viewer:open", (event, rawUrl, title, contextId) => {
   const owner = BrowserWindow.fromWebContents(event.sender);
   return openDesktopViewer(owner, rawUrl, title, contextId);
@@ -3024,7 +3030,7 @@ for (const method of ["state", "begin", "signInAgain", "reopen", "cancel", "refr
 // and one of this app's own sources; main makes the request and opens only
 // Dodo's checkout page (cloud-account.mjs checkoutDestination).
 ipcMain.handle("cloud-account:checkout", localWorkspaceOnly("cloud-account:checkout", async (_event, plan, source) => {
-  if (!(await cloudOffersReady())) throw new Error("MausBot Cloud isn't offered in this app.");
+  if (!(await cloudOffersReady())) throw new Error("Hattera Cloud isn't offered in this app.");
   const client = ensureCloudAccount();
   if (typeof plan !== "string" || !CHECKOUT_SOURCES.includes(source)) throw new Error("Choose a plan to continue.");
   const offer = await client.offer();
@@ -3595,15 +3601,16 @@ app.whenReady().then(async () => {
       });
     } catch (error) {
       dialog.showErrorBox(
-        "OpenMausBot could not start safely",
-        error?.message ?? "Another process is using this OpenMausBot data folder.",
+        "Hattera could not start safely",
+        error?.message ?? "Another process is using this Hattera data folder.",
       );
       app.quit();
       return;
     }
   }
   if (app.isPackaged) {
-    app.setAsDefaultProtocolClient("openmausbot");
+    app.setAsDefaultProtocolClient("hattera");
+    app.setAsDefaultProtocolClient("openmausbot"); // existing shared links
     // Chromium adds this capability below JavaScript, so renderer requests
     // can mutate the local harness while a Full-access shell using curl
     // cannot impersonate the person operating the desktop app.

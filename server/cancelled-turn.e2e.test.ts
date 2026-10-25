@@ -7,7 +7,7 @@ import { createServer } from "node:http";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it, vi } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import { openSse } from "./testing/sse.ts";
 import { STOPPED_TURN_NAME } from "../shared/client-cancel.ts";
 import { roomRetryRequest } from "../src/lib/room-retry.ts";

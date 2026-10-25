@@ -17,6 +17,7 @@ import {
 import { PASS, type RouteHandler } from "./table.ts";
 
 export interface UsageRouteDeps {
+  accountName?(instanceId: string): string | undefined;
   dataDir: string;
   /** The operator's price list, when the server may read it (`billing`). */
   prices(): PriceList | null;
@@ -49,12 +50,16 @@ export function createUsageRoutes(deps: UsageRouteDeps): RouteHandler {
       return json(res, 400, { error: `groupBy must be one of ${USAGE_GROUPINGS.join(", ")}` });
     }
     const groupBy = requested as UsageGroupBy;
+    const summary = summarizeUsage(rows, groupBy, prices);
+    if (groupBy === "account") {
+      for (const group of summary.groups) group.label = deps.accountName?.(group.key.slice("account:".length)) || group.label;
+    }
     res.setHeader("cache-control", "no-store");
     return json(res, 200, {
       from: range.from.toISOString(),
       to: range.to.toISOString(),
       groupBy,
-      ...summarizeUsage(rows, groupBy, prices),
+      ...summary,
       budget: deps.budget(),
       billing: prices ? { currency: deps.currency() } : null,
     });

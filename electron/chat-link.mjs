@@ -8,7 +8,7 @@
 // Main only recognizes them and hands them to the page, which checks them
 // strictly against the chats it has (src/lib/thread-refs.ts) and opens one or
 // says it cannot. Opening a link never sends, interrupts or creates anything.
-const CHAT_LINK_PREFIXES = ["openmausbot://thread/", "openmausbot://bot/"];
+const CHAT_LINK_PREFIXES = ["hattera://thread/", "hattera://bot/", "openmausbot://thread/", "openmausbot://bot/"];
 const MAX_LINK_LENGTH = 1024;
 
 export function chatLinkFrom(value) {

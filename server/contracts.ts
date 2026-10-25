@@ -67,7 +67,7 @@ export function isModelVariant(value: unknown): value is string {
 // "Which model" is a data value carried on the request, never a service
 // binding (upstream ModelSelectionWire). instanceId is the routing key.
 
-/** An image already admitted to OpenMausBot's private attachment store.
+/** An image already admitted to Hattera's private attachment store.
  * Drivers receive this structured value instead of learning a host path from
  * prompt text. The harness validates the path and size before constructing it. */
 export interface TurnImageInput {
@@ -88,6 +88,8 @@ export interface InstanceConfig {
    * unchanged and custom images are admitted as bounded local data URLs. */
   icon?: ProviderIcon;
   environment?: Record<string, string>;
+  /** App-created independent credentials; never receives workspace defaults. */
+  accountProfile?: "isolated";
   enabled?: boolean;
   /** Picker group for this instance, over its driver's default: an
    * `openai-compat` instance on a provider's own key is "api", not "custom". */
@@ -535,6 +537,10 @@ export interface TextGenerationOptions {
 }
 
 export interface ProviderInstance {
+  /** Account allowances through the native provider's effective login. */
+  accountUsage?(): Promise<{ metrics: import("../shared/account-usage.ts").AccountMetric[]; source: string }>;
+  /** HTTP reporting shares the bounded request pool, without native process probes. */
+  readonly accountUsageTransport?: "http";
   readonly instanceId: InstanceId;
   readonly driverKind: DriverKind;
   readonly displayName: string | undefined;

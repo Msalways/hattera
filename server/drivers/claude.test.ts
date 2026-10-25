@@ -130,9 +130,11 @@ describe("ClaudeDriver.decodeConfig", () => {
     expect(sumNativeTurnResults(null, first)).toEqual(first);
     expect(sumNativeTurnResults(first, { ok: true, stopReason: "end_turn", cost: 0.03, usage: { input: 3, output: 4 } }))
       .toEqual({ ok: true, stopReason: "end_turn", cost: 0.03, usage: { input: 15, output: 9, cachedInput: 2 } });
-    // a failed half fails the turn; a figure missing on one side leaves the other's alone
+    // A missing native result preserves the subtotal, not a claim of complete usage.
     expect(sumNativeTurnResults(first, { ok: false, stopReason: null, cost: null }))
-      .toEqual({ ok: false, stopReason: "end_turn", cost: 0.01, usage: first.usage });
+      .toEqual({ ok: false, stopReason: "end_turn", cost: 0.01, usage: { ...first.usage, tokensReported: false } });
+    expect(sumNativeTurnResults(first, { ok: true, stopReason: null, cost: null, usage: { input: 3, output: 0, tokensReported: false } }).usage)
+      .toMatchObject({ input: 15, output: 5, tokensReported: false });
     expect(sumNativeTurnResults({ ok: true, stopReason: null, cost: null }, { ok: true, stopReason: null, cost: null }))
       .toEqual({ ok: true, stopReason: null, cost: null });
   });
@@ -1526,7 +1528,7 @@ describe("ClaudeDriver turns (fake CLI)", () => {
 
     const seen = JSON.parse(readFileSync(dump, "utf8"));
     // The one engine that connects by itself: its handshake has only
-    // spec-defined fields (claude.ts), so no OpenMausBot connector here,
+    // spec-defined fields (claude.ts), so no Hattera connector here,
     // unlike every other engine.
     expect(seen.mcpConfig.mcpServers.docs).toEqual({ type: "http", url: "https://docs.example/mcp", headers: { Authorization: "Bearer tok-docs" } });
     expect(seen.mcpConfig.mcpServers.legacy).toEqual({ type: "sse", url: "https://old.example/sse", headers: {} });
@@ -2232,7 +2234,7 @@ describe("ClaudeDriver turns (fake CLI)", () => {
       await expect(pendingAnswer).resolves.toMatchObject({ id: "before-stop", behavior: "deny" });
       const lateAnswer = nextAnswer();
       conn.write(JSON.stringify({ t: "ask", id: "after-stop", tool: "Bash", input: { command: "echo too late" } }) + "\n");
-      await expect(lateAnswer).resolves.toMatchObject({ id: "after-stop", behavior: "deny", message: "OpenMausBot: the turn ended" });
+      await expect(lateAnswer).resolves.toMatchObject({ id: "after-stop", behavior: "deny", message: "Hattera: the turn ended" });
       expect(recorder.events.filter((e) => e.type === "request.opened")).toHaveLength(openedBefore);
       await expect(instance.adapter.respondToRequest(threadId, "after-stop", { behavior: "allow" })).resolves.toBe("unavailable");
     } finally {
@@ -2811,7 +2813,7 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     await expect(answer).resolves.toMatchObject({
       id: "ask-between",
       behavior: "deny",
-      message: "OpenMausBot: the turn ended",
+      message: "Hattera: the turn ended",
     });
     expect(recorder.events.filter((e) => e.type === "request.opened")).toHaveLength(opensBefore);
     await expect(
@@ -3343,7 +3345,7 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     expect(await nextAnswer()).toMatchObject({
       id: "dup-1",
       behavior: "deny",
-      message: "OpenMausBot: duplicate ask id — skipping this request.",
+      message: "Hattera: duplicate ask id — skipping this request.",
     });
     expect(recorder.events.filter((e) => e.type === "request.opened" && e.requestId === "dup-1")).toHaveLength(1);
 
@@ -3375,7 +3377,7 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     expect(await conn2Answer).toMatchObject({
       id: "dup-2",
       behavior: "deny",
-      message: "OpenMausBot: duplicate ask id — skipping this request.",
+      message: "Hattera: duplicate ask id — skipping this request.",
     });
     expect(recorder.events.filter((e) => e.type === "request.opened" && e.requestId === "dup-2")).toHaveLength(1);
 
@@ -3433,7 +3435,7 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     expect(await nextAnswer()).toMatchObject({
       id: "dup-4",
       behavior: "deny",
-      message: "OpenMausBot: duplicate ask id — skipping this request.",
+      message: "Hattera: duplicate ask id — skipping this request.",
     });
     expect(recorder.events.filter((e) => e.type === "request.opened" && e.requestId === "dup-4")).toHaveLength(1);
 
@@ -3477,7 +3479,7 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     expect(await reply).toMatchObject({
       id: "ask-late",
       behavior: "deny",
-      message: "OpenMausBot: the turn ended",
+      message: "Hattera: the turn ended",
     });
     expect(recorder.events.filter((e) => e.type === "request.opened")).toHaveLength(opensBefore);
     await expect(instance.adapter.respondToRequest("t-perm-late", "ask-late", { behavior: "allow" })).resolves.toBe(
@@ -3512,7 +3514,7 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     expect(await reply).toMatchObject({
       id: "q-late",
       behavior: "answer",
-      message: "OpenMausBot: the turn is ending — wrap up.",
+      message: "Hattera: the turn is ending — wrap up.",
     });
     expect(recorder.events.filter((e) => e.type === "request.opened")).toHaveLength(opensBefore);
     await expect(

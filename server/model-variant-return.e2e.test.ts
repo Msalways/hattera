@@ -3,7 +3,7 @@ import { closeSync, existsSync, openSync, readFileSync, writeFileSync } from "no
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer } from "../scripts/control-hattera.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 
 it("blocks direct and group turns when an offline engine returns without support for its saved variant", async () => {

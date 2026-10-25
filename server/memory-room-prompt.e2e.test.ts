@@ -4,7 +4,7 @@
 // two different places, and only the assembled bytes prove they agree.
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 
 it("gives a room turn the memory_update guidance, not the file-tools one", async () => {
   const fixture = await launchVerificationServer();
@@ -27,7 +27,7 @@ it("gives a room turn the memory_update guidance, not the file-tools one", async
     }
   };
   try {
-    // SAFETY: control-omb returns the created bot record under `bot`
+    // SAFETY: control-hattera returns the created bot record under `bot`
     const { bot: lead } = await runControlOmb(["new-bot", "--name", "Lead"], { env }) as { bot: { id: string } };
     // SAFETY: same shape as above
     const { bot: helper } = await runControlOmb(["new-bot", "--name", "Helper"], { env }) as { bot: { id: string } };

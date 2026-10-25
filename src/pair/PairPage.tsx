@@ -25,19 +25,25 @@ export function githubSignInTarget(currentOrigin: string, configuredOrigin?: str
   return configuredOrigin && configuredOrigin !== currentOrigin ? `${configuredOrigin}/pair?githubStart=1` : null;
 }
 
-/** In the desktop app, a code in the link came from the app itself (Connect
- * to my Cloud, or a pairing link the person pasted to connect): it is used at
- * once, with no second click. A browser still asks, so a link someone sent
- * cannot sign it in to their server unseen. */
-export function pairsAutomatically(initialCode: string | null, desktop = typeof window !== "undefined" && Boolean(window.ogb?.workspaces)): boolean {
-  return Boolean(initialCode) && desktop;
+/** Desktop links and server-confirmed local CLI links redeem their one-use
+ * code automatically. Self-hosted and ordinary remote links ask for confirmation. The
+ * marker never grants access: the server must validate the code and session. */
+export function pairsAutomatically(
+  initialCode: string | null,
+  desktop = typeof window !== "undefined" && Boolean(window.ogb?.workspaces),
+  search = typeof location !== "undefined" ? location.search : "",
+  hostname = typeof location !== "undefined" ? location.hostname : "",
+  localCli = false,
+): boolean {
+  return Boolean(initialCode) && (desktop || localCli && new URLSearchParams(search).get("cli") === "1"
+    && ["localhost", "127.0.0.1", "[::1]"].includes(hostname));
 }
 
 /** What the page says above the form. My Cloud has no server screen to
  * read a code from: it says where its connection starts instead. */
 export function pairIntro({ mode, sent, email, cloudHome }: { mode: "email" | "code" | null; sent: boolean; email: string; cloudHome: boolean }): string {
   if (mode === "email") return sent ? `We emailed an 8-digit code to ${email}. It works once and expires in ten minutes.` : "Enter your email and we will send you a one-time code.";
-  if (cloudHome) return "To open My Cloud, choose Open My Cloud in the desktop app (Settings → MausBot Cloud), or Use in your browser on your Plan page. Have a pairing code? Enter it below.";
+  if (cloudHome) return "To open My Cloud, choose Open My Cloud in the desktop app (Settings → Hattera Cloud), or Use in your browser on your Plan page. Have a pairing code? Enter it below.";
   return "Enter the pairing code shown on the server. Codes work once and expire after five minutes.";
 }
 
@@ -62,7 +68,8 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
   const githubAutoStart = useRef(false);
 
   useEffect(() => {
-    if (!opening || !initialCode) return;
+    if (!initialCode || !pairsAutomatically(initialCode, undefined, undefined, undefined, environment?.capabilities.localCli === true)) return;
+    setOpening(true);
     let active = true;
     void pairWithCode({ code: initialCode, label, attemptId }).then((result) => {
       if (!active) return;
@@ -73,7 +80,7 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
     return () => { active = false; };
     // Once, for the code the link carried.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [environment?.capabilities.localCli]);
 
   useEffect(() => {
     void fetch("/.well-known/openmausbot/environment")
@@ -161,7 +168,7 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
         {reasonWorthShowing(reason) && !connected ? <p className="mt-3 text-[13px] text-ink-secondary">{reasonWorthShowing(reason)}</p> : null}
         {githubFailure && !connected ? <p role="alert" className="mt-3 text-[13px] text-danger">{githubFailure === "state" ? "GitHub sign-in lost its browser session. Start again from this page." : githubFailure === "start" ? "GitHub sign-in could not start. Try again or check the server log." : "GitHub sign-in did not finish. Use the configured owner account and try again."}</p> : null}
         {/* An expired or used code on a Cloud: the app starts a fresh one. */}
-        {error && cloudHome && initialCode ? <p className="mt-3 text-[13px] text-ink-secondary">This link has expired or was already used. In the desktop app, open Settings → MausBot Cloud and choose Open My Cloud.</p> : null}
+        {error && cloudHome && initialCode ? <p className="mt-3 text-[13px] text-ink-secondary">This link has expired or was already used. In the desktop app, open Settings → Hattera Cloud and choose Open My Cloud.</p> : null}
         </>}
         <div className="hattera-pair-options">
         {!opening && !connected && environment?.capabilities.githubSignIn ? (
@@ -218,7 +225,7 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
                 <input id="signin-label" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} className={input} />
               </>
             ) : null}
-            {error ? <p className="mt-3 text-[13px] text-danger">{error}</p> : null}
+            {error ? <p role="alert" className="mt-3 text-[13px] text-danger">{error}</p> : null}
             <button type="submit" disabled={busy || !email.includes("@") || (sent && otp.replace(/\D/g, "").length < 8)} className={button}>
               {busy ? (sent ? "Signing in…" : "Sending…") : sent ? "Sign in" : "Send code"}
             </button>
@@ -255,7 +262,7 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
               This device
             </label>
             <input id="pair-label" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} className={input} />
-            {error ? <p className="mt-3 text-[13px] text-danger">{error}</p> : null}
+            {error ? <p role="alert" className="mt-3 text-[13px] text-danger">{error}</p> : null}
             <button type="submit" disabled={busy || code.replace(/[^a-z0-9]/gi, "").length < 12} className={button}>
               {busy ? "Connecting…" : "Connect"}
             </button>

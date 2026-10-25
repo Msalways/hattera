@@ -79,7 +79,7 @@ describe.skipIf(process.platform === "win32")("Codex browser turns with a minima
       child.once("exit", () => { clearTimeout(timer); reject(new Error(`Fixture exited: ${stderr}`)); });
       child.stdout!.on("data", (chunk) => {
         output += chunk;
-        if (output.includes(`openmausbot server on ${base}`)) { clearTimeout(timer); resolve(); }
+        if (output.includes(`hattera server on ${base}`)) { clearTimeout(timer); resolve(); }
       });
     });
     events = await openSse(`${base}/api/events`);

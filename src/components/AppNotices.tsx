@@ -1,6 +1,6 @@
 // The one place the desktop app's notices appear (src/lib/notices.ts): at the
 // bottom left, one at a time, in order:
-// 1. the card after the update, offering OpenMausBot Cloud's free trial to
+// 1. the card after the update, offering Hattera Cloud's free trial to
 //    someone with no plan (CloudTrialIntro);
 // 2. the free trial's own notice, for someone in one (CloudTrialNotice);
 // 3. This computer's My Cloud card, for someone with a plan (CloudNotice);

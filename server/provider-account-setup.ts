@@ -5,7 +5,8 @@ import { z } from "zod";
 import { writeFileAtomic } from "./atomic.ts";
 import { userHome, harnessHome } from "./env-path.ts";
 import { managedHermesHome } from "./official-engine-install.ts";
-import { providerAccountForm } from "../shared/provider-account-setup.ts";
+import { PROVIDER_KEY_ENV } from "../shared/provider-account-setup.ts";
+import { profileAccountForm } from "./provider-profiles.ts";
 import type { InstanceConfigMap } from "./contracts.ts";
 import { clineProviderSettingsPath } from "./drivers/acp/cline.ts";
 
@@ -35,13 +36,15 @@ function save(path: string, value: unknown, yaml = false): void {
 }
 
 /** Fixed vendor settings, using the same home as the instance's chat process. */
-export function configureProviderAccount(instanceId: string, entry: InstanceConfigMap[string], raw: unknown): InstanceConfigMap[string] {
-  const form = providerAccountForm(entry.driver, instanceId);
+export function configureProviderAccount(instanceId: string, entry: InstanceConfigMap[string], raw: unknown,
+  resolvedEnvironment?: Record<string, string | undefined>): InstanceConfigMap[string] {
+  const form = profileAccountForm(instanceId, entry);
   if (!form) throw new Error("This provider uses its own in-app sign-in or API-key settings.");
   const input = providerAccountInput.parse(raw);
   const next = structuredClone(entry);
   if (form === "key") {
-    const name = { cursorAgent: "CURSOR_API_KEY", droidAgent: "FACTORY_API_KEY", geminiAgent: "GEMINI_API_KEY" }[entry.driver as "cursorAgent" | "droidAgent" | "geminiAgent"];
+    const name = entry.driver === "claudeAgent" ? "ANTHROPIC_API_KEY" : PROVIDER_KEY_ENV[entry.driver];
+    if (!name) throw new Error("This provider has no API-key account form.");
     next.environment = { ...next.environment, [name]: input.key };
     return next;
   }
@@ -57,7 +60,11 @@ export function configureProviderAccount(instanceId: string, entry: InstanceConf
     throw new Error("Use an HTTPS provider URL, or HTTP for a local model server.");
   }
   const baseUrl = url.href.replace(/\/+$/, "");
-  const env = { ...process.env, ...entry.environment };
+  if (entry.driver === "openai-compat") {
+    next.config = { ...next.config as object, url: baseUrl, model: input.model, key: input.key, provider: "" };
+    return next;
+  }
+  const env = { ...process.env, ...(resolvedEnvironment ?? entry.environment) };
   if (entry.driver === "clineAgent") {
     const config = entry.config as { cli?: string } | undefined;
     const path = clineProviderSettingsPath(env, { cli: config?.cli || "cline", fullAuto: false });
@@ -68,6 +75,15 @@ export function configureProviderAccount(instanceId: string, entry: InstanceConf
       provider: "openai-compatible", model: input.model, apiKey: input.key, baseUrl,
     } } };
     settings.lastUsedProvider = "openai-compatible";
+    save(path, settings);
+  } else if (entry.driver === "opencodeGo") {
+    const path = join(env.XDG_CONFIG_HOME || join(userHome(env), ".config"), "opencode", "opencode.json");
+    const settings = document(path);
+    settings.provider = { ...record(settings.provider ?? {}), hattera: {
+      npm: "@ai-sdk/openai-compatible", name: "Hattera account", options: { baseURL: baseUrl, apiKey: input.key },
+      models: { [input.model]: { name: input.model } },
+    } };
+    settings.model = `hattera/${input.model}`;
     save(path, settings);
   } else if (entry.driver === "qwenAgent") {
     const path = join(harnessHome("qwen", env), "settings.json");

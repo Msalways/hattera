@@ -11,6 +11,33 @@ vi.mock("@/state/store", () => ({ api: vi.fn() }));
 import { PlanUsage } from "./PlanUsage";
 
 describe("Plan usage presentation", () => {
+  it("shows provider-declared availability and wallet currency without a fabricated meter", () => {
+    fixture.report = { providers: [{ id: "wallet", name: "Provider", ok: true, reporting: { status: "current", source: "Account API", metrics: [
+      { id: "unlimited", label: "Weekly", availability: "unlimited", unit: "units", used: null, remaining: null, limit: null, resetsAt: null },
+      { id: "excluded", label: "Video", availability: "not-in-plan", unit: "units", used: null, remaining: null, limit: null, resetsAt: null },
+      { id: "wallet", label: "Wallet", unit: "currency", currency: "CNY", remaining: 5, used: null, limit: null, resetsAt: null },
+    ] } }] };
+    const html = renderToStaticMarkup(createElement(PlanUsage));
+    expect(html).toContain("Unlimited (provider reported)");
+    expect(html).toContain("Not included in this plan");
+    expect(html).not.toContain('role="meter"');
+    expect(html).toMatch(/CN|CNY|¥/);
+    expect(html).not.toContain("$5");
+  });
+  it("shows arbitrary reporting metrics and stale data without inventing missing allowances", () => {
+    fixture.report = { providers: [{ id: "all", name: "Configured account", ok: true, reporting: {
+      status: "stale", source: "Native account protocol", collectedAt: "2026-10-02T09:00:00Z", message: "Connection offline", dashboardUrl: "https://example.com/usage",
+      metrics: [{ id: "model:8h", label: "8-hour", scope: "Model A", unit: "percent", used: 25, remaining: 75, limit: 100, windowSeconds: 28800, resetsAt: null },
+        { id: "unknown", label: "Monthly", scope: null, unit: "tokens", used: null, remaining: null, limit: null, windowSeconds: null, resetsAt: null }],
+    } }] };
+    const html = renderToStaticMarkup(createElement(PlanUsage));
+    expect(html).toContain("75% remaining");
+    expect(html).toContain("8-hour");
+    expect(html).toContain("last known snapshot");
+    expect(html).toContain("Not reported");
+    expect(html).not.toContain("5-hour");
+    expect(html).not.toContain("0 tokens");
+  });
   it("distinguishes remaining account allowance, per-model usage, and unavailable windows", () => {
     fixture.report = {
       fetchedAt: "2026-10-02T09:00:00Z",

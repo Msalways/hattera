@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 
 it("offers Haiku 5.5 and sends a saved selection to the Claude CLI", async () => {
   const fixture = await launchVerificationServer({ FAKE_CLAUDE_VERSION: "2.1.296" });

@@ -7,8 +7,8 @@ import { afterAll, describe, expect, it } from "vitest";
 import { resolveAgentBrowserBinary } from "../../server/browser-engine.ts";
 import { waitForExit } from "../../server/testing/cleanup.ts";
 import { BOT_ROLES, roleProfilePatch } from "../../src/lib/bot-roles.ts";
-import { runControlOmb } from "../control-omb.ts";
-import { UI_TOOLS_DIR } from "./control-omb-ui.ts";
+import { runControlOmb } from "../control-hattera.ts";
+import { UI_TOOLS_DIR } from "./control-hattera-ui.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const binary = resolveAgentBrowserBinary({ dataDir: UI_TOOLS_DIR, env: process.env });
@@ -33,7 +33,7 @@ describe("bot setup and tools in the real renderer", () => {
     let stderr = "";
     // Windows kill("SIGINT") terminates immediately instead of delivering a
     // catchable signal. Ask the disposable launcher to run its normal cleanup.
-    const launcher = new URL("./control-omb-ui.ts", import.meta.url).href;
+    const launcher = new URL("./control-hattera-ui.ts", import.meta.url).href;
     const bootstrap = `import { launchUi } from ${JSON.stringify(launcher)};
       process.on('message', message => { if (message === 'stop') process.emit('SIGINT'); });
       try { await launchUi([]); } finally { process.disconnect(); }`;

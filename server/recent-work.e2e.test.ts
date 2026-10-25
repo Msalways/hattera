@@ -5,7 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 
 /** Every memory/log/*.md under the fixture's data dir, with contents. */
 function dailyLogs(root: string): Array<{ path: string; text: string }> {
@@ -57,7 +57,7 @@ it("carries a bot's recent 1:1 work into a room turn, tells the room, logs the t
     return `${sent?.systemPrompt ?? ""}\n${text}`;
   };
   try {
-    // SAFETY: control-omb returns the created bot record under `bot`
+    // SAFETY: control-hattera returns the created bot record under `bot`
     const { bot: lead } = await runControlOmb(["new-bot", "--name", "Lead"], { env }) as { bot: { id: string; threadId: string } };
     // SAFETY: same shape as above
     const { bot: helper } = await runControlOmb(["new-bot", "--name", "Helper"], { env }) as { bot: { id: string } };

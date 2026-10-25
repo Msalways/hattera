@@ -10,6 +10,6 @@ services:
   caddy:
     environment:
       OMB_HTTPS_HOST: ""
-      OMB_PUBLIC_HOST: ${OMB_PUBLIC_HOST:?Set OMB_PUBLIC_HOST to the VM public IPv4 address}
+      OMB_PUBLIC_HOST: ${HATTERA_PUBLIC_HOST:-${OMB_PUBLIC_HOST:?Set OMB_PUBLIC_HOST to the VM public IPv4 address}}
     volumes:
       - ./deploy/oracle/Caddyfile.public-ip:/etc/caddy/Caddyfile:ro

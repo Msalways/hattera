@@ -45,7 +45,7 @@ test("inherited Object names are not install commands", () => {
 test("a staged path that is gone is not used", () => {
   const workspace = mkdtempSync(join(tmpdir(), "omb-staged-"));
   try {
-    const present = join(workspace, "OpenMausBot.deb");
+    const present = join(workspace, "Hattera.deb");
     writeFileSync(present, "x");
     const missing = join(workspace, "gone.deb");
 
@@ -98,7 +98,7 @@ test("the quoted path survives a shell round-trip", { skip: posixShell }, () => 
 });
 
 test("the whole command parses into the arguments apt-get would receive", { skip: posixShell }, () => {
-  const file = "/home/o'brien/.cache/openmausbot-updater/pending/OpenMausBot-0.1.44-amd64.deb";
+  const file = "/home/o'brien/.cache/openmausbot-updater/pending/Hattera-0.1.44-amd64.deb";
   const command = packageInstallCommand("deb", file);
 
   // Replace the privileged verb with a printer, then confirm the shell hands
@@ -127,7 +127,7 @@ test("the package marker decides the install path", () => {
     linuxPackageType({
       platform: "linux",
       resourcesPath: "/tmp/squashfs-root/resources",
-      appImage: "/home/u/OpenMausBot.AppImage",
+      appImage: "/home/u/Hattera.AppImage",
       readMarker: marker(null),
     }),
     "AppImage",
@@ -139,7 +139,7 @@ test("the package marker decides the install path", () => {
     linuxPackageType({
       platform: "linux",
       resourcesPath: "/opt/app/resources",
-      appImage: "/home/u/OpenMausBot.AppImage",
+      appImage: "/home/u/Hattera.AppImage",
       readMarker: marker("deb"),
     }),
     "deb",

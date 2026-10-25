@@ -24,21 +24,45 @@ export async function codexAccountEmail(
   env: Record<string, string | undefined>,
   timeoutMs = 3_000,
 ): Promise<string | null> {
+  const response = await codexAccountRequest(cli, env, "account/read", timeoutMs);
+  const account = (response as { account?: { type?: string; email?: unknown } } | null)?.account;
+  const email = account?.type === "chatgpt" ? account.email : null;
+  return typeof email === "string" && email.length <= 254 && EMAIL.test(email) && !/[\p{Cc}\p{Cf}]/u.test(email) ? email : null;
+}
+
+/** A bounded, read-only exchange; never creates a thread or starts inference. */
+export async function codexAccountRequest(
+  cli: string,
+  env: Record<string, string | undefined>,
+  method: "account/read" | "account/rateLimits/read" | "account/usage/read",
+  timeoutMs = 8_000,
+): Promise<unknown | null> {
+  return (await codexAccountRequests(cli, env, [method], timeoutMs))?.[method] ?? null;
+}
+
+export async function codexAccountRequests(
+  cli: string,
+  env: Record<string, string | undefined>,
+  methods: readonly ("account/read" | "account/rateLimits/read" | "account/usage/read")[],
+  timeoutMs = 8_000,
+): Promise<Record<string, unknown> | null> {
+  if (!methods.length) return {};
   const cwd = env.HOME || env.USERPROFILE || homedir();
   if (!isAbsolute(cwd) || !codexHome(env)) return null;
-  return new Promise((resolveEmail) => {
+  return new Promise((resolveResult) => {
     let child: ReturnType<typeof spawnCli>;
     try {
       child = spawnCli(cli, ["app-server"], { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
     } catch {
-      resolveEmail(null);
+      resolveResult(null);
       return;
     }
     let finishing = false;
     let buffer = "";
     let outputBytes = 0;
     let initialized = false;
-    const finish = async (email: string | null) => {
+    const results: Record<string, unknown> = {};
+    const finish = async (result: Record<string, unknown> | null) => {
       if (finishing) return;
       finishing = true;
       clearTimeout(timer);
@@ -52,7 +76,7 @@ export async function codexAccountEmail(
         }
         stopped = await killCliTree(child, 1_000);
       }
-      resolveEmail(stopped ? email : null);
+      resolveResult(stopped ? result : null);
     };
     const timer = setTimeout(() => { void finish(null); }, timeoutMs);
     timer.unref();
@@ -67,7 +91,7 @@ export async function codexAccountEmail(
     child.stdout.on("data", (chunk: string) => {
       if (finishing) return;
       outputBytes += Buffer.byteLength(chunk);
-      if (outputBytes > MAX_OUTPUT) { void finish(null); return; }
+      if (outputBytes > (methods.length === 1 && methods[0] === "account/read" ? MAX_OUTPUT : 256 * 1024)) { void finish(null); return; }
       buffer += chunk;
       let newline: number;
       while (!finishing && (newline = buffer.indexOf("\n")) !== -1) {
@@ -80,14 +104,13 @@ export async function codexAccountEmail(
           if (message.error || !message.result) { void finish(null); return; }
           initialized = true;
           send({ method: "initialized", params: {} });
-          send({ id: 2, method: "account/read", params: { refreshToken: false } });
-        } else if (initialized && message?.id === 2) {
-          const account = message.error ? null : message.result?.account;
-          const email = account?.type === "chatgpt" ? account.email : null;
-          void finish(typeof email === "string" && email.length <= 254 && EMAIL.test(email) && !/[\p{Cc}\p{Cf}]/u.test(email) ? email : null);
+          methods.forEach((method, index) => send({ id: index + 2, method, params: method === "account/read" ? { refreshToken: false } : {} }));
+        } else if (initialized && typeof message?.id === "number" && methods[message.id - 2]) {
+          results[methods[message.id - 2]] = message.error ? null : message.result ?? null;
+          if (Object.keys(results).length === methods.length) void finish(results);
         }
       }
     });
-    send({ id: 1, method: "initialize", params: { clientInfo: { name: "openmausbot", version: "1" } } });
+    send({ id: 1, method: "initialize", params: { clientInfo: { name: "openmausbot", version: "1" }, ...(methods.some(method => method !== "account/read") ? { capabilities: { experimentalApi: true } } : {}) } });
   });
 }

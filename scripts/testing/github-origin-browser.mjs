@@ -12,6 +12,7 @@ if (dockerUrl && (new URL(dockerUrl).hostname !== '127.0.0.1' || !new URL(docker
 const profile = await mkdtemp(join(tmpdir(), 'hattera-github-browser-'));
 const dist = resolve('dist');
 const starts = [];
+const pairAttempts = [];
 let canonical = dockerUrl ? new URL(dockerUrl).origin : undefined;
 const server = dockerUrl ? null : createServer(async (req, res) => {
   const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
@@ -24,6 +25,12 @@ const server = dockerUrl ? null : createServer(async (req, res) => {
   if (pathname === '/api/auth/session') {
     res.writeHead(403, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ error: 'Sign in to this fixture' }));
+    return;
+  }
+  if (pathname === '/api/auth/pair') {
+    pairAttempts.push(pathname);
+    res.writeHead(403, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Self-hosted fixture requires sign-in' }));
     return;
   }
   if (pathname === '/identity/start/github' && req.method === 'GET') {
@@ -91,6 +98,10 @@ try {
     await send('Page.navigate', { url: `${canonical}/pair?github=state` });
     await until(() => evaluate('document.querySelector("[role=alert]")?.textContent?.includes("lost its browser session") ?? false'));
   }
+  await send('Page.navigate', { url: `${canonical}/pair?cli=1#code=ABCD-EFGH-JK23` });
+  await until(() => evaluate('!!Array.from(document.querySelectorAll("button")).find(button => button.textContent?.trim() === "Sign in with GitHub")'));
+  await new Promise(done => setTimeout(done, 1000));
+  if (pairAttempts.length || visited.some(url => new URL(url).pathname === '/api/auth/pair')) throw new Error('A CLI URL flag attempted automatic authentication on self-hosting');
   const from = dockerUrl ? canonical : `http://localhost:${new URL(canonical).port}`;
   for (let attempt = 1; attempt <= (dockerUrl ? 2 : 1); attempt++) {
     await send('Page.navigate', { url: `${from}/` });
@@ -109,7 +120,7 @@ try {
       throw new Error(`OAuth started on the wrong origin: ${JSON.stringify(start)}`);
     }
   }
-  console.log(JSON.stringify({ ok: true, from, callbackOrigin: canonical, starts: dockerUrl ? 2 : starts.length }));
+  console.log(JSON.stringify({ ok: true, from, callbackOrigin: canonical, starts: dockerUrl ? 2 : starts.length, cliUrlCannotSkipSelfHostedLogin: true }));
 } finally {
   socket?.close();
   browser.kill();

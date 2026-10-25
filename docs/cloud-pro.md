@@ -1,23 +1,23 @@
 # OMB Cloud: the home machine
 
 OMB Cloud (the Personal, Pro and Max plans) gives one person an always-on
-OpenMausBot server of their own. The plans differ in machine size, disk and
+Hattera server of their own. The plans differ in machine size, disk and
 included allowances; everything on this page applies to all of them. Each
 customer gets one Fly app with one `home` machine that is always on, a volume
 at `/data`, and TLS at `https://<app>.fly.dev`. The desktop app, the phone and
 the web are windows onto it. Local use of the app is unchanged and free.
-Customers read its name as **MausBot Cloud** wherever they meet it (the
+Customers read its name as **Hattera Cloud** wherever they meet it (the
 app, the Admin's pages, emails); "OMB Cloud" is this page's shorthand, and
-the app itself is still OpenMausBot.
+the app itself is still Hattera.
 
 OMB Cloud includes no AI usage. The person signs in on their machine with their
 own Claude or ChatGPT subscription, or an API key, through the same sign-in
-flows as any OpenMausBot server. Nothing on a Cloud home is routed to a
+flows as any Hattera server. Nothing on a Cloud home is routed to a
 platform model gateway. The one exception is a free trial's Claude credit, a
 small one-time amount the Admin meters on its own relay, used only until the
 person connects their own AI ([Trial Claude credit](#trial-claude-credit)).
 
-This page is the OpenMausBot half of a contract with three parties:
+This page is the Hattera half of a contract with three parties:
 
 - **the home machine**: this repository's `cloud-home` image (`Dockerfile`, `deploy/fly/`);
 - **the Admin** (openmaus-cloud, `docs/consumer-cloud.md` there): provisions
@@ -31,7 +31,7 @@ Contract version: `1` (`cloudContractVersion` on the wire).
 ## What the person sees
 
 1. They subscribe on the Cloud site. The Admin creates the Fly app and machine.
-2. They open the desktop app, go to **Settings → MausBot Cloud** and sign in (the
+2. They open the desktop app, go to **Settings → Hattera Cloud** and sign in (the
    existing device sign-in). A **Your Cloud** card says **Setting up** until
    the machine is up.
 3. When it is ready, the machine appears under **Servers** as **My Cloud**, and
@@ -92,7 +92,7 @@ replayed from Settings).
 1. Get the phone app: the menu under your name → **Get the phone app** (App
    Store for iPhone, APK for Android).
 2. The same menu → **Connect your phone · to your Cloud (always on)**, or
-   **Settings → MausBot Cloud → Use My Cloud on your phone**. The Cloud opens in
+   **Settings → Hattera Cloud → Use My Cloud on your phone**. The Cloud opens in
    the app window at its phone pairing.
 3. **Create pairing code**, and scan the QR code with the phone app.
 
@@ -109,14 +109,14 @@ How it fits together (`src/lib/phone-pairing.ts`):
   Cloud (always on)* first, which does what **Use My Cloud on your phone**
   does, then *to this computer*. A paid plan whose Cloud is not Ready keeps
   the single *to this computer* line, with a note that the Cloud will show
-  there. A failed switch opens Settings → MausBot Cloud.
+  there. A failed switch opens Settings → Hattera Cloud.
 - **Use My Cloud on your phone** shows for a paid plan. With a Ready Cloud it
   calls `cloud-account:connectHomeForPhone`, which takes no arguments and
   connects as **Open My Cloud** does, adding the one fixed request
   `?desktop-settings=phone` (on `/pair` too, which carries it on once paired).
   The Cloud's page opens Settings on its phone pairing. It never makes a code
   by itself. Before the Cloud is Ready, or if opening it failed, the card
-  lists the two steps instead. On the Cloud itself, Settings → MausBot Cloud
+  lists the two steps instead. On the Cloud itself, Settings → Hattera Cloud
   offers the same button and opens the pairing directly.
 
 ### Only your own devices
@@ -268,7 +268,7 @@ answers, so no step flickers back. When the main pane already shows the step tha
 sign-in in the chat view), the card says **You're on this step** instead of
 repeating it. With every listed step done but no turn finished yet, the card says the bot
 is setting itself up in the chat. Lending this Mac to the Cloud is not a step;
-it stays in Settings → MausBot Cloud and the menu-bar item's **Lending
+it stays in Settings → Hattera Cloud and the menu-bar item's **Lending
 settings…**.
 
 **Hide setup** is the only dismiss. The Cloud keeps it (`cloud-setup-hidden`
@@ -328,7 +328,7 @@ says "sign in again on your computer". A check that names no machine for the
 account ends it (a stopped machine named without its address does not). A
 call placed while a saved sign-in is still restoring, in the first seconds
 after launch, waits for it (at most 5 seconds) rather than being refused.
-Signing out of MausBot Cloud takes it away at once, and so do another
+Signing out of Hattera Cloud takes it away at once, and so do another
 account, companion client mode and restarting the app before a check succeeds
 (the last verified Cloud is kept in memory only); every other server's page
 stays refused. In a web browser, the browser asks for the microphone for
@@ -369,7 +369,7 @@ decides everything from its own verified state (`electron/cloud-entry.mjs`).
    that arrives before the app is ready). If the window already shows
    **My Cloud**, coming forward is all it does.
 2. Otherwise the window returns to this computer (a hosted server that was
-   showing stays saved under **Servers**) and opens **Settings → MausBot Cloud**.
+   showing stays saved under **Servers**) and opens **Settings → Hattera Cloud**.
    Before that view acts, the app gives a saved Cloud sign-in up to five
    seconds to finish restoring, so it is never mistaken for signed out.
 3. Opened this way, the view acts on its own, with no confirmation:
@@ -387,7 +387,7 @@ sign-out in that view starts nothing) and one automatic connection per link.
 A failed connection shows the card's error; clicking the link again retries.
 Closing Settings or choosing another section ends it. While it is open, the
 first-run welcome waits, as it does for Organization settings. A normal visit
-to **Settings → MausBot Cloud** never signs in or connects by itself.
+to **Settings → Hattera Cloud** never signs in or connects by itself.
 
 The link does nothing in development builds, and in companion client mode it
 explains that the app must be disconnected from the other computer first.
@@ -482,7 +482,7 @@ computer sharing exactly as before: off unless a maintainer sets
 
 ### What the person sees
 
-In **Settings → MausBot Cloud**, the **My Cloud** card has a **Let My Cloud use
+In **Settings → Hattera Cloud**, the **My Cloud** card has a **Let My Cloud use
 this Mac** switch under **Open My Cloud** (it is part of connecting, not
 a dialog). Turning it on shows what can be lent; each change applies at once,
 with no confirmation. The switch and the chosen scopes are the consent.
@@ -763,7 +763,7 @@ refuses to start if Node, itself, the server's entry point, Caddy or its
 config (or any folder above them) is not root's, is writable by others, or
 is on the volume. Only the `/data` volume is `maus`'s.
 
-`HOME=/data`, so `~/.claude`, `~/.codex`, `~/.grok` and OpenMausBot's own
+`HOME=/data`, so `~/.claude`, `~/.codex`, `~/.grok` and Hattera's own
 data (`/data/.openmausbot`) persist on the volume.
 
 ### Why the server stays on loopback
@@ -921,7 +921,7 @@ credit, the Admin also sets:
 | `OMB_CLOUD_AI_URL` | env | `https://cloud.openmausbot.com/api/cloud/services/ai/v1`, an OpenAI-compatible base URL with its `/v1` (as the Admin sends it): `POST {url}/chat/completions` and `GET {url}/models` only. Nothing Anthropic-shaped (no `/v1/messages`) answers a credit token. |
 | `OMB_CLOUD_AI_TOKEN` | secret | This machine's credit token (`omb_ai_…`), sent as `Authorization: Bearer`. It works only through the relay, only for this account's credit, and not at all once it is spent or the Cloud is deleted. |
 
-- **OpenMausBot's own chat engine, nothing else.** `server/cloud-credit-provider.ts`
+- **Hattera's own chat engine, nothing else.** `server/cloud-credit-provider.ts`
   adds one read-only **Trial credit · Claude** engine: the OpenAI-compatible
   driver (`openai-compat`, the same chat engine and tools as any API key) with
   the relay as its address and the token as its own key, on the models the
@@ -966,7 +966,7 @@ x-omb-cloud-timestamp: 1790000000
 x-omb-cloud-nonce: <base64url, 16–128 characters>
 x-omb-cloud-signature: v1=<base64url HMAC-SHA256(OMB_CLOUD_BOOTSTRAP_SECRET, canonical)>
 
-{"label":"OpenMausBot app (Cloud)","ttlSeconds":300}
+{"label":"Hattera app (Cloud)","ttlSeconds":300}
 ```
 
 where `canonical` is
@@ -1095,7 +1095,7 @@ notice queue (below), on this computer's page and on My Cloud's own page.
 one closes until another launch:
 
 1. **The card after the update** (`CloudTrialIntro`, id `cloud-trial-intro-v1`):
-   MausBot Cloud's free trial for someone signed out or with no plan who
+   Hattera Cloud's free trial for someone signed out or with no plan who
    has used the app before this launch, only while the Admin offers a trial
    (it waits for one). Its numbers are the Admin's: the trial's days, the
    lowest monthly price, the Claude credit and money-back. At most once a
@@ -1135,12 +1135,12 @@ being linked, or whose state is unknown is offered a plan anywhere in the app.
 
 In the Server menu, **My Cloud** goes through the same connection as
 **Open My Cloud** (no pairing code to type); when it cannot, the app
-opens **Settings → MausBot Cloud**, which says the next step. In the desktop app a
+opens **Settings → Hattera Cloud**, which says the next step. In the desktop app a
 `/pair#code=` link connects without a second click; a browser still asks. On a
 Cloud home the pairing page says where its connection starts (the environment
 descriptor's `capabilities.cloudHome`).
 
-On the person's own Cloud, open in the app's window, **Settings → MausBot Cloud**
+On the person's own Cloud, open in the app's window, **Settings → Hattera Cloud**
 shows the plan read only (`cloud-plan:*`: its name and whether it is active,
 **Manage in your browser** and **Switch to this computer**). It is listed only
 on an OMB Cloud home (`config.cloudHome`), never on another server open in the
@@ -1163,10 +1163,10 @@ malformed session summary or grant is treated as none.
 
 ## Add a Cloud
 
-The one way to buy MausBot Cloud in the app, the same for every way in:
+The one way to buy Hattera Cloud in the app, the same for every way in:
 the card after the update, **Show me how**, **Add a Cloud…** in the server
 menu (the sidebar's and the menu bar's Server menu), Settings (the Cloud card
-in General, and MausBot Cloud), and the routine screen's note.
+in General, and Hattera Cloud), and the routine screen's note.
 
 - **The menu item.** Main adds **Add a Cloud…** under the saved servers only
   for the installed app on this computer (never a dev build, companion mode or
@@ -1201,7 +1201,7 @@ in General, and MausBot Cloud), and the routine screen's note.
   checkout already being prepared), the offer says why. The plan picker is a
   radio group with one tab stop and arrow keys, and each new step takes focus
   at its heading. A payment problem, an ended sign-in or a Cloud that can't
-  be reached go to Settings → MausBot Cloud instead.
+  be reached go to Settings → Hattera Cloud instead.
 - **Checkout runs in the default browser, never the app.** Signed in, main
   asks the Admin for this account's checkout (`POST /api/cloud/desktop/checkout`
   with the plan and where it was opened) and opens the address only when it is
@@ -1257,12 +1257,12 @@ section is only what the Cloud adds.
 
 - **The Admin's grant.** Main signs in to the Cloud through the Admin: it
   opens a single-use pairing window for the signed-in owner
-  (`POST /api/cloud/desktop/pairing`, `pairHome`), so **Settings → MausBot Cloud**
+  (`POST /api/cloud/desktop/pairing`, `pairHome`), so **Settings → Hattera Cloud**
   can copy before the Cloud was ever opened in this app. No session in the
   window yet is therefore not a block on the Cloud, as it is on other servers.
   A saved "My Cloud" entry that is not this account's verified Cloud is copied
   to like any other server.
-- **Settings → MausBot Cloud**, under My Cloud once it is Ready, opens the same
+- **Settings → Hattera Cloud**, under My Cloud once it is Ready, opens the same
   panel as Settings → Servers, named "My Cloud".
 - **The setup checklist.** While the Cloud's setup checklist is up, the copy
   offer is its second step instead of a card (Setup checklist, above).
@@ -1319,8 +1319,8 @@ section is only what the Cloud adds.
 ## Published image
 
 Every push to `main` and every release tag publishes the home machine image as
-`ghcr.io/milind-soni/openmausbot-cloud-home`, tagged `latest` (main only), `sha-<commit>` and the release tag.
+`ghcr.io/msalways/hattera-cloud-home`, tagged `latest` (main only), `sha-<commit>` and the release tag.
 It is the `Dockerfile`'s `cloud-home` target for the same commit, with Grok and the current Claude Code and
 Codex installed. The Docker workflow's summary prints the digest. Set it in the Admin as
-`OMB_CLOUD_HOME_IMAGE=ghcr.io/milind-soni/openmausbot-cloud-home@sha256:…`; changing it rolls the new image
+`OMB_CLOUD_HOME_IMAGE=ghcr.io/msalways/hattera-cloud-home@sha256:…`; changing it rolls the new image
 out to existing machines one at a time, reverting automatically on a failed health check.

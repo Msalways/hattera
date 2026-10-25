@@ -114,7 +114,7 @@ describe("Settings in Simple mode", () => {
     const hidden = SECTIONS.map((entry) => entry.id).filter((id) => !placed.includes(id));
     // Skills (the shared library, main's new page) is Advanced-only too, so
     // Simple stays at five pages; a deep link still opens it.
-    expect(hidden).toEqual(["skills", "usage", "backups", "workspaces", "experimental"]);
+    expect(hidden).toEqual(["skills", "backups", "workspaces", "experimental"]);
     for (const id of hidden) expect(SIMPLE_HIDDEN_SECTIONS).toContain(id);
   });
 
@@ -151,7 +151,7 @@ describe("Settings in Simple mode", () => {
     fixture.section = "cloudAccount";
     const html = render();
     expect(currentPage(html)).toBe("account");
-    expect(blocks(html)).toEqual(["cloudAccount", "organization"]);
+    expect(blocks(html)).toEqual(["cloudAccount", "organization", "usage"]);
   });
 
   it("adds People and Activity to Account for a hosted workspace's admins in a browser", () => {
@@ -161,14 +161,14 @@ describe("Settings in Simple mode", () => {
     const html = render();
     // no Servers page without the desktop bridge, and no desktop-only account pages
     expect(pages(html)).toEqual(["general", "appearance", "ai", "computers", "account"]);
-    expect(blocks(html)).toEqual(["people", "activity"]);
+    expect(blocks(html)).toEqual(["people", "activity", "usage"]);
   });
 
-  it("drops Account when nothing on it is shown", () => {
+  it("keeps Account available for usage when the other account sections are hidden", () => {
     // an OMB Cloud home in a browser: no desktop account pages, nobody to invite, not an admin
     vi.stubGlobal("window", {});
     fixture.config = { ...fixture.config, cloudHome: true };
-    expect(pages(render())).toEqual(["general", "appearance", "ai", "computers"]);
+    expect(pages(render())).toEqual(["general", "appearance", "ai", "computers", "account"]);
   });
 
   it("keeps a paired remote client's reduced set: Appearance, and Computers with Remote access and Servers", () => {
@@ -193,6 +193,7 @@ describe("Settings in Simple mode", () => {
     ["computer", "computers"],
     ["cloudAccount", "account"],
     ["organization", "account"],
+    ["usage", "account"],
   ])("lands a deep link to %s on %s", (section, page) => {
     fixture.section = section;
     const html = render();
@@ -201,7 +202,6 @@ describe("Settings in Simple mode", () => {
   });
 
   it.each<[AppSettingsSection, string]>([
-    ["usage", "usage"],
     ["backups", "backups"],
     ["experimental", "skillAuthoring"],
   ])("opens a hidden page (%s) for as long as it is the open one", (section, content) => {

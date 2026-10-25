@@ -22,7 +22,8 @@ function fixture({ open = async () => true } = {}) {
 const settle = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
 
 test("the Cloud protocol is a fixed action without URL routing or credentials", () => {
-  assert.equal(CLOUD_DEEP_LINK, "openmausbot://cloud");
+  assert.equal(CLOUD_DEEP_LINK, "hattera://cloud");
+  assert.equal(isCloudDeepLink("hattera://cloud"), true);
   assert.equal(isCloudDeepLink("openmausbot://cloud"), true);
   for (const value of [null, undefined, {}, ["openmausbot://cloud"], "", "openmausbot://cloud/", "openmausbot://cloud?", "openmausbot://cloud#",
     "openmausbot://cloud?code=ABCDE-FGHJK", "openmausbot://cloud#code=ABCD-EFGH-JKLM", "openmausbot://cloud?url=https://home.example",
@@ -34,7 +35,7 @@ test("the Cloud protocol is a fixed action without URL routing or credentials", 
 });
 
 test("consuming a launch action prevents it replaying on a later restart without changing other arguments", () => {
-  const original = ["/Applications/OpenMausBot", "--profile=fixture", "openmausbot://cloud?ignored", "openmausbot://organization", "openmausbot://install/example"];
+  const original = ["/Applications/Hattera", "--profile=fixture", "openmausbot://cloud?ignored", "openmausbot://organization", "openmausbot://install/example"];
   const argv = [...original, "openmausbot://cloud", "openmausbot://cloud"];
   assert.equal(takeCloudDeepLink(argv), true);
   assert.deepEqual(argv, original);
@@ -44,9 +45,9 @@ test("consuming a launch action prevents it replaying on a later restart without
 
 test("a cold-start link waits until main can navigate, then opens exactly once", async () => {
   const h = fixture();
-  const argv = ["/Applications/OpenMausBot", "--fixture", "openmausbot://cloud"];
+  const argv = ["/Applications/Hattera", "--fixture", "openmausbot://cloud"];
   assert.equal(h.entry.fromLaunch(argv), true);
-  assert.deepEqual(argv, ["/Applications/OpenMausBot", "--fixture"]);
+  assert.deepEqual(argv, ["/Applications/Hattera", "--fixture"]);
   await settle();
   assert.deepEqual(h.calls, [], "no window exists to reveal or navigate yet");
   assert.equal(await h.entry.ready(), true);
@@ -57,7 +58,7 @@ test("a cold-start link waits until main can navigate, then opens exactly once",
 
 test("a launch without the link leaves nothing pending", async () => {
   const h = fixture();
-  assert.equal(h.entry.fromLaunch(["/Applications/OpenMausBot", "openmausbot://cloud/"]), false);
+  assert.equal(h.entry.fromLaunch(["/Applications/Hattera", "openmausbot://cloud/"]), false);
   assert.equal(await h.entry.ready(), false);
   assert.deepEqual(h.calls, []);
 });
@@ -78,11 +79,11 @@ test("once ready, open-url and a second instance open immediately and consume th
   assert.equal(h.entry.fromUrl("openmausbot://cloud"), true);
   await settle();
   assert.deepEqual(h.calls, ["reveal", "open"]);
-  const commandLine = ["C:\\OpenMausBot.exe", "--flag", "openmausbot://cloud"];
+  const commandLine = ["C:\\Hattera.exe", "--flag", "openmausbot://cloud"];
   assert.equal(h.entry.fromArgs(commandLine), true);
   await settle();
   assert.deepEqual(h.calls, ["reveal", "open", "reveal", "open"]);
-  assert.deepEqual(commandLine, ["C:\\OpenMausBot.exe", "--flag"]);
+  assert.deepEqual(commandLine, ["C:\\Hattera.exe", "--flag"]);
 });
 
 test("anything else is left to the other link handlers without revealing or opening", async () => {
@@ -110,7 +111,7 @@ test("a failed open is contained and a later link still opens", async () => {
 });
 
 test("a consumed launch link is not replayed by the companion or updater relaunch", () => {
-  const argv = ["/fixture/OpenMausBot", "--fixture", "openmausbot://cloud", "openmausbot://cloud?ignored"];
+  const argv = ["/fixture/Hattera", "--fixture", "openmausbot://cloud", "openmausbot://cloud?ignored"];
   takeCloudDeepLink(argv);
   const calls = [];
   runInNewContext(`${between("function relaunchAfterDesktopRemoteChange()", 'ipcMain.handle("desktop-remote:state"')}\nrelaunchAfterDesktopRemoteChange();`, {
@@ -182,6 +183,6 @@ test("Add a Cloud… is decided in main: someone with a Cloud gets the native bo
   assert.match(native, /buttons: \["Email me when it’s ready", "Open My Cloud", "Cancel"\]/);
   assert.match(native, /await ensureCloudAccount\(\)\.interest\("another_cloud"\);/);
   // The gate: the installed app, not companion mode, not a branded build (read once from the local server).
-  assert.match(between("function cloudOffersAllowed()", "\n}\n"), /return app\.isPackaged && !desktopRemoteAccess && brandedBuild === false;/);
+  assert.match(between("function cloudOffersAllowed()", "\n}\n"), /return app\.isPackaged && !desktopRemoteAccess && brandedBuild === false && Boolean\(process.env.OMB_CONTROL_PLANE_URL\);/);
   assert.match(between("async function readCloudOfferBrand()", "\n}\n"), /fetch\(`http:\/\/127\.0\.0\.1:\$\{SERVER_PORT\}\/api\/brand`/);
 });

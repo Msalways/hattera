@@ -33,39 +33,39 @@ const text = (body: string): Message => ({ id: `m${++seq}`, at: seq, role: "bot"
 const ask = (body: string): Message => ({ id: `u${++seq}`, at: seq, role: "user", kind: "text", text: body });
 const stagedSkill = (card: Record<string, unknown> = {}): Message => ({
   id: `o${++seq}`, at: seq, role: "bot", kind: "options",
-  card: { title: "Enable this skill?", options: [], skillRequest: { name: "verify-omb" }, ...card } as unknown as Message["card"],
+  card: { title: "Enable this skill?", options: [], skillRequest: { name: "verify-hattera" }, ...card } as unknown as Message["card"],
 });
 const triggerTerms = (): string[] =>
   JSON.parse(readFileSync(new URL("../../skills/create-verification-skill/manifest.json", import.meta.url), "utf8")).triggerTerms;
 
-const DOCTOR = "pnpm control:omb doctor --url http://127.0.0.1:8799";
-const SEND = "node --experimental-strip-types scripts/control-omb.ts send --bot x --text y";
+const DOCTOR = "pnpm control:hattera doctor --url http://127.0.0.1:8799";
+const SEND = "node --experimental-strip-types scripts/control-hattera.ts send --bot x --text y";
 const PRESS = './node_modules/.bin/control-atlas.mjs press "Meta+K"';
 const PUSH = "git push origin main";
 
 describe("parseControlCommand", () => {
   it.each([
-    ["pnpm control:omb doctor --url http://127.0.0.1:1", "doctor"],
-    ["pnpm run control:omb doctor", "doctor"],
-    ["npm run control:omb -- doctor", "doctor"],
+    ["pnpm control:hattera doctor --url http://127.0.0.1:1", "doctor"],
+    ["pnpm run control:hattera doctor", "doctor"],
+    ["npm run control:hattera -- doctor", "doctor"],
     [SEND, "send"],
     [PRESS, "press"],
-    ["cd repo && node scripts/control-omb.ts doctor", "doctor"],
-    ["node scripts\\control-omb.ts doctor", "doctor"],
-    ["FOO=1 pnpm control:omb wait --bot b", "wait"],
-    ["timeout 30 npx tsx ./scripts/control-omb.ts screenshot > out.png 2>&1", "screenshot"],
-    ["sudo -u maus pnpm control:omb doctor", "doctor"],
+    ["cd repo && node scripts/control-hattera.ts doctor", "doctor"],
+    ["node scripts\\control-hattera.ts doctor", "doctor"],
+    ["FOO=1 pnpm control:hattera wait --bot b", "wait"],
+    ["timeout 30 npx tsx ./scripts/control-hattera.ts screenshot > out.png 2>&1", "screenshot"],
+    ["sudo -u maus pnpm control:hattera doctor", "doctor"],
   ])("accepts %s as a control-CLI invocation of %s", (command, subcommand) => {
     expect(parseControlCommand(command)).toEqual({ subcommand, dryRun: false });
   });
 
   it.each([
-    "cat scripts/control-omb.ts",
-    "sed -n 1,40p scripts/control-omb.ts",
-    "git log -- scripts/control-omb.ts",
-    "grep -n doctor scripts/control-omb.ts",
-    "cat docs/access-control-omb.tsx",
-    "npmcontrol:omb doctor",
+    "cat scripts/control-hattera.ts",
+    "sed -n 1,40p scripts/control-hattera.ts",
+    "git log -- scripts/control-hattera.ts",
+    "grep -n doctor scripts/control-hattera.ts",
+    "cat docs/access-control-hattera.tsx",
+    "npmcontrol:hattera doctor",
     "pnpm typecheck",
     "pnpm typecheck && pnpm test",
   ])("rejects %s — the CLI is not what runs", (command) => {
@@ -73,14 +73,14 @@ describe("parseControlCommand", () => {
   });
 
   it("marks a dry run wherever the flag sits in the segment", () => {
-    expect(parseControlCommand("pnpm control:omb send --bot b --dry-run")).toEqual({ subcommand: "send", dryRun: true });
-    expect(parseControlCommand("pnpm control:omb --dry-run send")).toEqual({ subcommand: "send", dryRun: true });
+    expect(parseControlCommand("pnpm control:hattera send --bot b --dry-run")).toEqual({ subcommand: "send", dryRun: true });
+    expect(parseControlCommand("pnpm control:hattera --dry-run send")).toEqual({ subcommand: "send", dryRun: true });
     // the flag in another segment belongs to that command
-    expect(parseControlCommand("pnpm control:omb doctor && pnpm release --dry-run")).toEqual({ subcommand: "doctor", dryRun: false });
+    expect(parseControlCommand("pnpm control:hattera doctor && pnpm release --dry-run")).toEqual({ subcommand: "doctor", dryRun: false });
   });
 
   it("falls back to the CLI token's basename when no subcommand follows", () => {
-    expect(parseControlCommand("pnpm control:omb --help")?.subcommand).toBe("control:omb");
+    expect(parseControlCommand("pnpm control:hattera --help")?.subcommand).toBe("control:hattera");
     expect(parseControlCommand("./scripts/control-atlas.mjs && echo done")?.subcommand).toBe("control-atlas.mjs");
   });
 });
@@ -182,7 +182,7 @@ describe("runSteps", () => {
       codex(SEND, false),
       acp(PRESS),
       claude("git status", true),
-      claude("cat scripts/control-omb.ts", true),
+      claude("cat scripts/control-hattera.ts", true),
       claude(PUSH, true),
     ]);
     expect(steps.map((s) => [s.label, s.status, s.verified])).toEqual([

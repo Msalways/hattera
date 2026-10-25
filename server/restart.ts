@@ -4,7 +4,7 @@
 // installs the restore before anything else loads. Every launcher in this
 // repo honours it through one restartPolicy:
 //
-//   - `openmausbot serve` (cli.ts serveUntilStopped), which systemd, launchd,
+//   - `hattera serve` (cli.ts serveUntilStopped), which systemd, launchd,
 //     fleet and a terminal all run;
 //   - the container image's launcher (server-launcher.ts);
 //   - the OMB Cloud home's launcher (cloud-home-start.ts);

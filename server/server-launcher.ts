@@ -6,6 +6,7 @@
 // the container restarts, until `docker compose up -d`; this keeps it served.
 // SIGTERM and SIGINT are passed on, and the launcher exits with the server's
 // own code.
+import "../shared/product-compat.mjs";
 import { spawn, type ChildProcess } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -25,7 +26,7 @@ export function superviseServer(start: () => ChildProcess, options: { signals?: 
       child.once("error", () => finish(1));
       child.once("exit", (code, signal) => {
         if (policy.again(code, stopping)) {
-          console.log("OpenMausBot is starting again to finish installing a copy from the desktop app…");
+          console.log("Hattera is starting again to finish installing a copy from the desktop app…");
           run();
           return;
         }

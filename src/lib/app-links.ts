@@ -1,8 +1,8 @@
 // The handful of outward links the app offers from the profile menu and the
 // About dialog. They are collected here so "where does Help go?" has one
 // answer rather than one per call site.
-export const APP_NAME = "OpenMausBot";
-export const APP_REPOSITORY = "https://github.com/milind-soni/OpenMausBot";
+export const APP_NAME = "Hattera";
+export const APP_REPOSITORY = "https://github.com/Msalways/hattera";
 export const HATTERA_REPOSITORY = "https://github.com/Msalways/hattera";
 export const HATTERA_DOCS_URL = `${HATTERA_REPOSITORY}/tree/main/apps/docs/content/docs`;
 export const HATTERA_FEEDBACK_URL = `${HATTERA_REPOSITORY}/issues`;
@@ -17,10 +17,10 @@ export const APPROVAL_LEVELS_URL = `${APP_REPOSITORY}/blob/main/docs/approval-le
 /** Feedback goes to the community rather than the issue tracker: most of it
  * is a question or a "does anyone else see this", and those get an answer in
  * Discord in minutes instead of sitting open as an issue. */
-export const FEEDBACK_URL = "https://discord.gg/9Wb8MEpXRs";
+export const FEEDBACK_URL = `${APP_REPOSITORY}/issues`;
 export const RELEASES_URL = `${APP_REPOSITORY}/releases`;
-/** Every OpenMausBot Cloud plan side by side (Personal, Pro, Max). */
-export const PRICING_URL = "https://www.openmausbot.com/pricing";
+/** Every Hattera Cloud plan side by side (Personal, Pro, Max). */
+export const PRICING_URL = `${APP_REPOSITORY}#project-status`;
 /** A link to the website or the Cloud page, tagged with where in the app it
  * was opened (`src`, one of lib/cloud-plan's sources), for the counts. */
 export function withSource(url: string, source: string): string {

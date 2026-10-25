@@ -26,6 +26,28 @@ it("in the desktop app, a code the link carried connects at once; a browser stil
   expect(pairsAutomatically(null, true)).toBe(false);
 });
 
+it("only explicitly generated loopback CLI links connect automatically", () => {
+  for (const hostname of ["localhost", "127.0.0.1", "[::1]"]) {
+    expect(pairsAutomatically(code, false, "?cli=1", hostname, true)).toBe(true);
+    expect(pairsAutomatically(code, false, "?cli=1", hostname, false)).toBe(false);
+    expect(pairsAutomatically(null, false, "?cli=1", hostname, true)).toBe(false);
+    expect(pairsAutomatically(code, false, "", hostname, true)).toBe(false);
+  }
+  for (const hostname of ["example.com", "100.65.0.2", "127.0.0.1.example.com", ""]) {
+    expect(pairsAutomatically(code, false, "?cli=1", hostname, true)).toBe(false);
+  }
+});
+
+it("a CLI query flag cannot skip authentication without the server's launcher capability", async () => {
+  vi.stubGlobal("window", {});
+  vi.stubGlobal("location", { hostname: "127.0.0.1", search: "?cli=1", replace: (url: string) => replaced.push(url) });
+  f.pair.mockResolvedValue({ ok: true });
+  expect(render(code)).toContain("<form");
+  f.effects[0](); await flush();
+  expect(f.pair).not.toHaveBeenCalled();
+  expect(replaced).toEqual([]);
+});
+
 it("moves GitHub sign-in to the callback origin before starting OAuth", () => {
   expect(githubSignInTarget("http://localhost:8080", "http://127.0.0.1:8080"))
     .toBe("http://127.0.0.1:8080/pair?githubStart=1");

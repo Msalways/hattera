@@ -6,8 +6,8 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { launchVerificationServer, runControlOmb, type VerificationServer } from "./control-omb.ts";
-import { agentBrowser, ensureUiBrowser, sessionEnv } from "./testing/control-omb-ui.ts";
+import { launchVerificationServer, runControlOmb, type VerificationServer } from "./control-hattera.ts";
+import { agentBrowser, ensureUiBrowser, sessionEnv } from "./testing/control-hattera-ui.ts";
 import { fixtureApi } from "./testing/preview-fixture.ts";
 import { fakeVnc } from "./testing/fake-vnc.ts";
 import { BASE_IMAGE_DIGEST, CUA_DRIVER_VERSION, IMAGE, IMAGE_LAYER_VERSION } from "../server/container-computer.ts";

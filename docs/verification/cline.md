@@ -14,7 +14,7 @@ the selected API key in `CLINE_API_KEY` for saved API providers; OAuth login
 and refresh remain Cline's responsibility. A saved custom model is pinned
 over ACP before the prompt so it cannot silently become a catalog fallback.
 
-Permissions always go through OpenMausBot's ACP approval broker, including
+Permissions always go through Hattera's ACP approval broker, including
 Full Access. Cline's terminal auto-approval default is explicitly disabled.
 MCP tools use the existing scoped integration gate. Native tool selection is
 not advertised: removing native tools from a bot's allowlist is refused.

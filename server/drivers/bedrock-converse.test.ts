@@ -4,7 +4,19 @@ import { bedrockConverseBody, bedrockConverseFetch } from "./bedrock-converse.ts
 import { OpenAICompatDriver } from "./openai-compat.ts";
 import { recordEvents } from "../testing/events.ts";
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+it("preserves missing usage and rate headers through the Converse translation", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ output: { message: { content: [{ text: "Fixture" }] } } }, {
+    headers: { "x-ratelimit-remaining-requests": "0", "content-encoding": "gzip" },
+  })));
+  const result = await bedrockConverseFetch("https://bedrock-runtime.us-east-1.amazonaws.com/chat/completions", {
+    body: JSON.stringify({ model: "fixture", messages: [] }),
+  });
+  expect((await result.json() as { usage?: unknown }).usage).toBeUndefined();
+  expect(result.headers.get("x-ratelimit-remaining-requests")).toBe("0");
+  expect(result.headers.get("content-encoding")).toBeNull();
+});
 
 it("preserves systems, images, tool calls and tool results in the native Converse protocol", () => {
   const body = bedrockConverseBody({ messages: [

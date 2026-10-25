@@ -23,7 +23,7 @@ renames the populated team, adds and removes members, then empties and renames
 it again. It imports a legacy template with a colliding name and restarts the
 exact disposable server. It checks retained instructions and conversation
 messages, archived bots moving to General when their team is deleted, and
-explicit empty-team deletion. API requests and `control-omb` wait/messages
+explicit empty-team deletion. API requests and `control-hattera` wait/messages
 results are kept beside the fixture log in `*.team-lifecycle.json`.
 
 A second real process restart uses legacy bot and group records needing
@@ -32,7 +32,7 @@ conversations readable and persists their task migrations, logs a diagnostic,
 and leaves the malformed file byte-for-byte unchanged. Later team and shared
 instruction writes still fail closed until that file is repaired.
 
-The renderer test uses `control-omb ui launch`, opens **Create team**, and checks
+The renderer test uses `control-hattera ui launch`, opens **Create team**, and checks
 that renaming preserves the sidebar's collapsed state and ordering. It moves
 two bots through Team map, edits membership, and creates a bot directly in the
 team. Dismissing that pending creation must retain unsaved membership edits and

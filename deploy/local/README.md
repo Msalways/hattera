@@ -42,7 +42,9 @@ and `OMB_HTTPS_HOST` empty. GitHub's OAuth app Homepage URL can be
 `http://127.0.0.1:8080`. These values are passed to the server; its identity
 database lives on the persistent `/data` volume.
 
-Open Hattera on the server computer at `http://127.0.0.1:8080`. In
+Open Hattera on the server computer at `http://127.0.0.1:8080` and sign in with
+GitHub. Without GitHub configuration, use the initial pairing link printed by
+`docker compose logs omb`. In
 **Settings → AI → Model providers and accounts**, expand a provider to install
 its CLI and complete the sign-in it supports. For another device, use
 **Settings → Remote access → Create pairing code** and open the pairing link on
@@ -61,7 +63,7 @@ For terminal-based setup or recovery, the equivalent commands are:
 
 ```sh
 docker compose exec omb codex login --device-auth
-docker compose exec omb node dist-server/openmausbot.js pair
+docker compose logs omb  # initial pairing link when GitHub is not configured
 ```
 
 On Windows, `./maus.ps1` forwards arguments to Compose using the repository

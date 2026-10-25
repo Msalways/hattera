@@ -37,7 +37,7 @@ systemctl is-active openmausbot.service: active
 NRestarts=0
 codex login status: Logged in using ChatGPT
 kernel.apparmor_restrict_unprivileged_userns = 1
-control-omb doctor: ok=true, packaged=true, availableEngines=[codex]
+control-hattera doctor: ok=true, packaged=true, availableEngines=[codex]
 ```
 
 The browser received approval for only the requested public-page navigation and
@@ -108,7 +108,7 @@ installation flow, not the new desktop bundle.
 
 ## Cleanup
 
-Codex was signed out on the VPS, and OpenMausBot logout confirmed the managed
+Codex was signed out on the VPS, and Hattera logout confirmed the managed
 address was released. The exact disposable server, its primary IPv4, firewall,
 and uploaded SSH key were deleted. Fresh lists of all four resource types were
 empty. The private Hetzner API-token file was retained locally as requested;

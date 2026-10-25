@@ -1159,14 +1159,22 @@ const MARKDOWN_COMPONENTS: Components = {
 
 // A thread link only ever comes from a "#Title" run or a canonical
 // openmausbot://thread/ link, whatever case or escaping its scheme uses.
-const MAY_LINK_THREAD = /#|openmausbot/i;
+const MAY_LINK_THREAD = /#|hattera|openmausbot/i;
 const NO_THREAD_REFS: ThreadRefsValue = { threads: [] };
 
 /** Render message Markdown with math, protected code, scoped attachments, and mentions. */
-function ChatMarkdownComponent({ text, message, mentionPeers = NO_MENTION_PEERS, everyone = false, delivered }: {
+const PORTABLE_MARKDOWN_COMPONENTS: Components = { ...MARKDOWN_COMPONENTS,
+  img: ({ alt }) => <span>{alt || t("attach.imageUnavailable")}</span>,
+  a: ({ href, children }) => href && /^https?:\/\//i.test(href)
+    ? <a href={href} target="_blank" rel="noreferrer" className={LINK_CLASS}>{children}</a> : <span>{children}</span>,
+};
+
+function ChatMarkdownComponent({ text, message, mentionPeers = NO_MENTION_PEERS, everyone = false, delivered, portable = false }: {
   text: string; message?: MessageAttachmentContext;
   mentionPeers?: readonly MentionPeer[]; everyone?: boolean;
   delivered?: DeliveredFiles;
+  /** Peer text has no authority over this machine's local resources. */
+  portable?: boolean;
 }) {
   // "#Title" mentions link to the threads the person can see (ThreadRefs);
   // @mentions were already decorated by remarkMentions, which runs first.
@@ -1202,7 +1210,7 @@ function ChatMarkdownComponent({ text, message, mentionPeers = NO_MENTION_PEERS,
           remarkPlugins={[remarkGfm, remarkMath, remarkWindowsPathDestinations, unwrapLinkedImages, remarkGithubRefs, [remarkMentions, { peers: mentionPeers, everyone }], remarkThreadRefs(threads, currentBotId)]}
           rehypePlugins={mathPlugin ? [mathPlugin] : []}
           urlTransform={chatUrlTransform}
-          components={MARKDOWN_COMPONENTS}
+          components={portable ? PORTABLE_MARKDOWN_COMPONENTS : MARKDOWN_COMPONENTS}
         >
           {source}
         </Markdown>
@@ -1228,6 +1236,7 @@ export function samePeers(previous: readonly MentionPeer[], next: readonly Menti
 
 export const ChatMarkdown = memo(ChatMarkdownComponent, (previous, next) => (
   previous.text === next.text
+  && previous.portable === next.portable
   && samePeers(previous.mentionPeers ?? NO_MENTION_PEERS, next.mentionPeers ?? NO_MENTION_PEERS)
   && previous.everyone === next.everyone
   && previous.message?.threadId === next.message?.threadId

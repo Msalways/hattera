@@ -37,6 +37,9 @@ export function restoredWorkspaceConfig(portable: unknown, destination: unknown)
 
 /** Exact app-owned authentication paths, not a scan of user document text. */
 export function excludedWorkspaceAuthPath(path: string): boolean {
+  if (/^hattera-runtime\.json(?:$|\.)/i.test(path)) return true;
+  if (/^private-network(?:\/|$)/i.test(path)) return true;
+  if (/^collaboration(?:\/|$)/i.test(path)) return true;
   // Machine/provider-specific execution grants are not portable template data.
   if (/^command-allowlist\.json(?:$|\.\d+\.[0-9a-f-]+\.tmp$)/.test(path)) return true;
   // MCP sign-in tokens belong to this machine's browser sign-ins.

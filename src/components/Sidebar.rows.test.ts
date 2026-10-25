@@ -77,11 +77,12 @@ let state: AppState = {
   instances: [{ instanceId: "test", driverKind: "codex", displayName: "Test", snapshot: { state: "available" } } as InstanceInfo],
 };
 const dispatch = vi.fn();
+const closeDrawer = vi.fn();
 let root: Root;
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 async function draw() {
   const value = { state, dispatch, flushBotPatches: async () => null, refreshInstances: async () => {}, refreshModels: async () => {} };
-  flushSync(() => root.render(createElement(BotEditorStore, { value, children: createElement(Sidebar, { open: true, onClose: () => {} }) })));
+  flushSync(() => root.render(createElement(BotEditorStore, { value, children: createElement(Sidebar, { open: true, onClose: closeDrawer }) })));
   await settle();
 }
 const threadTitles = ["Report draft", "Budget check", "Old notes"];
@@ -134,6 +135,15 @@ describe("sidebar rows", () => {
     for (const id of ["atlas", "scout", "pepper"]) expect(document.querySelector(`[data-sidebar-bot-row="${id}"]`)).not.toBeNull();
     for (const id of ["atlas-now", "atlas-earlier", "atlas-old"]) expect(document.querySelector(`[data-sidebar-thread-row="${id}"]`)).not.toBeNull();
     expect(document.body.textContent).toContain(t("task.updated.hours", { count: 1 }));
+  });
+
+  it("closes the phone drawer when reopening the current bot or thread, including keyboard activation", () => {
+    closeDrawer.mockClear();
+    const current = document.querySelector<HTMLElement>('[data-sidebar-bot-row="atlas"]')!;
+    current.click();
+    current.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    document.querySelector<HTMLButtonElement>('[data-sidebar-thread-row="atlas-now"]')!.click();
+    expect(closeDrawer).toHaveBeenCalledTimes(3);
   });
 
   it("renders no row for a store event no row shows", async () => {

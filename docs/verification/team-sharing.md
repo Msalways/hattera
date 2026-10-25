@@ -91,7 +91,7 @@ functions: starter notes and pictures ticked by default with the matching
 line, an answer setting the starting ticks only on the first look, and a
 refusal dropping the counts (so Save is off) while keeping every skill box.
 The second command also runs in CI, in the advisory `ui-smoke` job.
-The second owns a disposable `control-omb ui` app whose Scout has 31 skills,
+The second owns a disposable `control-hattera ui` app whose Scout has 31 skills,
 17 of them long enough that the file passes 4 MB: Templates → Share →
 **Share the Sales desk team** shows the refusal with every skill box and Save
 disabled; unticking one long skill brings the counts back; starter notes are

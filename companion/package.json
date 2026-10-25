@@ -1,10 +1,11 @@
 {
-  "name": "@openmausbot/companion",
+  "name": "@hattera/companion",
   "version": "0.1.0",
   "private": true,
-  "description": "A sidecar that lets a paired phone reach an unmodified OpenMausBot harness",
+  "description": "A sidecar that lets a paired phone reach an unmodified Hattera harness",
   "type": "module",
   "bin": {
+    "hattera-companion": "./src/index.ts",
     "openmausbot-companion": "./src/index.ts"
   },
   "engines": {

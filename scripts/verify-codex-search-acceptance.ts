@@ -1,8 +1,8 @@
-// Real-model search acceptance through an isolated OpenMausBot server.
+// Real-model search acceptance through an isolated Hattera server.
 // Existing sign-in is explicitly designated; personal chats/config are not copied.
 import { copyFileSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { launchVerificationServer, runControlOmb } from "./control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "./control-hattera.ts";
 import { fixtureApi } from "./testing/preview-fixture.ts";
 import { verifiedNativeSearch } from "./testing/native-search-evidence.ts";
 

@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 
 it("applies the bot's own alert and voice changes at once, refuses a stale Undo, and supersedes credential requests in an isolated conversation", async () => {

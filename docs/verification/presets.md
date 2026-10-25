@@ -86,7 +86,7 @@ fills (never the model, computer, approval or connected apps), the picture,
 the summary lines, creation passing the preset and leaving its skills and
 notes to the server, the share request, part names, the preset file's
 contents list and its import preview. The second owns a disposable
-`control-omb ui` app: **Settings → Share as preset…** shows the counts and
+`control-hattera ui` app: **Settings → Share as preset…** shows the counts and
 saves `sky-1.0.0.openmaus.json` (captured in the page); **Templates →
 Import** of that file shows "Preset bots and skills · no team" and **Add
 presets** adds it; **Share team** shows no preset until **Include my New bot

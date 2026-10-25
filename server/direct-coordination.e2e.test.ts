@@ -4,7 +4,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import { request } from "../scripts/mcp-server.ts";
 import { rebuiltSessionNotice } from "./resume-recovery.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
@@ -525,7 +525,7 @@ it("continues one recipient thread for every follow-up from the same conversatio
   expect((await leadTasks()).find((task: any) => task.threadId === f.lead.activeTaskId)).not.toHaveProperty("closedBy");
 }, { FAKE_CLAUDE_VERSION: "2.1.270" }), 90_000);
 
-// The same server code runs a VPS (`openmausbot serve`), the desktop app and
+// The same server code runs a VPS (`hattera serve`), the desktop app and
 // a Cloud home (server/cloud-personal.e2e.test.ts covers that one).
 it.each<[string, NodeJS.ProcessEnv]>([
   ["a headless server", {}],

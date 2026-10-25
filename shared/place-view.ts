@@ -87,7 +87,7 @@ export interface PlaceFacts {
   place: Place | "auto" | "off";
   server: ServerKind;
   bot: string;
-  /** Desktop only: signed in to a paid OpenMausBot Cloud plan (the desktop bridge). */
+  /** Desktop only: signed in to a paid Hattera Cloud plan (the desktop bridge). */
   plan?: boolean;
   /** Where cloud computers come from here: the plan's, the person's own Boat key, or nowhere. */
   boat: "included" | "own-key" | "none";
@@ -154,7 +154,7 @@ export const PLACE_EN = {
   "place.view.ccUnavailable.short": "Not available now",
   "place.view.ccUnavailable.line": "Cloud computers can't start right now. It isn't anything you did.",
   "place.view.ccEnded.short": "Plan ended",
-  "place.view.ccEnded.line": "Your MausBot Cloud plan has ended, so cloud computers are off.",
+  "place.view.ccEnded.line": "Your Hattera Cloud plan has ended, so cloud computers are off.",
   "place.view.ccNoStart.short": "Didn't start",
   "place.view.ccNoStart.line": "{bot}'s cloud computer didn't start.",
   "place.view.ccClearing.short": "Clearing up",

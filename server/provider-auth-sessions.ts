@@ -19,6 +19,21 @@ const failure = (message: string, status: number) => Object.assign(new Error(mes
 export class ProviderAuthSessions {
   private readonly flows = new Map<string, Flow>();
 
+  /** Reconcile native completion before account mutations. The setup panel can
+   * unmount as soon as credentials appear, before its last owner status poll.
+   * Only the driver's terminal result releases the lease; a snapshot alone
+   * is not sufficient, and a failed read keeps the operation blocked. */
+  async refresh(instanceIds: readonly string[]): Promise<void> {
+    await Promise.all(instanceIds.map(async id => {
+      const flow = this.flows.get(id);
+      if (!flow || flow.busy || flow.revoked || !flow.flowId || !flow.instance.getAuthentication || flow.expiresAt <= Date.now()) return;
+      try {
+        const status = await flow.instance.getAuthentication(flow.flowId);
+        if (this.flows.get(id) === flow && !flow.busy && !flow.revoked && status.phase !== "waiting") flow.expiresAt = 0;
+      } catch { /* Preserve ownership until native completion can be confirmed. */ }
+    }));
+  }
+
   isActive(instanceId: string): boolean {
     const flow = this.flows.get(instanceId);
     return Boolean(flow && (flow.busy || (!flow.revoked && flow.expiresAt > Date.now())));

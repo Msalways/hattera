@@ -145,8 +145,8 @@ final startup JSON. For bounded chat evidence, copy the exact fixture bot and
 execution-thread IDs into the shared control commands:
 
 ```sh
-pnpm control:omb wait --bot BOT_ID --task THREAD_ID --timeout 30 --url http://127.0.0.1:PORT
-pnpm control:omb messages --bot BOT_ID --task THREAD_ID --limit 20 --url http://127.0.0.1:PORT
+pnpm control:hattera wait --bot BOT_ID --task THREAD_ID --timeout 30 --url http://127.0.0.1:PORT
+pnpm control:hattera messages --bot BOT_ID --task THREAD_ID --limit 20 --url http://127.0.0.1:PORT
 ```
 
 Use only the printed fixture server URL. The browser interaction checklist is

@@ -115,7 +115,8 @@ const streamTurn = () => {
   for (const delta of ["Hello", " from", " pi"]) {
     send({ type: "message_update", usage: { input: 0, output: 0 }, assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta } });
   }
-  send({ type: "turn_end", message: { stopReason: "end_turn", usage: { input: 12, output: 3 } }, usage: { input: 12, output: 3 } });
+  const usage = process.env.FAKE_PI_USAGE ? JSON.parse(process.env.FAKE_PI_USAGE) : { input: 12, output: 3 };
+  send({ type: "turn_end", message: { stopReason: "end_turn", usage }, usage });
   send({ type: "agent_end" });
 };
 

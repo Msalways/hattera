@@ -1,4 +1,4 @@
-// A stand-in for cloudflare/control-plane for tests of `openmausbot login`
+// A stand-in for cloudflare/control-plane for tests of `hattera login`
 // and `serve --tunnel`: the routes the desktop's control-plane client uses,
 // answering in the shapes its validators accept. Authorization is only "is
 // this a credential this stub issued". Records every call so a test can

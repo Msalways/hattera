@@ -47,6 +47,15 @@ vi.mock("shiki/engine/javascript", () => ({
 }));
 
 describe("mention highlighting", () => {
+  it("renders peer text without local file authority or automatic image loads", () => {
+    const html = renderToStaticMarkup(createElement(ChatMarkdown, { portable: true,
+      text: "[Private file](file:///C:/private.txt) ![Hidden image](https://images.example/private.png) [Public reference](https://example.com/docs)" }));
+    expect(html).toContain("Private file");
+    expect(html).toContain('href="https://example.com/docs"');
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain('href="file:');
+    expect(html).not.toContain("/api/threads/");
+  });
   const mentionPeers = [{ name: "Atlas" }, { name: "調査担当" }];
   it("carries bot colors into Markdown without coloring everyone as a bot", () => {
     const html = renderToStaticMarkup(createElement(ChatMarkdown, {
@@ -548,14 +557,14 @@ describe("#Title thread links in markdown", () => {
   });
 
   it("renders a sent canonical link as a chip that opens the thread", () => {
-    const markup = render("done in [QA PR 245](openmausbot://thread/qa-245?bot=scout) today");
+    const markup = render("done in [QA PR 245](hattera://thread/qa-245?bot=scout) today");
     expect(markup).toContain('<button type="button" data-thread-link="qa-245"');
     expect(markup).toContain(">QA PR 245</button>");
     expect(markup).not.toContain('href="openmausbot://');
   });
 
   it("keeps a dead thread link as plain text, never an external anchor", () => {
-    const markup = render("see [Gone](openmausbot://thread/dead?bot=scout)");
+    const markup = render("see [Gone](hattera://thread/dead?bot=scout)");
     expect(markup).toContain(">Gone<");
     expect(markup).not.toContain("data-thread-link");
     expect(markup).not.toContain('href="openmausbot://');

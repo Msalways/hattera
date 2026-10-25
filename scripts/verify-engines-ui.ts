@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createServer as createHttpServer, type IncomingMessage } from "node:http";
 import { createServer } from "vite";
 import type { InstanceInfo } from "../src/state/store.tsx";
-import { launchVerificationServer } from "./control-omb.ts";
+import { launchVerificationServer } from "./control-hattera.ts";
 import { providerIconError, type ProviderIcon } from "../shared/provider-icon.ts";
 
 async function requestJson(req: IncomingMessage): Promise<unknown> {

@@ -50,7 +50,7 @@ export type CloudMoveJob =
  * hosted organisation workspace, or (not on a Cloud home, whose sign-in is its
  * owner's OMB Cloud account) an email sign-in list that lets someone else in
  * (sharedSignIn: a member, a second admin, or a whole @domain). The owner's
- * own address alone (`openmausbot access add you@example.com`) is not. */
+ * own address alone (`hattera access add you@example.com`) is not. */
 export function workspaceShared(input: { hosted: boolean; cloudHome: boolean; signIn: SignInLists }): boolean {
   return input.hosted || (!input.cloudHome && sharedSignIn(input.signIn));
 }

@@ -18,6 +18,7 @@ import * as mdb from "./message-db.ts";
 import { forgetBotMemoryJournal, journalFile } from "./memory-journal.ts";
 import { runCommand, type Command } from "./commands.ts";
 import { workspaceDir } from "./workspace.ts";
+import { reportedTokens, tokenCount } from "../shared/token-usage.ts";
 import type { Destination } from "./surface.ts";
 import { newId, type ModelSelection } from "./contracts.ts";
 import { pickBotName } from "./names.ts";
@@ -1248,6 +1249,7 @@ export class Store {
       bulletin?: string;
       defaultResponder?: GroupDefaultResponder;
       completed?: boolean;
+      sharedGroupId?: string;
     },
   ): GroupRecord {
     this.rememberSections([section]);
@@ -1258,6 +1260,7 @@ export class Store {
       threadId,
       name,
       memberIds,
+      ...(setup?.sharedGroupId ? { sharedGroupId: setup.sharedGroupId } : {}),
       defaultResponder: dm
         ? { kind: "mentions" }
         : normalizeGroupDefaultResponder(setup?.defaultResponder, memberIds, false),
@@ -1286,7 +1289,7 @@ export class Store {
     );
   }
 
-  patchGroup(id: string, patch: Partial<Pick<GroupRecord, "name" | "memberIds" | "defaultResponder" | "bulletin" | "unread" | "lastReadMessageId" | "busyBotId" | "cwd" | "pinnedMessageId" | "section" | "setupCompletedAt" | "setupSkippedAt" | "audienceFloor" | "installedPackage" | "turnTimeoutMinutes">>): GroupRecord | null {
+  patchGroup(id: string, patch: Partial<Pick<GroupRecord, "name" | "memberIds" | "defaultResponder" | "bulletin" | "unread" | "lastReadMessageId" | "busyBotId" | "cwd" | "pinnedMessageId" | "section" | "setupCompletedAt" | "setupSkippedAt" | "audienceFloor" | "installedPackage" | "turnTimeoutMinutes" | "sharedGroupId">>): GroupRecord | null {
     const group = this.group(id);
     if (!group) return null;
     if (Object.prototype.hasOwnProperty.call(patch, "section")) {
@@ -1365,7 +1368,7 @@ export class Store {
       detail: string;
       finishedAt: number;
     } | null,
-    fallbackDetail = "OpenMausBot restarted before this goal finished.",
+    fallbackDetail = "Hattera restarted before this goal finished.",
     fallbackFinishedAt = Date.now(),
   ): number {
     const ownedThreadIds = new Set<string>();
@@ -1419,12 +1422,13 @@ export class Store {
     return group.tasks?.find((task) => task.threadId === threadId);
   }
 
-  createGroupTask(groupId: string, title?: string, activate = true): GroupTaskRecord | null {
+  createGroupTask(groupId: string, title?: string, activate = true, sharedTopicId?: string): GroupTaskRecord | null {
     const group = this.group(groupId);
     if (!group || group.dm) return null;
     const createdAt = Date.now();
     const task: GroupTaskRecord = {
       threadId: newId(),
+      ...(sharedTopicId ? { sharedTopicId } : {}),
       title: title?.trim().slice(0, 80) || UNTITLED_TASK,
       createdAt,
       updatedAt: createdAt,
@@ -2495,7 +2499,7 @@ export class Store {
   addTaskUsage(
     botId: string,
     threadId: string,
-    turn: { input?: number; output?: number; cachedInput?: number; costUsd: number | null; context?: { tokens?: number; window?: number } },
+    turn: { input?: number; output?: number; cachedInput?: number; tokensReported?: boolean; costUsd: number | null; context?: { tokens?: number; window?: number } },
   ): TaskUsage | null {
     const task = this.taskByThread(botId, threadId);
     if (!task) return null;
@@ -2517,12 +2521,15 @@ export class Store {
     task.usage = {
       input: prevInput + turnInput,
       output: prev.output + clean(turn.output),
+      ...(prev.tokensReported === false || !reportedTokens(turn) ? { tokensReported: false } : {}),
       ...(cachedKnown ? { cachedInput: nextCachedInput } : {}),
+      ...(prev.cachedInputReported === false || tokenCount(turn.cachedInput) === undefined && (turnInput > 0 || !reportedTokens(turn)) ? { cachedInputReported: false } : {}),
       costUsd: cost === null ? prevCost : (prevCost ?? 0) + cost,
       turns: prev.turns + 1,
       lastTurn: {
         input: turnInput, output: clean(turn.output),
-        ...(typeof turn.cachedInput === "number" ? { cachedInput: Math.min(clean(turn.cachedInput), turnInput) } : {}),
+        ...(!reportedTokens(turn) ? { tokensReported: false } : {}),
+        ...(tokenCount(turn.cachedInput) !== undefined ? { cachedInput: Math.min(clean(turn.cachedInput), turnInput) } : {}),
         costUsd: cost,
       },
       // a turn that reported no context keeps the previous reading rather

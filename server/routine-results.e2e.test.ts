@@ -5,7 +5,7 @@ import { connect, type Socket } from "node:net";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "../scripts/control-hattera.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 
 it("reports every run into the bot's main thread while fresh executions, approvals, deletion and unread stay reachable", async () => {

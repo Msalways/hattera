@@ -23,6 +23,8 @@ import { brokerSocketPath, describeSpawnFailure, execCli, killCliTree, spawnCli 
 import { classifyResumeFailure, mayReplay, rebuiltSessionNotice, recoveryPromptFor } from "../resume-recovery.ts";
 import { hostTimeZone } from "../turn-clock.ts";
 import { ClaudeLoginController } from "./claude-login-auth.ts";
+import { observeClaudeLimit } from "../account-metrics.ts";
+import { reportedTokens, type TokenUsage } from "../../shared/token-usage.ts";
 
 import type {
   DriverCreateInput,
@@ -267,7 +269,7 @@ export function claudeResultError(frame: { errors?: unknown; result?: unknown; s
  * Keeping the probe and turn environments identical prevents setup from
  * claiming an API-key login that the turn itself would deliberately remove.
  */
-function claudeEnvironment(
+export function claudeEnvironment(
   model?: string | null,
   source: NodeJS.ProcessEnv = process.env,
   configDir?: string,
@@ -319,7 +321,7 @@ export function claudeInheritWarning(env: NodeJS.ProcessEnv): ProviderSnapshot["
   return {
     title: "Bots inherit this machine's Claude Code setup",
     message:
-      "OMB_CLAUDE_INHERIT_USER_CONFIG=1 is set on the OpenMausBot process, so every Claude bot also loads this " +
+      "OMB_CLAUDE_INHERIT_USER_CONFIG=1 is set on the Hattera process, so every Claude bot also loads this " +
       "computer's own MCP servers, connectors, skills, hooks and personal CLAUDE.md on every turn — often thousands " +
       "of extra tokens per model call, and tools nobody gave the bot. Unless a bot genuinely needs a server from " +
       "your user-scope Claude config, remove the variable and restart; add the server under Settings → MCP servers " +
@@ -486,7 +488,7 @@ export function claudeCliUpdate(version: string | null, cli: string): ProviderSn
   const missing = (Object.keys(CLAUDE_FLAG_FLOORS) as (keyof typeof CLAUDE_FLAG_FLOORS)[])
     .filter((flag) => !claudeCliSupports(parsed, flag));
   const effects = [
-    ...(missing.includes("--autocompact") ? ["no compaction window picked by OpenMausBot"] : []),
+    ...(missing.includes("--autocompact") ? ["no compaction window picked by Hattera"] : []),
     ...(missing.includes("--setting-sources") ? ["bots still see this machine's own Claude Code setup"] : []),
     ...(missing.includes("--system-prompt-snapshot") ? ["resumed turns cannot refresh stale system prompts"] : []),
   ];
@@ -645,17 +647,17 @@ type AskBehavior = "allow" | "deny" | "answer";
 type AskResolutionSource = "user" | "timeout" | "system";
 
 const DENY_TIMEOUT_NOTE =
-  "OpenMausBot: nobody answered this permission request in time. Skip this action and finish what you can without it.";
-const QUESTION_TIMEOUT_NOTE = "OpenMausBot: nobody answered in time. Use your best judgment and continue.";
-const DUPLICATE_ASK_ID_NOTE = "OpenMausBot: duplicate ask id — skipping this request.";
+  "Hattera: nobody answered this permission request in time. Skip this action and finish what you can without it.";
+const QUESTION_TIMEOUT_NOTE = "Hattera: nobody answered in time. Use your best judgment and continue.";
+const DUPLICATE_ASK_ID_NOTE = "Hattera: duplicate ask id — skipping this request.";
 
 /** The system-source reply for an ask that outlives the turn — used both to
  * drain in-flight `pending` asks on close() and to answer one that arrives
  * on an already-closed broker (see the `closed` branch below). */
 function systemEndedReply(kind: Ask["kind"]): { behavior: AskBehavior; message: string } {
   return kind === "question"
-    ? { behavior: "answer", message: "OpenMausBot: the turn is ending — wrap up." }
-    : { behavior: "deny", message: "OpenMausBot: the turn ended" };
+    ? { behavior: "answer", message: "Hattera: the turn is ending — wrap up." }
+    : { behavior: "deny", message: "Hattera: the turn ended" };
 }
 
 /** The structured questions behind an ask, when it is one. Claude's own
@@ -679,7 +681,7 @@ export interface NativeTurnResult {
   ok: boolean;
   stopReason: string | null;
   cost: number | null;
-  usage?: { input: number; output: number; cachedInput?: number };
+  usage?: TokenUsage;
 }
 
 /** A logical turn made of several native turns: any failed half fails it,
@@ -687,7 +689,7 @@ export interface NativeTurnResult {
  * the latest figure — the CLI reports total_cost_usd as the process's running
  * total ("cumulative across turns in streaming-input sessions … read the
  * latest result rather than summing", 2.1.282), so adding would double-bill.
- * A figure missing on one side leaves the other side's alone. */
+ * A missing figure preserves the known subtotal and marks it incomplete. */
 export function sumNativeTurnResults(earlier: NativeTurnResult | null, latest: NativeTurnResult): NativeTurnResult {
   if (!earlier) return latest;
   const usage = earlier.usage && latest.usage
@@ -703,7 +705,7 @@ export function sumNativeTurnResults(earlier: NativeTurnResult | null, latest: N
     ok: earlier.ok && latest.ok,
     stopReason: latest.stopReason ?? earlier.stopReason,
     cost: latest.cost ?? earlier.cost,
-    ...(usage ? { usage } : {}),
+    ...(usage ? { usage: { ...usage, ...(!reportedTokens(earlier.usage) || !reportedTokens(latest.usage) ? { tokensReported: false } : {}) } } : {}),
   };
 }
 
@@ -1643,7 +1645,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
           env: local.env,
         };
         // The isolated Local VM preserves the established pre-allow behavior.
-        // Host tools always route through OpenMausBot's permission broker.
+        // Host tools always route through Hattera's permission broker.
         if (!controlsHost) allowed.push("mcp__computer");
       }
       // peer-agent comms (list_bots/ask_bot) — the harness builds the whole
@@ -1694,7 +1696,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
       // shape and the CLI connects to it itself; header values ride in the
       // 0600 config file like every other credential here.
       // Claude Code is the one engine that keeps its own connection: every
-      // other engine reaches URL servers through OpenMausBot's remote proxy
+      // other engine reaches URL servers through Hattera's remote proxy
       // (mcp-remote-proxy.ts), whose minimal handshake strict servers
       // accept. Claude Code 2.1.292 sends only fields the MCP spec defines
       // (2025-11-25: roots, elicitation.form/url, clientInfo), none of the
@@ -2232,6 +2234,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
                 type: "thread.token-usage.updated",
                 input: (msg.usage.input_tokens || 0) + (msg.usage.cache_read_input_tokens || 0),
                 output: msg.usage.output_tokens || 0,
+                ...(!reportedTokens({ input: msg.usage.input_tokens, output: msg.usage.output_tokens }) ? { tokensReported: false } : {}),
                 ...(typeof msg.usage.cache_read_input_tokens === "number"
                   ? { cachedInput: msg.usage.cache_read_input_tokens }
                   : {}),
@@ -2260,6 +2263,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
             break;
           }
           case "rate_limit_event":
+            observeClaudeLimit(instanceId, o.rate_limit_info);
             // the account's usage window as the API's last response left it;
             // read only when the turn fails (claudeUsageLimit, `result`)
             if (session.turn) session.turn.limit = claudeLimitRefusal(o.rate_limit_info);
@@ -2325,6 +2329,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
                     usage: {
                       input: (o.usage.input_tokens || 0) + (o.usage.cache_read_input_tokens || 0) + (o.usage.cache_creation_input_tokens || 0),
                       output: o.usage.output_tokens || 0,
+                      ...(!reportedTokens({ input: o.usage.input_tokens, output: o.usage.output_tokens }) ? { tokensReported: false } : {}),
                       ...(typeof o.usage.cache_read_input_tokens === "number"
                         ? { cachedInput: o.usage.cache_read_input_tokens }
                         : {}),

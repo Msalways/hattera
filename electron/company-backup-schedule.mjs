@@ -104,7 +104,7 @@ export function createCompanyBackupSchedule({ store, scope, run, onState = () =>
       arm();
     }
   }
-  const RESTORE_WAITING = "The saved daily backup schedule can't be read right now. OpenMausBot tries again every minute.";
+  const RESTORE_WAITING = "The saved daily backup schedule can't be read right now. Hattera tries again every minute.";
   /** Reads the saved schedule. One that can never be read is removed and the
    * schedule is off, saying so. One that may only be locked (the keychain) is
    * kept, never removed, and read again shortly. */

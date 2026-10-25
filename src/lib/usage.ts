@@ -19,6 +19,7 @@ export function sumUsage(items: Array<TaskUsage | undefined>): TaskUsage {
     out.input += u.input;
     out.output += u.output;
     out.turns += u.turns;
+    if (u.tokensReported === false) out.tokensReported = false;
     if (hasFiniteCost(u.cachedInput)) out.cachedInput = (out.cachedInput ?? 0) + u.cachedInput;
     if (hasFiniteCost(u.costUsd)) out.costUsd = (out.costUsd ?? 0) + u.costUsd;
   }
@@ -71,6 +72,8 @@ export function cachedInput(u: TokenUsage): number {
 
 /** Keep input and output separate; an absent cache count is not zero. */
 export function usageDetail(u: TokenUsage): string {
+  if (u.tokensReported === false) return u.input + u.output > 0
+    ? t("chat.usage.partialDetail", { tokens: formatTokens(u.input + u.output) }) : t("chat.usage.unreported");
   const input = cachedKnown(u)
     ? `${t("chat.usage.uncachedInput", { tokens: formatTokens(uncachedInput(u)) })} · ${t("chat.usage.cachedInput", { tokens: formatTokens(cachedInput(u)) })}`
     : t("chat.usage.totalInput", { tokens: formatTokens(u.input) });
@@ -91,22 +94,30 @@ export function freshTokens(u: TaskUsage): number {
 /** Aggregate counters preserve the existing input-plus-output meaning.
  * Chat input chips label their narrower count explicitly. */
 export function headlineTokens(u: TaskUsage): number {
+  if (u.tokensReported === false) return u.input + u.output;
   return cachedKnown(u) ? freshTokens(u) : u.input + u.output;
 }
 
-export function cachedKnown(u: Pick<TaskUsage, "cachedInput">): boolean {
-  return hasFiniteCost(u.cachedInput);
+export function formatUsageTokens(u: TaskUsage): string {
+  const count = headlineTokens(u);
+  return u.tokensReported === false ? count > 0 ? `${formatTokens(count)}+` : "—" : formatTokens(count);
+}
+
+export function cachedKnown(u: Pick<TaskUsage, "cachedInput" | "cachedInputReported">): boolean {
+  return hasFiniteCost(u.cachedInput) && u.cachedInputReported !== false;
 }
 
 /** Column heading for a table of headlineTokens: "New tokens" once the cache
  * split is known and the figure leaves cache re-reads out, else "Tokens". */
 export function tokensColumnLabel(total: TaskUsage): string {
+  if (total.tokensReported === false) return t("usage.colReportedTokens");
   return t(cachedKnown(total) ? "usage.colNewTokens" : "usage.colTokens");
 }
 
 /** The line under a fresh-token total: what it leaves out, and everything
  * that went through the model, the figure a provider's dashboard shows. */
 export function cachedUsageNote(total: TaskUsage): string | null {
+  if (total.tokensReported === false || !cachedKnown(total)) return null;
   const cached = cachedInput(total);
   if (cached <= 0) return null;
   return t("usage.cachedNote", {
@@ -155,6 +166,7 @@ export function lastTurnDetail(u: TaskUsage): string | null {
 export function usageChip(u: TaskUsage): string {
   if (u.turns === 0 && u.input + u.output === 0) return "";
   if (hasFiniteCost(u.costUsd)) return formatUsd(u.costUsd);
+  if (u.tokensReported === false) return t("chat.usage.partialShort");
   if (cachedKnown(u)) return t("chat.usage.uncachedShort", { tokens: formatTokens(uncachedInput(u)) });
   return t("chat.usage.inputShort", { tokens: formatTokens(u.input) });
 }

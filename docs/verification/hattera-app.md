@@ -9,7 +9,30 @@ $env:OMB_VERIFY_BROWSER_CHROME = 'C:\Program Files\Google\Chrome\Application\chr
 node --experimental-strip-types scripts/verify-hattera-app.ts
 ```
 
-The launcher exits after its browser smoke and reports 27 checks. Set `OMB_VERIFY_BROWSER_CHROME` to the Edge executable to run the same fixture in Edge. It exercises fake Claude and OpenCode replies, OpenCode model selection and provider status, unconfigured MiniMax and Qwen setup cards, both Codex sign-in choices in Settings, a Cline installation started from the browser UI against a temporary local npm registry followed by device sign-in cancellation, retry and saved-account confirmation, engine uninstall cancellation, uninstall and reinstall with account preservation, external-engine disable and restore, a Bedrock setup form, native browser navigation and release, bot creation, identity and memory edits, saved tool restrictions, command skill creation, approval level changes, browser permission, mobile layout, pairing contrast across all ten saved skins, and pairing a second browser session through a proxied remote request. It verifies saved changes through the API and confirms that the downloaded Cline launcher is in the temporary tools directory. Screenshots are written under `output/playwright/`, including the model picker, provider cards, browser, mobile chat, and pairing page in Hattera and Midnight skins. The fixture uses a temporary app home and isolated browser profiles. It never imports live app data, account credentials, or browser profiles. A visible fixture banner identifies its screenshots. This is an internal diagnostic, not a product-testing URL.
+The launcher exits after its browser smoke and reports 31 checks. Set
+`OMB_VERIFY_BROWSER_CHROME` to the Edge executable to run the same fixture in Edge.
+It creates, renames and removes an independent provider profile, confirming the
+shared engine and original login are retained. It checks all configured accounts
+in Usage, packaged private-network controls, and group-sharing consent, disconnected
+network state, phone layout and keyboard closure. Account reporting and networking
+are captured at desktop and phone widths. Native reporting and official Tailscale
+browser-challenge delivery have separate checks in [account-network.md](account-network.md).
+
+Other journeys cover fake Claude/OpenCode replies, model selection, provider/setup
+cards, both Codex sign-in choices, a browser-started Cline installation through a
+temporary local npm registry, device sign-in cancellation/retry/confirmation,
+uninstall/reinstall with account preservation, external-engine disable/restore,
+Bedrock setup, native browser navigation/release, bot creation, identity/memory
+edits, tool restrictions, skill creation, approval levels and browser permissions.
+The fixture checks mobile chat, pairing contrast across ten skins, and pairing a
+second browser through proxied remote ingress. Saved changes are checked through
+the API; installed Cline software must be in the fixture's private tools directory.
+
+Screenshots go under `output/playwright/`, including model/provider cards, the
+browser, mobile chat/sharing and light/dark pairing pages. Temporary app homes and
+browser profiles never import live data, account credentials or existing browser
+profiles. Screenshots carry an isolated-fixture banner. These checks do not prove
+real provider authorization or a completed signed-in tailnet connection.
 
 For release artifact checks, set `OMB_VERIFY_WEB_DIST` to a copy of the image's `/app/dist` directory and `OMB_VERIFY_SERVER_ENTRY` to a copy of `/app/dist-server/index.js`. The server still receives the fixture's disposable home, environment and fake providers. This also avoids slow source TypeScript imports on Windows without extending the startup timeout.
 
@@ -64,6 +87,9 @@ For adjacent features that require more setup than the browser smoke, run their 
 This suite covers routine continuity, team persistence through restart, backup HTTP/auth controls, per-bot MCP selection, connected-app caching, and routine rendering. It uses disposable homes and local substitutes; it does not exercise those features as full Hattera browser journeys.
 
 ## Coverage inventory
+
+The unified [E2E command](e2e.md) saves this smoke's screenshots in its unique run
+directory under `app-screenshots/`. Standalone smoke runs use `output/playwright/`.
 
 | Area | Evidence here | Still needs acceptance |
 | --- | --- | --- |

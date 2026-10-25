@@ -251,9 +251,9 @@ describe("addressed room request tree", () => {
     // A routine run a restart failed ends its room work this way (index.ts onRunFailed).
     const kept = engine.enqueue(addr("A"), "kept", undefined, addr("B"), "work", "build").node;
     const ended = engine.enqueue({ ...addr("A"), threadId: "run" }, "run", undefined, addr("C"), "work", "build").node;
-    engine.cancelRoom("A", "run", "OpenMausBot restarted while this routine was running");
-    expect(engine.nodes.get("run")).toMatchObject({ status: "cancelled", result: "OpenMausBot restarted while this routine was running" });
-    expect(ended).toMatchObject({ status: "cancelled", result: "OpenMausBot restarted while this routine was running" });
+    engine.cancelRoom("A", "run", "Hattera restarted while this routine was running");
+    expect(engine.nodes.get("run")).toMatchObject({ status: "cancelled", result: "Hattera restarted while this routine was running" });
+    expect(ended).toMatchObject({ status: "cancelled", result: "Hattera restarted while this routine was running" });
     expect(kept.status).toBe("queued");
   }));
   it("names the conversation waiting on a teammate's direct thread until that work settles", () => fixture(async (engine, hooks) => {

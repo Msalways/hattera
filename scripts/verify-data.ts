@@ -9,8 +9,8 @@ import { fileURLToPath } from "node:url";
 import { closeBrowserSession } from "../server/browser-engine.ts";
 import { waitForExit } from "../server/testing/cleanup.ts";
 import { DATA_ROUTES, DATA_TOOL_NAMES, type DataSheet } from "../shared/data-surface.ts";
-import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "./control-omb.ts";
-import { agentBrowser, ensureUiBrowser, sessionEnv, type UiHandle } from "./testing/control-omb-ui.ts";
+import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "./control-hattera.ts";
+import { agentBrowser, ensureUiBrowser, sessionEnv, type UiHandle } from "./testing/control-hattera-ui.ts";
 import { mountPreview, parkUntilSignal, type MountedPreview } from "./testing/preview-fixture.ts";
 
 assert(process.argv.slice(2).every((arg) => arg === "--check"), "Usage: node --experimental-strip-types scripts/verify-data.ts [--check]");

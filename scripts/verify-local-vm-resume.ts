@@ -4,9 +4,9 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
-import { launchVerificationServer, runControlOmb } from "./control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "./control-hattera.ts";
 import { mountPreview } from "./testing/preview-fixture.ts";
-import { agentBrowser, ensureUiBrowser, sessionEnv } from "./testing/control-omb-ui.ts";
+import { agentBrowser, ensureUiBrowser, sessionEnv } from "./testing/control-hattera-ui.ts";
 
 const fixture = await launchVerificationServer();
 const home = mkdtempSync(join(tmpdir(), "omb-vmr-")); // Keep macOS browser sockets below their path limit.

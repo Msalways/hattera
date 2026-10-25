@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runServiceCommand, serviceServeArgs } from "./service-cli.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 
-describe("openmausbot service", () => {
+describe("hattera service", () => {
   let dir: string;
   const out: string[] = [];
   const err: string[] = [];
@@ -35,7 +35,7 @@ describe("openmausbot service", () => {
     out.length = 0;
     const refused = runServiceCommand({ action: "install", dataDir: join(dir, "x"), port: 8799, script: "/home/maus/.npm/_npx/deadbeef/node_modules/openmausbot/cli.js", node: "/usr/bin/node", platform: "linux" }, io);
     expect(refused).toBe(1);
-    expect(err.join("\n")).toMatch(/npm install -g openmausbot/);
+    expect(err.join("\n")).toContain("npm install -g ./hattera-VERSION.tgz");
     expect(existsSync(join(dir, "x", "openmausbot.service"))).toBe(false);
   });
 

@@ -145,18 +145,18 @@ describe("ACP decodeConfig", () => {
   it("kimi defaults to the kimi binary and declares cross-platform setup", () => {
     expect(KimiAgentDriver.decodeConfig(undefined)).toEqual({ cli: "kimi", fullAuto: false, workspace: undefined });
     expect(KimiAgentDriver.install?.command).toMatchObject({
-      darwin: expect.stringContaining("install.sh"),
-      linux: expect.stringContaining("install.sh"),
-      win32: expect.stringContaining("install.ps1"),
+      darwin: "npm install -g @moonshot-ai/kimi-code",
+      linux: "npm install -g @moonshot-ai/kimi-code",
+      win32: "npm install -g @moonshot-ai/kimi-code",
     });
     expect(KimiAgentDriver.install?.signInCommand).toBe("kimi login");
   });
   it("droid defaults to the droid binary and declares cross-platform setup", () => {
     expect(DroidAgentDriver.decodeConfig(undefined)).toEqual({ cli: "droid", fullAuto: false, workspace: undefined });
     expect(DroidAgentDriver.install?.command).toMatchObject({
-      darwin: expect.stringContaining("factory.ai/cli"),
-      linux: expect.stringContaining("factory.ai/cli"),
-      win32: expect.stringContaining("factory.ai/cli"),
+      darwin: "npm install -g droid",
+      linux: "npm install -g droid",
+      win32: "npm install -g droid",
     });
     expect(DroidAgentDriver.install?.signInCommand).toBe("droid");
   });
@@ -409,7 +409,7 @@ describe("ACP turns (fake CLI)", () => {
     expect(await send("second", "Memory: likes quiet hours.")).toBe("second");
     // A changed volatile half rides the next prompt as a labelled note.
     expect(await send("third", "Memory: moved to Toronto."))
-      .toBe("Context from OpenMausBot updated since this conversation started; it replaces any earlier copy:\n\nMemory: moved to Toronto.\n\nthird");
+      .toBe("Context from Hattera updated since this conversation started; it replaces any earlier copy:\n\nMemory: moved to Toronto.\n\nthird");
     // A cleared volatile half is announced once, not silently dropped.
     expect(await send("fourth", "")).toContain("have been cleared");
     expect(await send("fifth", "")).toBe("fifth");
@@ -709,6 +709,14 @@ describe("ACP turns (fake CLI)", () => {
     });
   };
 
+  it.each([{ inputTokens: 10 }, { outputTokens: 0 }, { inputTokens: -1, outputTokens: 4 }])("marks partial native usage as incomplete: %j", async usage => {
+    stubPromptResultUsage(usage, "root");
+    await create();
+    await instance.adapter.sendTurn({ threadId: "t-partial-usage", text: "go" });
+    await recorder.until(e => e.type === "turn.completed");
+    expect(recorder.events.find(e => e.type === "thread.token-usage.updated")).toMatchObject({ tokensReported: false });
+  });
+
   it("folds opencode cache reads into input and names them", async () => {
     stubPromptResultUsage(
       { inputTokens: 5030, outputTokens: 3, cachedReadTokens: 152960, totalTokens: 157993 },
@@ -984,7 +992,7 @@ describe("ACP turns (fake CLI)", () => {
   it.each([
     ["advertises no remote transport", undefined],
     ["advertises http and sse", "http,sse"],
-  ])("mounts every url server as OpenMausBot's connector for an agent that %s", async (_name, transports) => {
+  ])("mounts every url server as Hattera's connector for an agent that %s", async (_name, transports) => {
     if (transports) process.env.FAKE_ACP_MCP_TRANSPORTS = transports;
     try {
       await create();
@@ -1012,7 +1020,7 @@ describe("ACP turns (fake CLI)", () => {
   // "Unrecognized field 'schemaValidation'") refuses grok 1.0.25's own
   // handshake (capabilities.extensions). The fake agent connects each
   // mounted server with that handshake, natively if it were handed a URL.
-  it("lists a strict url server's tools through OpenMausBot's connector, even for an agent that speaks http", async () => {
+  it("lists a strict url server's tools through Hattera's connector, even for an agent that speaks http", async () => {
     const strict = await startFakeHttpMcp({ strictInitialize: "http-400", strictSchema: "2025-11-25",
       tools: [{ name: "report", inputSchema: { type: "object" } }, { name: "campaigns", inputSchema: { type: "object" } }],
       requireHeader: { name: "Authorization", value: "Bearer tok-voluum" } });
@@ -1025,7 +1033,7 @@ describe("ACP turns (fake CLI)", () => {
       expect(await recorder.until((event) => event.type === "turn.completed")).toMatchObject({ ok: true });
       const text = recorder.events.find((event) => event.type === "item.completed" && (event as { itemType?: string }).itemType === "assistant_text");
       expect((text as { text?: string } | undefined)?.text).toBe("voluum: report,campaigns");
-      expect(strict.initializes).toEqual([{ protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "OpenMausBot tool proxy", version: "1" } }]);
+      expect(strict.initializes).toEqual([{ protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "Hattera tool proxy", version: "1" } }]);
     } finally {
       delete process.env.FAKE_ACP_MCP_TRANSPORTS;
       await strict.close();

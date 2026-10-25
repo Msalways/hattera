@@ -22,6 +22,7 @@
 // Local pane only lists `custom` options for custom-only engines.
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
+import { tokenUsage } from "../../shared/token-usage.ts";
 import { join } from "node:path";
 
 import { PROVIDER_CREDENTIAL_ENV, stripWorkspaceCredentialEnv } from "../config.ts";
@@ -852,7 +853,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           type: "turn.completed",
           ok,
           stopReason: stopReason ?? (ok ? "end_turn" : "failed"),
-          ...(usage ? { usage: { input: usage.input ?? 0, output: usage.output ?? 0 } } : {}),
+          ...(usage ? { usage: tokenUsage(usage.input, usage.output) } : {}),
         });
         try {
           child.stdin.end();
@@ -1225,7 +1226,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           ready = receipt.ok === true && JSON.stringify(receipt.toolScope) === JSON.stringify(toolScope);
         } catch { /* Missing or malformed readiness is never a grant. */ }
         if (!ready) {
-          const message = "Pi tool selection enforcement is unavailable. Update Pi and check the OpenMausBot extension before retrying.";
+          const message = "Pi tool selection enforcement is unavailable. Update Pi and check the Hattera extension before retrying.";
           emit({ ...base(threadId, turnId), type: "runtime.error", message });
           settle(false);
           throw new Error(message);

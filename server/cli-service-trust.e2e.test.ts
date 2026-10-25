@@ -1,4 +1,4 @@
-// `openmausbot serve` on a server that trusts local requests only as a
+// `hattera serve` on a server that trusts local requests only as a
 // service (OMB_LOOPBACK_TRUST=service). The real CLI starts the real server
 // in a disposable home: the server refuses session-less local admin requests,
 // yet the CLI that started it still prints a pairing code through the secret
@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 
 const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
-const ENTRY = join(SERVER_DIR, "openmausbot.ts");
+const ENTRY = join(SERVER_DIR, "hattera.ts");
 const PORT = 38800 + Math.floor(Math.random() * 5_000);
 const run = promisify(execFile);
 
@@ -39,7 +39,7 @@ const cli = async (args: string[]) => {
   }
 };
 
-describe.skipIf(process.platform === "win32")("openmausbot serve under service loopback trust", () => {
+describe.skipIf(process.platform === "win32")("hattera serve under service loopback trust", () => {
   beforeAll(async () => {
     home = mkdtempSync(join(tmpdir(), "omb-cli-service-"));
     serve = spawn(process.execPath, ["--experimental-strip-types", ENTRY, "serve", "--port", String(PORT), "--data-dir", join(home, "data")], {

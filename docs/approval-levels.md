@@ -2,7 +2,7 @@
 
 Approval levels belong to a bot and apply to its next provider turn, including
 when that provider resumes an existing native thread. Each level is one of the
-provider's own permission modes, passed through. OpenMausBot does not judge an
+provider's own permission modes, passed through. Hattera does not judge an
 action itself: there is no app-side allowlist, classifier, or pattern rule. A
 native tool request that reaches you is one the provider left for you. In Full
 Access, OMB also applies its own configuration tools without another approval.
@@ -13,7 +13,7 @@ Access, OMB also applies its own configuration tools without another approval.
 | **Auto-accept edits** | Approves file edits automatically; other actions can still require approval. Offered where the provider has such a mode (Claude, Grok, Antigravity). |
 | **Approve for me** | Uses the provider's automatic review on Codex, Claude, Cursor, and Grok to approve routine actions and ask about others. Providers without an equivalent fall back to asking. |
 | **Full access** | Enables the provider's permissive mode for commands, edits, and selected-computer actions, including potentially destructive or sensitive work. Residual native permission prompts are answered for you. OMB profile changes, routine actions, team setup, bot deletion, and enabled skill authoring apply without a second approval. Peer-review prompts are skipped within the bot's authorized scope. Delegation uses the receiving bot's setting, never the sender's — except from a Chief of Staff, whose level flows down (below). Actual questions and missing credentials still need your input. |
-| **Custom (`config.toml`)** | Codex only. OpenMausBot reads and reapplies the effective approval and sandbox settings from your Codex configuration. |
+| **Custom (`config.toml`)** | Codex only. Hattera reads and reapplies the effective approval and sandbox settings from your Codex configuration. |
 
 Full access is an elevated-risk standing approval. Full and Custom can only be
 enabled from a packaged local desktop app, where the choice crosses a private
@@ -71,10 +71,10 @@ native session, so their driver keeps the allow for that bot, that exact tool
 and that exact server (as launched: a changed command, URL or credential is
 another server, and a bridge into a VM or a Boat is new each turn) for the
 rest of the conversation, in memory until the server restarts. Another bot in
-the same room asks again. OpenMausBot keeps no standing grant for a provider's tool. It is not
+the same room asks again. Hattera keeps no standing grant for a provider's tool. It is not
 offered for computer control, for a sandbox change or on a guest's turn. The
 harness's own agents tools (coordinating teammates, threads, memory) never
-ask on Claude, Codex or API models: OpenMausBot authorizes each of those
+ask on Claude, Codex or API models: Hattera authorizes each of those
 routes itself.
 
 Auto-accept edits and Ask card whatever the provider asks about. Approve for
@@ -150,12 +150,12 @@ multi-question card renders its structured form on current apps instead.
 These settings apply on each turn, including resumed conversations. Switching
 to a different provider while elevated requires leaving Full/Custom first;
 choose Ask. Switching models within Antigravity keeps the selected level.
-Native modes require a CLI version that supports them; OpenMausBot does not
+Native modes require a CLI version that supports them; Hattera does not
 silently substitute unrestricted access when a mode is rejected.
 
 ### Read-only integration tools
 
-OpenMausBot's built-in agents MCP server describes nine scoped reads with
+Hattera's built-in agents MCP server describes nine scoped reads with
 explicit read-only, non-destructive, idempotent, closed-world metadata:
 `list_bots`, `list_rooms`, `list_threads`, `check_delegation`, `wait_delegation`,
 `session_search`, `session_read`, `list_routines`, and `skills_list`.
@@ -171,7 +171,7 @@ The level set follows the provider-boundary approach in
 [T3 Code's permission modes](https://github.com/pingdotgg/t3code/blob/e16b8b059c9f5ff6dfed1addecffb831c6aee043/docs/user/permission-modes.md):
 Supervised, Auto-accept edits, Auto, and Full access, each a provider mode
 rather than an app rule, with a remembered approval that belongs to the
-provider's session. Its quieter default is Full access; OpenMausBot keeps its
+provider's session. Its quieter default is Full access; Hattera keeps its
 own opt-in desktop confirmation and Ask as the default.
 
 ## Verification for contributors

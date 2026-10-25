@@ -1,4 +1,4 @@
-# Contributing to OpenMausBot
+# Contributing to Hattera
 
 Thanks for wanting to help — community PRs have already shipped in this repo, and more are welcome.
 This file tells you how to get a working dev setup, what the codebase expects from a change, and what
@@ -23,7 +23,7 @@ and logged in. macOS is the primary release platform and Ubuntu 24.04 x64 is the
 the harness server itself is portable Node and the test suite runs on macOS, Linux, and Windows.
 
 ```sh
-git clone https://github.com/milind-soni/OpenMausBot && cd OpenMausBot
+git clone https://github.com/Msalways/hattera && cd hattera
 pnpm install
 
 pnpm dev:server    # harness server → 127.0.0.1:8799
@@ -57,12 +57,12 @@ fail-closed Wayland CUA smoke,
 and produces one release artifact containing:
 
 - the versioned `.deb` and AppImage;
-- stable `OpenMausBot-amd64.deb` and `OpenMausBot.AppImage` copies used by the latest-download links;
+- stable `Hattera-amd64.deb` and `Hattera.AppImage` copies used by the latest-download links;
 - `SHA256SUMS-ubuntu-x64.txt` covering both versioned and stable names.
 
 Before publishing, confirm that `package.json` has the release version and dispatch the workflow against the same
 commit used for the other platforms. Attach all five Ubuntu files to the matching release in the separate
-[OpenMausBot releases](https://github.com/milind-soni/OpenMausBot/releases). Then verify the checksum
+[Hattera releases](https://github.com/Msalways/hattera/releases). Then verify the checksum
 file and install the `.deb` plus launch the AppImage in a clean Ubuntu 24.04 x86_64 GNOME environment. Never combine
 packages built from different commits under one version.
 

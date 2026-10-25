@@ -75,9 +75,9 @@ function workspaceSummary(state) {
 
 /** Native identity must not depend on a hosted renderer's version/title. */
 function workspaceWindowTitle(state, companion) {
-  if (companion) return `OpenMausBot — Connected to: ${companion.serverName} (${new URL(companion.endpoint).host})`;
+  if (companion) return `Hattera — Connected to: ${companion.serverName} (${new URL(companion.endpoint).host})`;
   const active = activeEnvironment(state);
-  return active ? `OpenMausBot — Hosted: ${active.name} (${new URL(active.origin).host})` : "OpenMausBot";
+  return active ? `Hattera — Hosted: ${active.name} (${new URL(active.origin).host})` : "Hattera";
 }
 
 /** Renderer navigation stays in the selected workspace. Switching is a main
@@ -103,7 +103,7 @@ function workspaceSenderAllowed(event, contents, state, localOrigin) {
 
 /** Native menu choices, never renderer-supplied destinations or callbacks. */
 /** The sidebar's server menu. `onAddCloud`: "Add a Cloud…" just under the
- * saved servers, only where main offers OpenMausBot Cloud (cloudOffersAllowed);
+ * saved servers, only where main offers Hattera Cloud (cloudOffersAllowed);
  * `sublabels`: a saved server's line under its name in place of its host (My
  * Cloud's "Always on"). */
 function workspaceMenuTemplate(state, { onSwitch, onConnect, onForget, onAddCloud, sublabels = {} }) {

@@ -3,7 +3,7 @@ import { closeSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "../scripts/control-hattera.ts";
 import { handleToolCall, request } from "../scripts/mcp-server.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 
@@ -46,7 +46,7 @@ it("boots and reports an interrupted routine back to its source room", async () 
       return fetch(url + "/api/health").then(r => r.ok).catch(() => false);
     }, { timeout: 10_000, interval: 150 }).toBe(true);
     const { runs } = await request("/api/routines", {}, url) as any;
-    expect(runs[0]).toMatchObject({ status: "failed", error: "OpenMausBot restarted while this routine was running" });
+    expect(runs[0]).toMatchObject({ status: "failed", error: "Hattera restarted while this routine was running" });
     const { messages } = await request(`/api/threads/${channel.activeTaskId}/messages`, {}, url) as any;
     expect(messages.filter((m: any) => m.routineRun?.runId === "interrupted-room-run"))
       .toMatchObject([{ routineRun: { status: "failed" } }]);
@@ -96,13 +96,13 @@ it("ends the teammate work of a routine a restart failed instead of running it a
       return fetch(url + "/api/health").then(r => r.ok).catch(() => false);
     }, { timeout: 10_000, interval: 150 }).toBe(true);
     const { runs } = await request("/api/routines", {}, url) as any;
-    expect(runs[0]).toMatchObject({ status: "failed", error: "OpenMausBot restarted while this routine was running" });
+    expect(runs[0]).toMatchObject({ status: "failed", error: "Hattera restarted while this routine was running" });
     const nodes = () => JSON.parse(readFileSync(join(dataDir, "room-handoffs.json"), "utf8"));
     // Reported to the run's thread like any ended work; never run again.
     await expect.poll(() => nodes().find((n: any) => n.id === "cut-work")?.reported, { timeout: 10_000 }).toBe(true);
     expect(nodes().map((n: any) => [n.id, n.status, n.result])).toEqual([
-      ["cut-root", "cancelled", "OpenMausBot restarted while this routine was running"],
-      ["cut-work", "cancelled", "OpenMausBot restarted while this routine was running"],
+      ["cut-root", "cancelled", "Hattera restarted while this routine was running"],
+      ["cut-work", "cancelled", "Hattera restarted while this routine was running"],
     ]);
     await new Promise((resolve) => setTimeout(resolve, 750));
     const { messages } = await request(`/api/threads/${mate.activeTaskId}/messages`, {}, url) as any;

@@ -1,18 +1,18 @@
-// `openmausbot` on the command line: run the server anywhere and pair devices
-// to it. One implementation for three homes — `npx openmausbot` (the npm
+// `hattera` on the command line: run the server anywhere and pair devices
+// to it. One implementation for three homes — `hattera` (the npm
 // package), `node dist-server/cli.js` (the container image) and
 // `pnpm omb` (a checkout) — because scripts/bundle-server.mjs bundles this
 // file next to the server.
 //
-//   openmausbot setup [--data-dir ~/.openmausbot]
-//   openmausbot start [serve options]
-//   openmausbot serve [--port 8799] [--data-dir ~/.openmausbot] [--label "cab mini"]
+//   hattera setup [--data-dir ~/.openmausbot]
+//   hattera start [serve options]
+//   hattera serve [--port 8799] [--data-dir ~/.openmausbot] [--label "cab mini"]
 //                     [--public-url https://host] [--tailscale | --tunnel | --domain HOST] [--no-pair]
-//   openmausbot pair  [--label "My MacBook"] [--client] [--public-url https://host]
-//   openmausbot sessions [revoke <id>]
-//   openmausbot status
-//   openmausbot login [--email you@example.com]
-//   openmausbot logout
+//   hattera pair  [--label "My MacBook"] [--client] [--public-url https://host]
+//   hattera sessions [revoke <id>]
+//   hattera status
+//   hattera login [--email you@example.com]
+//   hattera logout
 //
 // `serve` starts the server, waits for it, and prints a pairing link with a
 // QR code: scan it with the phone or open it on a laptop. `--tailscale` asks
@@ -20,8 +20,9 @@
 // `--tunnel` (after `login`) serves at a public https://c-… address
 // through a Cloudflare tunnel: no domain, no proxy, no open port.
 //
-// This module only exports; openmausbot.ts is the entry that runs main(), so
+// This module only exports; hattera.ts is the entry that runs main(), so
 // bundling this file into other entries (pair-cli.ts) never runs it twice.
+import productCompatibility from "../shared/product-compat.mjs";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
@@ -39,6 +40,8 @@ import { hostedWorkspaceConfigured } from "./enterprise.ts";
 import { resolveLoopbackTrust } from "./request-auth.ts";
 import { restartPolicy } from "./restart.ts";
 import { writeFileAtomic } from "./atomic.ts";
+import { localRuntimeMatches, findLocalRuntime } from "./local-runtime.ts";
+import { launchLocalWeb } from "./web-launcher.ts";
 import { postgresConnectionUrl } from "./postgres-config.ts";
 import { ensureCaddy, normalizeDomainOption, startCaddy, type RunningCaddy } from "./caddy.ts";
 import { runServiceCommand } from "./service-cli.ts";
@@ -72,7 +75,7 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 export interface CliOptions {
-  command: "setup" | "start" | "serve" | "pair" | "sessions" | "status" | "login" | "logout" | "access" | "service" | "browser" | "fleet" | "help";
+  command: "setup" | "start" | "serve" | "web" | "stop" | "pair" | "sessions" | "status" | "login" | "logout" | "access" | "service" | "browser" | "fleet" | "help";
   port: number;
   dataDir: string;
   label?: string;
@@ -114,14 +117,16 @@ export interface CliOptions {
   /** Explicitly ignore saved remote access for this launch. */
   local?: boolean;
   open?: boolean;
+  cliOnly?: boolean;
   /** Internal guided-start presentation; serve remains script-friendly. */
   guided?: boolean;
   phone?: "ios" | "android";
 }
 
-const COMMANDS = ["setup", "start", "serve", "pair", "sessions", "status", "login", "logout", "access", "service", "browser", "fleet", "help", "--help", "-h"];
+const COMMANDS = ["setup", "start", "serve", "web", "stop", "pair", "sessions", "status", "login", "logout", "access", "service", "browser", "fleet", "help", "--help", "-h"];
 
 export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env): CliOptions | { error: string } {
+  env = productCompatibility.withLegacyEnvironment(env);
   const implicitStart = !argv.length || (argv[0]!.startsWith("--") && argv[0] !== "--help");
   const [command = "start", ...rest] = implicitStart ? ["start", ...argv] : argv;
   if (!COMMANDS.includes(command)) {
@@ -130,7 +135,7 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
   const options: CliOptions = {
     command: command === "--help" || command === "-h" ? "help" : (command as CliOptions["command"]),
     port: Number(env.OMB_PORT || 8799),
-    dataDir: env.OMB_DATA_DIR || join(homedir(), ".openmausbot"),
+    dataDir: env.OMB_DATA_DIR || productCompatibility.defaultDataDirectory(homedir()),
     tailscale: false,
     tunnel: false,
     client: false,
@@ -170,6 +175,7 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
       }
       else if (arg === "--no-pair") options.pair = false;
       else if (arg === "--no-open") options.open = false;
+      else if (options.command === "web" && arg === "--cli-only") { options.cliOnly = true; options.open = false; }
       else if (arg === "--local") options.local = true;
       else if (arg === "--json") options.json = true;
       else if (arg === "--email") options.email = value();
@@ -221,35 +227,40 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
   return options;
 }
 
-export const USAGE = `openmausbot — your team of AI bots, ready in a few steps
+export const USAGE = `hattera — your team of AI bots, ready in a few steps
 
-  openmausbot                         set up once, then open your workspace
-  openmausbot setup [--data-dir DIR]
-  openmausbot start [the same options as serve]
-  openmausbot serve [--port 8799] [--data-dir DIR] [--label NAME]
+  hattera                         set up once, then open your workspace
+  hattera setup [--data-dir DIR]
+  hattera start [the same options as serve]
+  hattera web [--port N] [--data-dir DIR] [--no-open | --cli-only]
+  hattera stop [--data-dir DIR]
+  hattera serve [--port 8799] [--data-dir DIR] [--label NAME]
                     [--public-url https://host] [--tailscale | --tunnel | --domain HOST] [--no-pair]
-  openmausbot pair  [--label NAME] [--client] [--phone ios|android]
+  hattera pair  [--label NAME] [--client] [--phone ios|android]
                     [--public-url https://host]
-  openmausbot sessions [revoke ID]
-  openmausbot status
-  openmausbot login [--email you@example.com]
-  openmausbot logout
-  openmausbot access list | add EMAIL [--chat-only] | remove EMAIL
-  openmausbot service install [--domain HOST | --tunnel | --tailscale] [--port N] [--data-dir DIR] | uninstall
-  openmausbot browser install [--with-deps] | status
-  openmausbot fleet init --domain HOST [--operator USER] | create NAME --admin EMAIL [--member EMAIL] [--brand FILE]
+  hattera sessions [revoke ID]
+  hattera status
+  hattera login [--email you@example.com]
+  hattera logout
+  hattera access list | add EMAIL [--chat-only] | remove EMAIL
+  hattera service install [--domain HOST | --tunnel | --tailscale] [--port N] [--data-dir DIR] | uninstall
+  hattera browser install [--with-deps] | status
+  hattera fleet init --domain HOST [--operator USER] | create NAME --admin EMAIL [--member EMAIL] [--brand FILE]
                     [--anthropic-key-file FILE] [--cap USD] [--license-key KEY] [--memory 1G]
                   | list | users NAME add|remove EMAIL [--chat-only] | suspend NAME | resume NAME
                   | delete NAME --yes [--keep-data] | upgrade   (all take --dry-run)
                   | agent [--socket PATH] [--group USER]   (root; installed by init --operator)
 
 setup   choose AI access and optional phone access; keep existing bots and chats
-start   same as openmausbot: use your saved settings and open the workspace
+web     start or reopen the same persistent local runtime from any folder;
+        --cli-only starts without opening a browser. Configure providers in UI.
+stop    gracefully stop a runtime started by hattera web; keep saved work
+start   same as hattera: use your saved settings and open the workspace
 serve   starts the server without prompts and prints a pairing link + QR code
 pair    mints a pairing code against a running server (--client: chat only)
 sessions lists paired devices; "sessions revoke ID" signs one out
 status  what the server says about itself
-login   signs this machine in to an OpenMausBot account (an emailed code)
+login   signs this machine in to a Hattera account (an emailed code)
         and reserves its public address for --tunnel
 logout  releases that address and signs out
 access  who may sign in with an emailed code at /pair: an address or
@@ -258,7 +269,7 @@ access  who may sign in with an emailed code at /pair: an address or
 service keep the server running across reboots: writes a systemd unit
         (Linux) or a launchd agent (macOS) for the same serve options and
         prints the commands that install it. Install the package
-        permanently first (npm install -g openmausbot).
+        permanently first (npm install -g ./hattera-VERSION.tgz).
 browser install: the bots' browser engine (agent-browser, pinned) into the
         data dir, and Chrome for Testing into the user's browser cache.
         --with-deps also installs
@@ -278,7 +289,7 @@ fleet   many client workspaces on one Linux server, each its own account,
              and HTTPS certificates enabled for the tailnet)
 --tunnel     serve at a public https://c-… address through a
              Cloudflare tunnel: no domain, no proxy, no open port. Run
-             \`openmausbot login\` once on this machine first.
+             \`hattera login\` once on this machine first.
 --domain     serve at https://HOST on your own domain: a pinned Caddy is
              downloaded once and run alongside the server, and gets the
              certificate itself. Point the domain's DNS at this machine and
@@ -288,8 +299,8 @@ fleet   many client workspaces on one Linux server, each its own account,
 --no-pair   skip phone setup and do not print a pairing code
 --local     start locally this time, ignoring saved remote-access settings
 
-Install once with \`npm install -g openmausbot\`, then type \`openmausbot\`.
-Or run without a global install: \`npx openmausbot\`. Node 24+ is required.
+Install once with \`npm install -g ./hattera-VERSION.tgz\`, then type \`hattera\`.
+Build the tarball from https://github.com/Msalways/hattera. Node 24+ is required.
 `;
 
 /** Terminal in, terminal out; tests substitute all three. */
@@ -329,7 +340,7 @@ export function serverVersion(here = HERE): string {
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 // ── talking to a running server (loopback = owner) ────────────────────
-/** Set only inside `openmausbot serve` on a service-trust server: the secret
+/** Set only inside `hattera serve` on a service-trust server: the secret
  * it handed the server it started, which opens that server's pairing route. */
 let serveOwnerToken: string | undefined;
 
@@ -344,7 +355,7 @@ async function api(port: number, path: string, init: { method?: string; body?: s
 
 /** What to do when a server treats this command as a local service rather
  * than its owner (OMB_LOOPBACK_TRUST=service, or a hosted workspace). */
-export const SERVICE_TRUST_HELP = "This server does not treat commands on this computer as its owner (OMB_LOOPBACK_TRUST=service, or a hosted workspace), so it will not pair devices or list sessions for them. Sign in as an admin and use Settings → Remote access, let people sign in with their email (openmausbot access add you@example.com), or restart the server with OMB_LOOPBACK_TRUST=owner.";
+export const SERVICE_TRUST_HELP = "This server does not treat commands on this computer as its owner, so it will not pair devices or list sessions for them. Sign in as an admin and use Settings → Remote access, or use the configured GitHub or email sign-in. For a local CLI workspace, start hattera web; self-hosting keeps its sign-in requirement.";
 
 function refusedAsService(status: number, body: any): boolean {
   return status === 403 && typeof body?.error === "string" && /shared server|Sign in through the workspace portal/.test(body.error);
@@ -362,13 +373,7 @@ async function serverUp(port: number, pid?: number): Promise<boolean> {
 /** Check identity before reusing a running process. Never attach to another
  * workspace just because it happens to be listening on the requested port. */
 export async function isWorkspaceRunning(options: CliOptions): Promise<boolean> {
-  try {
-    const { status, body } = await api(options.port, "/api/health");
-    if (status !== 200 || body?.app !== "openmausbot") return false;
-    const expected = readFileSync(join(options.dataDir, "environment-id"), "utf8").trim();
-    const descriptor = await api(options.port, "/.well-known/openmausbot/environment");
-    return /^[0-9a-f-]{36}$/i.test(expected) && descriptor.status === 200 && descriptor.body?.environmentId === expected;
-  } catch { return false; }
+  return localRuntimeMatches(options.dataDir, options.port);
 }
 
 /** No shell commands, credentials or remote URLs go to the OS URL opener. */
@@ -403,7 +408,7 @@ export function applyStartupPreferences(options: CliOptions, saved: AppConfig["c
   if (options.local) return { ...options, tunnel: false, tailscale: false, publicUrl: undefined, phone: undefined };
   if (!saved || options.tunnel || options.tailscale || options.publicUrl) return options;
   if (saved.access === "public-url" && (!saved.publicUrl || !normalizePhoneOrigin(saved.publicUrl))) {
-    throw new Error("The saved phone address is not a valid HTTPS origin. Run openmausbot setup to correct it, or openmausbot --local to start only on this computer.");
+    throw new Error("The saved phone address is not a valid HTTPS origin. Run hattera setup to correct it, or hattera --local to start only on this computer.");
   }
   return {
     ...options,
@@ -427,8 +432,8 @@ function startupPreferences(options: CliOptions): NonNullable<AppConfig["cliStar
 async function showPhonePairing(options: CliOptions, origin: string | undefined, log: (line: string) => void): Promise<boolean> {
   const ready = !!origin && await verifyPhoneEndpoint(options.port, origin);
   if (!ready) {
-    log("Phone access is not reachable yet. OpenMausBot is ready on this computer; no phone pairing code was created.");
-    log("Check the HTTPS connection, then run openmausbot pair again with the same --data-dir and --port.");
+    log("Phone access is not reachable yet. Hattera is ready on this computer; no phone pairing code was created.");
+    log("Check the HTTPS connection, then run hattera pair again with the same --data-dir and --port.");
     return false;
   }
   for (const line of phonePairingInstructions(options.phone ?? "ios", { origin: origin!, ready })) log(line);
@@ -477,7 +482,7 @@ export function pairingBlock(input: {
     lines.push(qrToString(target));
     lines.push("");
     if (scanInvite) {
-      lines.push(`Scan that in the OpenMausBot app. For a browser instead, open the web`);
+      lines.push(`Scan that in the Hattera app. For a browser instead, open the web`);
       lines.push(`address above and type the code.`);
     } else if (input.phone === "android") {
       // Android asked for an app invite this server cannot build. Say so,
@@ -488,7 +493,7 @@ export function pairingBlock(input: {
       lines.push(`OMB_PUBLIC_URL, or open the web address above and type the code.`);
     } else if (input.inviteUrl) {
       lines.push(`Scan that with Camera for the browser, or paste the phone-app link`);
-      lines.push(`above into the OpenMausBot app.`);
+      lines.push(`above into the Hattera app.`);
     }
   }
   return lines.join("\n");
@@ -528,7 +533,7 @@ async function mintPairing(port: number, options: { label?: string; client?: boo
 // ── commands ───────────────────────────────────────────────────────────
 export async function runPair(options: CliOptions): Promise<number> {
   if (!(await serverUp(options.port))) {
-    console.error(`no OpenMausBot server on http://127.0.0.1:${options.port}; start one with \`openmausbot serve\` or set OMB_PORT`);
+    console.error(`no Hattera server on http://127.0.0.1:${options.port}; start one with \`hattera serve\` or set OMB_PORT`);
     return 1;
   }
   if (process.stdin.isTTY && process.stdout.isTTY && !options.label && !options.client) {
@@ -549,7 +554,7 @@ export async function runPair(options: CliOptions): Promise<number> {
     }
     if (!origin || !normalizePhoneOrigin(origin)) {
       console.log("Your workspace is running only on this computer. A phone cannot use its localhost address.");
-      console.log("Stop the server, run openmausbot setup and choose phone access, then start openmausbot again.");
+      console.log("Stop the server, run hattera setup and choose phone access, then start hattera again.");
       return 1;
     }
     const ui = defaultSetupIo();
@@ -571,7 +576,7 @@ export async function runPair(options: CliOptions): Promise<number> {
 
 export async function runSessions(options: CliOptions): Promise<number> {
   if (!(await serverUp(options.port))) {
-    console.error(`no OpenMausBot server on http://127.0.0.1:${options.port}`);
+    console.error(`no Hattera server on http://127.0.0.1:${options.port}`);
     return 1;
   }
   if (options.revoke) {
@@ -602,7 +607,7 @@ export async function runSessions(options: CliOptions): Promise<number> {
     return 0;
   }
   if (!sessions.length) {
-    console.log("no paired devices yet: run `openmausbot pair`");
+    console.log("no paired devices yet: run `hattera pair`");
     return 0;
   }
   console.log(formatSessions(sessions));
@@ -618,7 +623,7 @@ export function formatSessions(sessions: Array<{ id: string; label: string; scop
   const head = ["id", "device", "scope", "last seen", "expires"];
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
   const line = (r: string[]) => r.map((c, i) => c.padEnd(widths[i])).join("  ");
-  return [line(head), ...rows.map(line), "", "revoke one with: openmausbot sessions revoke <id>"].join("\n");
+  return [line(head), ...rows.map(line), "", "revoke one with: hattera sessions revoke <id>"].join("\n");
 }
 
 export async function runStatus(options: CliOptions, io: CliIo = defaultIo()): Promise<number> {
@@ -626,9 +631,9 @@ export async function runStatus(options: CliOptions, io: CliIo = defaultIo()): P
   try {
     const res = await fetch(`http://127.0.0.1:${options.port}/.well-known/openmausbot/environment`);
     const body: any = await res.json();
-    io.log(options.json ? JSON.stringify(body, null, 2) : `${body.label} · OpenMausBot ${body.version} on ${body.platform} · id ${body.environmentId}`);
+    io.log(options.json ? JSON.stringify(body, null, 2) : `${body.label} · Hattera ${body.version} on ${body.platform} · id ${body.environmentId}`);
   } catch {
-    io.error(`no OpenMausBot server on http://127.0.0.1:${options.port}`);
+    io.error(`no Hattera server on http://127.0.0.1:${options.port}`);
     code = 1;
   }
   if (!options.json) {
@@ -686,7 +691,7 @@ export async function runAccess(options: CliOptions, io: CliIo = defaultIo()): P
   };
   if (options.accessAction === "list") {
     if (!admins.length && !members.length) {
-      io.log("nobody can sign in with an email yet; pairing codes only. Add someone with: openmausbot access add you@example.com");
+      io.log("nobody can sign in with an email yet; pairing codes only. Add someone with: hattera access add you@example.com");
       return 0;
     }
     for (const entry of admins) io.log(`${entry.padEnd(40)} full access`);
@@ -706,7 +711,7 @@ export async function runAccess(options: CliOptions, io: CliIo = defaultIo()): P
       return 1;
     }
     await write({ admins: without(admins), members: without(members) });
-    io.log(`${entry} can no longer sign in (existing sessions stay until they expire or are revoked with \`openmausbot sessions revoke\`)`);
+    io.log(`${entry} can no longer sign in (existing sessions stay until they expire or are revoked with \`hattera sessions revoke\`)`);
     return 0;
   }
   await write(options.chatOnly ? { admins: without(admins), members: [...without(members), entry] } : { admins: [...without(admins), entry], members: without(members) });
@@ -728,9 +733,9 @@ export async function runLogin(options: CliOptions, io: CliIo = defaultIo()): Pr
   }
   const existing = describeTunnelAccount(account.credentials.read());
   if (existing.address) io.log(`already signed in as ${existing.email ?? "?"} (${existing.address}); signing in again refreshes it`);
-  const email = (options.email ?? (await io.ask("Email for your OpenMausBot account: "))).trim();
+  const email = (options.email ?? (await io.ask("Email for your Hattera account: "))).trim();
   if (!email) {
-    io.error("an email address is needed: openmausbot login --email you@example.com");
+    io.error("an email address is needed: hattera login --email you@example.com");
     return 1;
   }
   try {
@@ -754,7 +759,7 @@ export async function runLogin(options: CliOptions, io: CliIo = defaultIo()): Pr
   }
   io.log(`Signed in as ${signedIn.email ?? email}.`);
   io.log(`This machine's public address: ${signedIn.address}`);
-  io.log("Serve there with:  openmausbot serve --tunnel");
+  io.log("Serve there with:  hattera serve --tunnel");
   return 0;
 }
 
@@ -786,7 +791,7 @@ export async function runBrowser(options: CliOptions, io: CliIo = defaultIo()): 
   const status = browserEngineStatus({ dataDir: options.dataDir });
   if (options.browserAction === "status") {
     io.log(describeBrowserEngine(status));
-    if (status.kind !== "ready" && status.installable) io.log("install it with:  openmausbot browser install");
+    if (status.kind !== "ready" && status.installable) io.log("install it with:  hattera browser install");
     return status.kind === "ready" ? 0 : 1;
   }
   let binary = resolveAgentBrowserBinary({ dataDir: options.dataDir });
@@ -809,11 +814,11 @@ export async function runBrowser(options: CliOptions, io: CliIo = defaultIo()): 
     await ensureChrome(binary, { withDeps: options.withDeps === true, log: io.log });
   } catch (error) {
     io.error(`Chrome is not ready: ${message(error)}`);
-    if (process.platform === "linux" && !options.withDeps) io.error("on Linux, install Chrome's system libraries with `sudo openmausbot browser install --with-deps`, then retry `openmausbot browser install` as the user running serve");
+    if (process.platform === "linux" && !options.withDeps) io.error("on Linux, install Chrome's system libraries with `sudo hattera browser install --with-deps`, then retry `hattera browser install` as the user running serve");
     return 1;
   }
   io.log("browser installed for this user and data directory; run serve as the same user, then enable it under Settings → Computers and per bot");
-  if (process.platform === "linux" && options.withDeps) io.log("if serve runs as another user, run `openmausbot browser install` from that user's login shell too");
+  if (process.platform === "linux" && options.withDeps) io.log("if serve runs as another user, run `hattera browser install` from that user's login shell too");
   return 0;
 }
 
@@ -865,7 +870,7 @@ async function planTunnel(options: CliOptions, log: (line: string) => void, reco
     account = createTunnelAccount({ dataDir: options.dataDir, version: serverVersion(), recovery, log: (line) => log(`tunnel: ${line}`) });
     if (account.credentials.status === "unavailable") return fail(`${account.credentials.file} exists but could not be read; fix or remove it`);
     if (!describeTunnelAccount(account.credentials.read()).email) {
-      return fail("no account on this machine yet: run `openmausbot login` first, then `openmausbot serve --tunnel`");
+      return fail("no account on this machine yet: run `hattera login` first, then `hattera serve --tunnel`");
     }
     // A fresh connector token when the control plane answers; the saved one otherwise.
     try {
@@ -873,13 +878,13 @@ async function planTunnel(options: CliOptions, log: (line: string) => void, reco
       const saved = tunnelAccess(account.credentials.read()) !== null;
       // Said even when a saved address exists: an expired sign-in means this
       // machine can no longer repair that address on its own.
-      if (state.status === "signed-out") log(`tunnel: the sign-in on this machine expired; run \`openmausbot login\` to renew it${saved ? " (serving the saved address until then)" : ""}`);
+      if (state.status === "signed-out") log(`tunnel: the sign-in on this machine expired; run \`hattera login\` to renew it${saved ? " (serving the saved address until then)" : ""}`);
       else if (state.message) log(`tunnel: ${state.message}${saved ? " Serving the saved address for now." : ""}`);
     } catch (error) {
       log(`tunnel: control plane not reachable right now (${message(error)}); using the saved address`);
     }
     access = tunnelAccess(account.credentials.read());
-    if (!access) return fail("this machine has no public address; run `openmausbot login` again");
+    if (!access) return fail("this machine has no public address; run `hattera login` again");
   }
   let binary: string;
   try {
@@ -895,7 +900,7 @@ async function planTunnel(options: CliOptions, log: (line: string) => void, reco
 export async function runServe(options: CliOptions, log: (line: string) => void = console.log): Promise<number> {
   const { browserEngineStatus, describeBrowserEngine } = await import("./browser-engine.ts");
   if (await serverUp(options.port)) {
-    console.error(`something already answers on http://127.0.0.1:${options.port}; use \`openmausbot pair\` against it, or --port for a second server`);
+    console.error(`something already answers on http://127.0.0.1:${options.port}; use \`hattera pair\` against it, or --port for a second server`);
     return 1;
   }
   let publicUrl = options.publicUrl;
@@ -1041,12 +1046,12 @@ export async function runServe(options: CliOptions, log: (line: string) => void 
       await new Promise((r) => setTimeout(r, 250));
     }
     if (exited !== null) {
-      if (exited !== 0) log(`OpenMausBot could not start.${logPath ? ` Details: ${logPath}` : " See the output above."}`);
+      if (exited !== 0) log(`Hattera could not start.${logPath ? ` Details: ${logPath}` : " See the output above."}`);
       return exited;
     }
     if (stopping) return await childExit;
     if (!(await serverUp(options.port, child.pid))) {
-      console.error(`OpenMausBot did not become ready within a minute.${logPath ? ` Details: ${logPath}` : " See its output above."}`);
+      console.error(`Hattera did not become ready within a minute.${logPath ? ` Details: ${logPath}` : " See its output above."}`);
       await stop();
       return 1;
     }
@@ -1080,7 +1085,7 @@ export async function runServe(options: CliOptions, log: (line: string) => void 
       void plan.account?.service.restore().catch(() => undefined);
     }
     log("");
-    log(`OpenMausBot is running on http://127.0.0.1:${options.port}${publicUrl ? `, reachable at ${publicUrl}` : ""}`);
+    log(`Hattera is running on http://127.0.0.1:${options.port}${publicUrl ? `, reachable at ${publicUrl}` : ""}`);
     if (options.guided) {
       log("Your bots and conversations are saved automatically.");
       log(`Details if you need help: ${logPath}`);
@@ -1107,14 +1112,14 @@ export async function runServe(options: CliOptions, log: (line: string) => void 
       try {
         log(await mintPairing(options.port, { label: options.label ? `${options.label} owner` : undefined, client: options.client, publicUrl: publicUrl ?? undefined }));
         log("");
-        log("another device later:  openmausbot pair --label \"Kitchen iPad\"");
+        log("another device later:  hattera pair --label \"Kitchen iPad\"");
       } catch (error) {
         log(`no pairing code: ${message(error)}`);
-        log("start without one next time:  openmausbot serve --no-pair");
+        log("start without one next time:  hattera serve --no-pair");
       }
     }
     log(options.guided ? "\nKeep this terminal open while using your bots. Ctrl+C stops the server, not your saved work." : "stop with Ctrl+C");
-    if (options.guided) log("Next time: openmausbot · Change AI or phone setup: openmausbot setup · Pair another phone: openmausbot pair");
+    if (options.guided) log("Next time: hattera · Change AI or phone setup: hattera setup · Pair another phone: hattera pair");
     return await childExit;
   } finally {
     serveOwnerToken = undefined;
@@ -1135,7 +1140,7 @@ export async function serveUntilStopped(options: CliOptions, run: (options: CliO
   for (;;) {
     const code = await run(launch);
     if (!policy.again(code)) return code;
-    console.log("\nOpenMausBot is starting again to finish installing a copy from the desktop app…");
+    console.log("\nHattera is starting again to finish installing a copy from the desktop app…");
     launch = { ...options, pair: false, open: false };
   }
 }
@@ -1150,7 +1155,7 @@ export async function runOnboardingCommand(
 ): Promise<number> {
   const interactive = process.stdin.isTTY === true && process.stdout.isTTY === true;
   if (options.command === "setup" && !interactive) {
-    io.error("Setup needs an interactive terminal. Run `npx openmausbot setup` in a terminal, then use `npx openmausbot serve` for unattended starts.");
+    io.error("Setup needs an interactive terminal. Run `npx hattera setup` in a terminal, then use `npx hattera serve` for unattended starts.");
     return 1;
   }
   process.env.OMB_DATA_DIR = options.dataDir;
@@ -1169,11 +1174,11 @@ export async function runOnboardingCommand(
   try {
     if (options.command === "setup" || !(await isSetupComplete(options.dataDir))) {
       if (!interactive) {
-        io.error("No completed setup was found. Run `npx openmausbot setup` in an interactive terminal first, or use `npx openmausbot serve` with an existing configuration.");
+        io.error("No completed setup was found. Run `npx hattera setup` in an interactive terminal first, or use `npx hattera serve` with an existing configuration.");
         return 1;
       }
       if (!(await runSetup({ dataDir: options.dataDir, port: options.port }))) {
-        io.log("Setup cancelled. Run openmausbot when you're ready.");
+        io.log("Setup cancelled. Run hattera when you're ready.");
         return 130;
       }
     }
@@ -1194,8 +1199,8 @@ export async function runOnboardingCommand(
       saveCliStartup(options.dataDir, startupPreferences(launch));
     }
     if (options.command === "setup") {
-      io.log("\nAll set. Start with: openmausbot (or npx openmausbot without a global install).");
-      if (options.dataDir !== join(homedir(), ".openmausbot") || options.port !== 8799) {
+      io.log("\nAll set. Start with: hattera (install this fork's tarball for the hattera command).");
+      if (options.dataDir !== productCompatibility.defaultDataDirectory(homedir()) || options.port !== 8799) {
         io.log(`Use the same --data-dir (${options.dataDir}) and --port (${options.port}) options when starting.`);
       }
       return 0;
@@ -1204,7 +1209,7 @@ export async function runOnboardingCommand(
     return startServer({ ...launch, guided: interactive });
   } catch (error) {
     if (!(error instanceof SetupCancelled)) throw error;
-    io.log("\nSetup stopped. Any AI setup already saved is kept; no server was started. Run openmausbot setup to continue.");
+    io.log("\nSetup stopped. Any AI setup already saved is kept; no server was started. Run hattera setup to continue.");
     return 130;
   }
 }
@@ -1222,6 +1227,24 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       return runOnboardingCommand(options);
     case "serve":
       return serveUntilStopped(options);
+    case "web": {
+      if (options.tailscale || options.tunnel || options.domain || options.publicUrl) throw new Error("Configure remote access in Hattera's Computers settings, or use the existing serve command for explicit proxy options.");
+      const entry = join(HERE, existsSync(join(HERE, "hattera.js")) ? "hattera.js" : "hattera.ts");
+      const result = await launchLocalWeb({ dataDir: options.dataDir, port: options.port, entry });
+      const url = `http://127.0.0.1:${result.runtime.port}`;
+      console.log(options.json ? JSON.stringify({ url, pid: result.runtime.pid, reused: result.reused, logPath: result.logPath })
+        : `Hattera ${result.reused ? "is already running" : "is running"}: ${url}\nIt stays running when this terminal closes. Use hattera stop to stop it.`);
+      if (options.open !== false) await openDashboard(result.runtime.port);
+      return 0;
+    }
+    case "stop": {
+      const runtime = await findLocalRuntime(options.dataDir);
+      if (!runtime) { console.error("No verified Hattera runtime was found for this data directory."); return 1; }
+      const response = await api(runtime.port, "/api/local-runtime/stop", { method: "POST", body: JSON.stringify({ pid: runtime.pid, environmentId: runtime.environmentId }) });
+      if (response.status !== 200) { console.error(response.body?.error ?? "Hattera could not stop."); return 1; }
+      console.log("Hattera is stopping. Saved work is kept.");
+      return 0;
+    }
     case "pair":
       return runPair(options);
     case "sessions":
@@ -1247,7 +1270,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     case "fleet":
       if (options.fleetAction === "agent") {
         const layout = fleetLayout();
-        await startFleetAgent({
+        const agent = await startFleetAgent({
           socketPath: options.socket ?? layout.socketPath,
           group: options.group,
           node: process.execPath,
@@ -1256,7 +1279,14 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         }, { log: (line) => console.log(line) });
         // A service: stay up until systemd stops it.
         await new Promise<void>((resolveStop) => {
-          for (const signal of ["SIGTERM", "SIGINT"] as const) process.once(signal, () => resolveStop());
+          const stop = () => {
+            process.off("SIGTERM", stop);
+            process.off("SIGINT", stop);
+            agent.closeAllConnections();
+            agent.close(() => resolveStop());
+          };
+          process.once("SIGTERM", stop);
+          process.once("SIGINT", stop);
         });
         return 0;
       }

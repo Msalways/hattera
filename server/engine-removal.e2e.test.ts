@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { request } from "node:http";
 import { expect, it } from "vitest";
-import { launchVerificationServer } from "../scripts/control-omb.ts";
+import { launchVerificationServer } from "../scripts/control-hattera.ts";
 import { fixtureApi } from "../scripts/testing/preview-fixture.ts";
 
 it("removes and restores engines through isolated HTTP routes, protecting accounts and configured work", async () => {

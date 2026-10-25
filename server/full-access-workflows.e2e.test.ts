@@ -6,7 +6,7 @@ import { closeSync, existsSync, openSync, readFileSync, writeFileSync } from "no
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 
 it("applies requested Full Access workflows through MCP without duplicate approvals, while exact Ask tasks still wait", async () => {

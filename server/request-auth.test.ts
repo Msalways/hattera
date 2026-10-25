@@ -446,7 +446,7 @@ describe("resolveRequestAuth", () => {
   });
 });
 
-describe("an IPC listener (openmausbot serve --tunnel) is remote by construction", () => {
+describe("an IPC listener (hattera serve --tunnel) is remote by construction", () => {
   // SAFETY: only headers, method and the socket peer are read; a unix-socket peer has no address
   const overSocket = (headers: Record<string, string>) => ({ headers, method: "GET", socket: {} }) as unknown as IncomingMessage;
 
@@ -568,10 +568,15 @@ describe("loopback trust: owner on one person's machine, service on a shared wor
       .toEqual({ kind: "loopback", scopes: ["admin", "client"] });
   });
 
-  it("defaults to service on a hosted workspace, owner elsewhere, and lets the operator choose", () => {
+  it("defaults to authenticated self-hosting and grants local owner access only to an explicit launcher", () => {
     const pick = (env: NodeJS.ProcessEnv, flags: { desktopManaged?: boolean; hostedWorkspace?: boolean } = {}) =>
       resolveLoopbackTrust({ env, desktopManaged: false, hostedWorkspace: false, ...flags });
-    expect(pick({})).toEqual({ trust: "owner", reason: "self-hosted default" });
+    expect(pick({})).toEqual({ trust: "service", reason: "self-hosted default" });
+    expect(pick({ OMB_LOCAL_CLI: "1" })).toEqual({ trust: "owner", reason: "local CLI launcher" });
+    expect(pick({ OMB_LOCAL_CLI: "1" }, { hostedWorkspace: true }).trust).toBe("service");
+    expect(pick({ GITHUB_CLIENT_ID: "fixture", OMB_LOOPBACK_TRUST: "owner" })).toEqual({ trust: "service", reason: "GitHub sign-in" });
+    expect(pick({ GITHUB_CLIENT_ID: "fixture", OMB_LOCAL_CLI: "1" }).trust).toBe("owner");
+    expect(pick({ OMB_LOCAL_CLI: "1", OMB_LOOPBACK_TRUST: "service" }).trust).toBe("service");
     expect(pick({}, { hostedWorkspace: true })).toEqual({ trust: "service", reason: "hosted workspace" });
     expect(pick({ OMB_LOOPBACK_TRUST: "service" })).toEqual({ trust: "service", reason: "OMB_LOOPBACK_TRUST" });
     expect(pick({ OMB_LOOPBACK_TRUST: " Service " }).trust).toBe("service");
@@ -582,7 +587,7 @@ describe("loopback trust: owner on one person's machine, service on a shared wor
     expect(typo.trust).toBe("service");
     expect(typo.warning).toMatch(/not owner or service/);
     expect(typo.warning).not.toContain("\n");
-    expect(pick({ OMB_LOOPBACK_TRUST: "" }).trust).toBe("owner");
+    expect(pick({ OMB_LOOPBACK_TRUST: "" }).trust).toBe("service");
     const desktop = pick({ OMB_LOOPBACK_TRUST: "service" }, { desktopManaged: true, hostedWorkspace: true });
     expect(desktop.trust).toBe("owner");
     expect(desktop.warning).toMatch(/ignored in the desktop app/);

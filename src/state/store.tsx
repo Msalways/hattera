@@ -169,6 +169,7 @@ export interface SecretRequestCardData {
 }
 
 export interface Message {
+  shared?: import("../../shared/wire").WireMessage["shared"];
   id: string;
   role: "bot" | "user";
   kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "routine.run" | "goal.run" | "digest" | "compaction";
@@ -248,6 +249,7 @@ export type GroupDefaultResponder = import("../../shared/wire").GroupDefaultResp
 
 /** A room: several bots + you in one shared thread. */
 export interface Group {
+  sharedGroupId?: string;
   usage?: GroupThreadUsage | null;
   id: string;
   threadId: string;
@@ -296,6 +298,7 @@ export interface Group {
 /** One of a channel's independent conversations. The channel's threadId
  * points at the active one; folder and pin state belong to the task. */
 export interface GroupTask {
+  sharedTopicId?: string;
   threadId: string;
   title: string;
   createdAt: number;
@@ -400,21 +403,7 @@ export interface ThreadCloser {
   at: number;
 }
 
-export interface TaskUsage {
-  input: number;
-  output: number;
-  /** cached share of `input` (context the model re-read); absent on records
-   * from builds before it was tracked */
-  cachedInput?: number;
-  /** null until any turn reported a cost — most engines never do; records
-   * from builds before cost existed lack the field entirely */
-  costUsd: number | null;
-  turns: number;
-  /** the most recent settled turn on its own */
-  lastTurn?: { input: number; output: number; cachedInput?: number; costUsd: number | null };
-  /** what filled the model's window on the last model call, and the window's size when known */
-  context?: { tokens: number; window?: number };
-}
+export type TaskUsage = import("../../shared/wire").TaskUsage;
 
 export interface Bot {
   /** Owner selection, independent of engine approval mode. */
@@ -858,7 +847,8 @@ export interface EngineInstall {
 /** One row of GET /api/instances — the model picker's data. */
 export interface InstanceInfo {
   /** Public setup defaults only; credentials are write-only. */
-  accountSetup?: { region?: string; model?: string };
+  accountSetup?: { region?: string; model?: string; url?: string; form?: import("../../shared/provider-account-setup").ProviderAccountForm };
+  accountProfile?: { canAdd: boolean; isolated: boolean; removable: boolean };
   instanceId: string;
   driverKind: string;
   displayName: string;
@@ -867,7 +857,7 @@ export interface InstanceInfo {
   icon?: import("../../shared/provider-icon").ProviderIcon;
   /** Company instances are owned by the desktop parent, never editable here. */
   readOnly?: boolean;
-  /** An OpenMausBot Cloud home's trial Claude credit (read-only): whether it
+  /** An Hattera Cloud home's trial Claude credit (read-only): whether it
    * can still run, or is used up or gone. The person's own engine always wins over it. */
   trialCredit?: "active" | "used_up" | "ended";
   managed?: { organizationId: string; organizationName: string };

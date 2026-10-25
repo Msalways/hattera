@@ -7,15 +7,17 @@ import { Download, Loader2 } from "lucide-react";
 import { api } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
+import type { LocaleKey } from "@/locales";
 import { cachedUsageNote, formatTokens, formatUsd, hasFiniteCost, headlineTokens, tokensColumnLabel } from "@/lib/usage";
 import { Card } from "./SettingsPrimitives";
 import { UsageBudgetCards, type BudgetState } from "./UsageBudget";
 
-export type UsageGroupBy = "bot" | "model" | "user" | "day" | "engine" | "routine";
-export const USAGE_GROUPINGS: readonly UsageGroupBy[] = ["bot", "model", "user", "day", "engine", "routine"];
+export type UsageGroupBy = "bot" | "model" | "user" | "day" | "engine" | "routine" | "account";
+export const USAGE_GROUPINGS: readonly UsageGroupBy[] = ["bot", "model", "user", "day", "engine", "routine", "account"];
 export type UsagePeriod = "month" | "lastMonth" | "days30";
 
 export interface UsageGroup {
+  unreportedTokens?: number;
   key: string;
   label: string;
   turns: number;
@@ -67,12 +69,13 @@ export function usageExportHref(range: { from: string; to: string }): string {
   return `/api/usage.csv?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`;
 }
 
-const GROUP_LABEL_KEYS: Record<UsageGroupBy, "usage.history.byBot" | "usage.history.byModel" | "usage.history.byUser" | "usage.history.byDay" | "usage.history.byEngine" | "usage.history.byRoutine"> = {
+const GROUP_LABEL_KEYS: Record<UsageGroupBy, LocaleKey> = {
   bot: "usage.history.byBot",
   model: "usage.history.byModel",
   user: "usage.history.byUser",
   day: "usage.history.byDay",
   engine: "usage.history.byEngine",
+  account: "accountUsage.byAccount",
   routine: "usage.history.byRoutine",
 };
 
@@ -113,7 +116,7 @@ export function UsageHistoryTable({ summary }: { summary: UsageSummary }) {
           <span className="truncate text-ink" title={group.label}>{usageGroupLabel(summary.groupBy, group)}</span>
           <span className="text-right tabular-nums text-ink-secondary">{group.turns}</span>
           <span className="text-right tabular-nums text-ink" title={t("usage.history.tokenSplit", { input: formatTokens(group.input), output: formatTokens(group.output), cached: formatTokens(group.cachedInput) })}>
-            {formatTokens(headlineTokens(group))}
+            {(group.unreportedTokens ?? 0) >= group.turns && group.turns > 0 ? t("accountUsage.unknown") : `${formatTokens(headlineTokens(group))}${group.unreportedTokens ? " *" : ""}`}
           </span>
           <CostCell group={group} />
           {billable && <span className="text-right tabular-nums text-ink">{money(group.billableUsd)}</span>}
@@ -122,10 +125,11 @@ export function UsageHistoryTable({ summary }: { summary: UsageSummary }) {
       <div className={cn(columns, "pt-2.5 text-[13px] font-medium text-ink")}>
         <span>{t("usage.history.total")}</span>
         <span className="text-right tabular-nums">{summary.total.turns}</span>
-        <span className="text-right tabular-nums">{formatTokens(headlineTokens(summary.total))}</span>
+        <span className="text-right tabular-nums">{summary.total.unreportedTokens === summary.total.turns && summary.total.turns > 0 ? t("accountUsage.unknown") : `${formatTokens(headlineTokens(summary.total))}${summary.total.unreportedTokens ? " *" : ""}`}</span>
         <CostCell group={summary.total} strong />
         {billable && <span className="text-right tabular-nums">{money(summary.total.billableUsd)}</span>}
       </div>
+      {summary.total.unreportedTokens ? <p className="mt-3 text-[12px] text-ink-secondary">{t("accountUsage.incompleteTokens", { count: summary.total.unreportedTokens })}</p> : null}
       {cachedNote && (
         <div className="mt-3 text-[12px] leading-relaxed text-ink-secondary">{cachedNote}</div>
       )}

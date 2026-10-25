@@ -13,6 +13,14 @@ beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "omb-group-usage-")); mkdirS
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("group thread accounting", () => {
+  it("keeps incomplete reporting across months, speakers and a rebuilt reader", () => {
+    write("2026-08", [row("2026-08-02", { tokensReported: false, input: 12, output: 0 })]);
+    write("2026-09", [row("2026-09-02")]);
+    const usage = load(dir).forThread("room")!;
+    expect(usage).toMatchObject({ input: 112, output: 10, turns: 2, tokensReported: false });
+    expect(usage.lastTurn?.tokensReported).toBeUndefined();
+    expect(load(dir).forThread("room")).toEqual(usage);
+  });
   it("does no disk work during lookups and rereads only changed months", () => {
     write("2026-08", [row("2026-08-02", { input: 75 })]);
     write("2026-09", [row("2026-09-02", { input: 90 })]);

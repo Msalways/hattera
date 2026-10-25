@@ -2,9 +2,9 @@
 // (docs/cloud-pro.md). Like openmausbot://organization it is an action, not a
 // router: it never carries an address, code or credential. Main answers it by
 // opening Settings → OMB Cloud, which signs in or connects from there.
-export const CLOUD_DEEP_LINK = "openmausbot://cloud";
+export const CLOUD_DEEP_LINK = "hattera://cloud";
 
-export const isCloudDeepLink = value => value === CLOUD_DEEP_LINK;
+export const isCloudDeepLink = value => value === CLOUD_DEEP_LINK || value === "openmausbot://cloud";
 export function takeCloudDeepLink(argv) {
   let found = false;
   // Relaunch uses process.argv again. Consume only this one-shot action,

@@ -62,7 +62,7 @@ const button = "ui-button ui-button-primary";
 const quiet = "ui-button";
 
 /** Settings → Remote access: mint a one-time pairing code with a QR for
- * the phone app (or for a non-phone client — MCP, `openmausbot pair`, a
+ * the phone app (or for a non-phone client — MCP, `hattera pair`, a
  * second desktop app), and see or sign out the devices that hold a
  * session. Shown for every client of a server: a hosted server reached
  * from a browser, the desktop app's own local server (#950), and the

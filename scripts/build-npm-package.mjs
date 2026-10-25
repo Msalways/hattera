@@ -1,19 +1,29 @@
-// Assemble the `openmausbot` npm package: the self-contained server bundle,
+// Assemble the `hattera` npm package: the self-contained server bundle,
 // the built UI, the bundled skills and the CLI, with a package.json of its
-// own. `npx openmausbot serve` then needs Node 24+ and nothing else.
+// own. `npx hattera serve` then needs Node 24+ and nothing else.
 //
 //   pnpm build:server && pnpm exec vite build && node scripts/build-npm-package.mjs
 //   cd release/npm && npm pack        # or npm publish --access public
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const out = join(root, "release", "npm");
 const app = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const serverDist=resolve(process.env.HATTERA_SERVER_DIST || join(root,"dist-server"));
+const webDist=resolve(process.env.HATTERA_WEB_DIST || join(root,"dist"));
+const networkDist=resolve(process.env.HATTERA_NETWORK_DIST || join(root,"dist-native","network"));
+for (const platform of ["win32", "darwin", "linux"]) {
+  for (const arch of ["x64", "arm64"]) {
+    for (const name of [`hattera-network${platform === "win32" ? ".exe" : ""}`, "THIRD_PARTY_NOTICES.txt"]) {
+      if (!existsSync(join(networkDist, `${platform}-${arch}`, name))) throw new Error("Build all private network targets with pnpm build:network --all before npm packaging.");
+    }
+  }
+}
 
-for (const required of ["dist-server/index.js", "dist-server/openmausbot.js", "dist/index.html"]) {
-  if (!existsSync(join(root, required))) {
+for (const required of [join(serverDist,"index.js"), join(serverDist,"hattera.js"),join(serverDist,"openmausbot.js"),join(webDist,"index.html")]) {
+  if (!existsSync(required)) {
     console.error(`missing ${required}: run \`pnpm build:server && pnpm exec vite build\` first`);
     process.exit(1);
   }
@@ -21,13 +31,14 @@ for (const required of ["dist-server/index.js", "dist-server/openmausbot.js", "d
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
-cpSync(join(root, "dist-server"), join(out, "dist-server"), { recursive: true });
-cpSync(join(root, "dist"), join(out, "dist"), { recursive: true });
+cpSync(serverDist, join(out, "dist-server"), { recursive: true });
+cpSync(webDist, join(out, "dist"), { recursive: true });
+cpSync(networkDist, join(out, "network"), { recursive: true });
 if (existsSync(join(root, "skills"))) cpSync(join(root, "skills"), join(out, "skills"), { recursive: true });
 // The enterprise layer, bundled by scripts/bundle-server.mjs, under the path
 // server/enterprise.ts loads from: <package>/enterprise/server/index.js.
 // Source-available under its own license; inert without OMB_LICENSE_KEY.
-const enterpriseBundle = join(root, "dist-server", "enterprise", "server", "index.js");
+const enterpriseBundle = join(serverDist, "enterprise", "server", "index.js");
 if (existsSync(enterpriseBundle)) {
   mkdirSync(join(out, "enterprise", "server"), { recursive: true });
   copyFileSync(enterpriseBundle, join(out, "enterprise", "server", "index.js"));
@@ -36,112 +47,31 @@ if (existsSync(enterpriseBundle)) {
   }
 }
 cpSync(join(root, "LICENSE"), join(out, "LICENSE"));
+cpSync(join(root, "NOTICE"), join(out, "NOTICE"));
 
 // The bin lives next to the bundle so serverEntry() finds index.js by path.
-writeFileSync(join(out, "cli.js"), `#!/usr/bin/env node\nimport "./dist-server/openmausbot.js";\n`);
+writeFileSync(join(out, "cli.js"), `#!/usr/bin/env node\nimport "./dist-server/hattera.js";\n`);
 
 writeFileSync(
   join(out, "package.json"),
   JSON.stringify(
     {
-      name: "openmausbot",
+      name: app.name,
       version: app.version,
-      description: "Run the OpenMausBot server anywhere and pair your devices to it",
+      description: "Run the Hattera server anywhere and pair your devices to it",
       license: "Apache-2.0",
       type: "module",
-      bin: { openmausbot: "cli.js" },
-      files: ["cli.js", "dist-server", "dist", "skills", "enterprise", "LICENSE", "README.md"],
+      bin: { hattera: "cli.js", openmausbot: "cli.js" },
+      files: ["cli.js", "dist-server", "dist", "network", "skills", "enterprise", "LICENSE", "NOTICE", "README.md"],
       engines: { node: ">=24" },
-      repository: { type: "git", url: "https://github.com/milind-soni/OpenMausBot.git" },
-      homepage: "https://github.com/milind-soni/OpenMausBot#readme",
-      keywords: ["openmausbot", "agents", "self-hosted", "server"],
+      repository: app.repository,
+      homepage: app.homepage,
+      keywords: ["hattera", "agents", "self-hosted", "server"],
     },
     null,
     2,
   ) + "\n",
 );
 
-writeFileSync(
-  join(out, "README.md"),
-  `# openmausbot
-
-Your own team of AI bots, with guided terminal setup. Requires Node 24+.
-
-\`\`\`sh
-npm install -g openmausbot
-openmausbot
-\`\`\`
-
-Or run \`npx openmausbot\` without a global install. Use the same command next
-time; \`openmausbot start\` is an alias for the bare command.
-
-First launch: use arrow keys and Enter (numbered choices in plain terminals) to choose
-ChatGPT/Codex, Claude Code, or an API service; sign in or paste a hidden API
-key; choose a model and save. Setup asks before installing a missing Codex
-or Claude CLI. The saved model applies only to new bots; existing bots and
-conversations keep their settings.
-
-One optional step connects your phone, defaulting to Skip for now. Choose
-an explicitly approved managed public HTTPS endpoint protected by pairing,
-existing Tailscale, or an HTTPS reverse proxy you already configured.
-Managed access uses a separate OpenMausBot account and asks permission for
-the public endpoint and possible connector download. The pairing page and
-basic server identity are public; chat and settings require pairing.
-Tailscale must already be installed and signed in on both devices.
-
-After the HTTPS connection is checked, scan the QR with your phone. When
-you pair an Android phone the QR is an app link, so scan it inside the
-OpenMausBot app; the web address is printed beside it if you would rather
-use a browser. On iPhone or iPad, scan with Camera for Safari, or use the
-app's own scanner. Choose Connect on the phone; scanning alone is not a
-completed pairing. Codes
-are private, single-use, and expire after five minutes. Guided phone
-access permits chat and approvals, not settings or pairing administration.
-Localhost and a bare LAN address cannot connect your phone to this server.
-
-Later launches reuse your saved choices and open OpenMausBot on this computer.
-Keep the terminal open: this is a foreground server, not a background
-service. Ctrl-C stops the server without deleting saved work. Automatic
-browser opening uses only the local address; it is skipped for SSH and
-headless sessions, and can be disabled with \`--no-open\`.
-
-\`\`\`sh
-openmausbot setup          # reconfigure AI and optional phone access; not a reset
-openmausbot --no-open      # do not open a browser
-openmausbot --local        # ignore saved remote access for this launch
-openmausbot --no-pair      # suppress phone prompts and invitations
-openmausbot pair           # another phone while the HTTPS server is running
-openmausbot sessions       # list devices; sessions revoke ID signs one out
-openmausbot serve          # no onboarding prompts; explicit remote flags for services
-\`\`\`
-
-Stop an existing server before reconfiguring or changing access mode.
-\`--local\` preserves your saved choice for next time. \`--no-pair\` does not
-turn off saved remote access; use \`--local\` for that on a new launch.
-With a custom \`--data-dir\` or \`--port\`, keep using those options when
-starting and pairing.
-
-API services include OpenAI, OpenRouter, Groq, and compatible
-endpoints.
-API connections currently support chat only. Setup asks before a short,
-potentially billable API test; native setup confirms sign-in, with model
-access checked when you send a message. API billing is separate from
-ChatGPT/Claude subscriptions. New API keys in config.json and managed
-account credentials in tunnel-account.json are plaintext, not encrypted,
-with owner-only permissions (0600 on Unix). Keep these files private.
-
-Ctrl-C before saving AI setup leaves its pending OMB changes unapplied.
-During the later phone step, it keeps the AI setup already saved and exits
-without starting a server. Completed installs and sign-ins remain; run
-\`openmausbot setup\` to continue without deleting your data.
-
-For a service, use \`serve --tunnel\` after \`login\` for managed HTTPS,
-\`serve --tailscale\` for your tailnet, or your own reverse proxy. The
-\`login\` command signs in to an OpenMausBot account, not an AI provider;
-it does not start the tunnel itself.
-
-[Setup guide](https://github.com/milind-soni/OpenMausBot/blob/main/docs/cli-onboarding.md)
-· [Hosting guide](https://github.com/milind-soni/OpenMausBot/blob/main/docs/self-hosting.md)
-`,
-);
-console.log(`npm package assembled at ${out} (openmausbot@${app.version})`);
+writeFileSync(join(out, "README.md"), "# Hattera\n\nYour own team of AI agents. Requires Node.js 24 or later.\n\nInstall the tarball built from https://github.com/Msalways/hattera (the public npm name must be configured before registry publishing):\n\n```sh\nnpm install -g ./hattera-VERSION.tgz\nhattera web\n```\n\nThe local web launcher opens the app directly and keeps a background runtime. `hattera web --cli-only` starts without opening a browser. Provider accounts still require their own authorization. The legacy `openmausbot` command remains an alias.\n\nFor self-hosting, use `hattera serve`. Hosted sign-in and pairing remain required; local CLI mode does not disable remote authentication. Use `hattera --help` for setup, pairing, sessions, service and browser-engine commands.\n\nNew installations use ~/.hattera. Existing ~/.openmausbot workspaces are reused without moving or deleting data. HATTERA_* environment settings take precedence over matching OMB_* settings; legacy OMB_* remains supported.\n\nSource, setup and capabilities: https://github.com/Msalways/hattera\n\nHattera derives from OpenMausBot by Milind Soni and contributors. See LICENSE and NOTICE. The optional enterprise components retain their separate license; renaming does not change those terms.\n" );
+console.log(`npm package assembled at ${out} (${app.name}@${app.version})`);

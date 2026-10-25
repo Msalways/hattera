@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { expect, it } from "vitest";
 import { z } from "zod";
 
-import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
+import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 
 type Bot = { id: string; threadId: string; name: string };

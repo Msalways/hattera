@@ -160,11 +160,11 @@ describe("guided phone pairing address discovery", () => {
   });
 });
 
-// `openmausbot pair` talks to 127.0.0.1, so the server answers as its owner and
+// `hattera pair` talks to 127.0.0.1, so the server answers as its owner and
 // builds the phone-app invite from its own public address (server/index.ts
 // POST /api/auth/pairing, through shared/pairing-link.ts). The CLI prints that
 // invite as it is, and builds its own only for --public-url.
-describe("the phone-app link `openmausbot pair` prints", () => {
+describe("the phone-app link `hattera pair` prints", () => {
   const credential = `omb_pair_${"b".repeat(43)}`;
   const serverName = "Miguel's computer";
   const pairingResponse = (fields: Record<string, unknown>) => {

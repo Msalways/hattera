@@ -13,7 +13,7 @@ Status: plan (Sep 14, 2026). First phase of the harness-upgrade programme descri
 Touches no bot-to-bot behaviour: delegation, rooms, peer comms and shared memory are untouched
 until Phase 6.
 
-**Standing rule (owner, Sep 14): OpenMausBot is model- and CLI-agnostic, and every item here must
+**Standing rule (owner, Sep 14): Hattera is model- and CLI-agnostic, and every item here must
 hold for every engine.** The engine families on main are: **Claude Code** (stream-json,
 `drivers/claude.ts`), **Codex** (app-server JSON-RPC, `drivers/codex.ts`), **pi** (rpc mode,
 `drivers/pi.ts`), the **ACP family** sharing `drivers/acp/core.ts` (Cursor, Gemini, Droid, Grok
@@ -163,7 +163,7 @@ only work record they have.
 ### 0.2 Claude Code hooks through the existing `--settings` file (`server/hooks/`, `drivers/claude.ts`)
 
 `authSettingsPath` becomes `settingsPath` and is always written (not only when auth settings
-exist). Its content gains a `hooks` block pointing at one local helper, `server/hooks/omb-hook.ts`
+exist). Its content gains a `hooks` block pointing at one local helper, `server/hooks/hattera-hook.ts`
 (run with the same `process.execPath --experimental-strip-types` as `PERM_PROXY_PATH`), which
 POSTs the event to `http://127.0.0.1:PORT/api/internal/hook` with the turn's capability token in
 `env` (the same `mintInternalCapability` door every proxy uses, so a hook can only report into its
@@ -179,7 +179,7 @@ Events and what the harness does with each:
 | `SessionStart` | `source: compact` | Return `additionalContext` = the last digest(s) of this thread (≤ 1,500 bytes) so post-compaction context carries the work record. Log `compaction.completed`. |
 | `Stop` | `*` | Bus event `turn.stop-hook` with the CLI's `stop_hook_active`; used only for a digest-vs-fold consistency counter in 0.6. No behaviour. |
 
-Conventions, enforced by `omb-hook.ts` and its tests: exit 0 on every path; 5 s global timer;
+Conventions, enforced by `hattera-hook.ts` and its tests: exit 0 on every path; 5 s global timer;
 stdin JSON parsed leniently; no network calls except loopback; no writes outside `DATA_DIR`. The
 `--settings` file is part of `privateFileFlags` already, so a changed hooks block does not change
 `argsKey` (no respawn of a healthy session) — but the hook *helper path* and the harness port are
@@ -378,7 +378,7 @@ baseline run in step 10 is executed for at least Claude, Codex and one ACP engin
    in `store.ts`/`message-db.ts`; fold writes it at settle; renderer chip; replay + room context
    admit digests. Tests: unit (`digest.test.ts`), e2e with the fake engine (`digest.e2e.test.ts`,
    modelled on `branching.test.ts`): a fake turn that edits two files yields a digest naming them.
-3. `hooks/omb-hook.ts` + `/api/internal/hook` + `PostToolUse` ingest with dedupe and spill; the
+3. `hooks/hattera-hook.ts` + `/api/internal/hook` + `PostToolUse` ingest with dedupe and spill; the
    `--settings` file always written; `hookCoverage: "full"`. Tests: hook helper unit tests (exit 0
    on garbage stdin, 5 s timer), route tests with a forged token (must refuse), fake-engine e2e
    where `FAKE_CLAUDE_*` emits a hook call.
@@ -399,7 +399,7 @@ baseline run in step 10 is executed for at least Claude, Codex and one ACP engin
 ## Verification
 
 Follow `docs/verification/README.md`: every claim below is proven against an isolated fixture
-(`scripts/control-omb.ts launch`), never the live app.
+(`scripts/control-hattera.ts launch`), never the live app.
 
 - **Matrix tests are mandatory for every item.** Each e2e case below runs as `describe.each` over
   the fake engines (`fake-claude-cli`, `fake-codex-app-server`, `fake-acp-cli`, `fake-agy-cli`,

@@ -409,7 +409,7 @@ if (process.versions.electron && process.argv.includes(flag)) {
   const { createServer } = await import("vite");
   const { default: react } = await import("@vitejs/plugin-react");
   const { default: tailwindcss } = await import("@tailwindcss/vite");
-  const { launchVerificationServer, runControlOmb } = await import("./control-omb.ts");
+  const { launchVerificationServer, runControlOmb } = await import("./control-hattera.ts");
   const { waitForExit } = await import("../server/testing/cleanup.ts");
   const fixture = await launchVerificationServer({});
   let runtime = fixture.child, child, ui, restartTask;

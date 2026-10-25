@@ -255,7 +255,7 @@ test("the app installs these handlers, with its one rule for My Cloud and a wait
 
 // ── My Cloud: one rule, decided once the saved sign-in has restored ──
 // The app's own wiring (main.mjs), end to end: the real Cloud sign-in client
-// restoring a saved record against a stand-in OpenMausBot Cloud, the Cloud remembered
+// restoring a saved record against a stand-in Hattera Cloud, the Cloud remembered
 // for its account as main remembers it, and the handlers asking myCloudOrigin,
 // the same rule the Cloud page's Settings → Plan channels use.
 const ADMIN = "http://127.0.0.1:9";
@@ -265,11 +265,11 @@ function myCloudFixture() {
   const identity = () => ({ cloudContractVersion: 1, expiresAt: f.now + 86_400_000, device: { id: "device-1" }, account: ACCOUNT });
   f.saved = { origin: ADMIN, token: `omc_${"T".repeat(43)}`, ...identity() };
   delete f.saved.cloudContractVersion;
-  // `f.cloud`: the machine OpenMausBot Cloud names for this account (null: none).
+  // `f.cloud`: the machine Hattera Cloud names for this account (null: none).
   f.cloud = { state: "ready", origin: CLOUD };
   const session = () => ({ ...identity(), cloud: f.cloud,
     entitlement: { plan: "pro", tier: "pro", status: "active", expiresAt: f.now + 30 * 86_400_000, version: 1 } });
-  // OpenMausBot Cloud answers now ("ready"), later (a promise the test releases),
+  // Hattera Cloud answers now ("ready"), later (a promise the test releases),
   // not at all ("down"), or that this computer's sign-in no longer counts ("ended").
   const fetch = async (url, { method = "GET" } = {}) => {
     if (!url.endsWith("/api/cloud/desktop/session")) return new Response(JSON.stringify({ error: "not_found" }), { status: 404 });
@@ -323,7 +323,7 @@ test("a Live call placed while the saved sign-in is still restoring hears the mi
 
 test("a restore that ends without this Cloud, or outlasts the wait, refuses rather than waiting on", async () => {
   const f = myCloudFixture();
-  // OpenMausBot Cloud does not answer at launch: nothing says this page is My Cloud.
+  // Hattera Cloud does not answer at launch: nothing says this page is My Cloud.
   f.admin = "down";
   const restored = f.restore();
   const mic = f.ask("media", MIC);
@@ -336,7 +336,7 @@ test("a restore that ends without this Cloud, or outlasts the wait, refuses rath
   assert.equal(await f.ask("media", MIC).done, false);
 });
 
-test("with OpenMausBot Cloud unreachable past the verified window, the same account's Cloud keeps the microphone", async () => {
+test("with Hattera Cloud unreachable past the verified window, the same account's Cloud keeps the microphone", async () => {
   const f = myCloudFixture();
   await f.restore();
   assert.equal(f.client.homeTarget()?.origin, CLOUD);
@@ -393,7 +393,7 @@ test("a check that finds no Cloud for this account ends it, for the microphone a
   const f = myCloudFixture();
   await f.restore();
   assert.equal(f.ask("media", MIC).value, true);
-  // OpenMausBot Cloud answers for this account and names no machine: the
+  // Hattera Cloud answers for this account and names no machine: the
   // address it named before is no longer theirs, whatever serves it now.
   f.cloud = null;
   await f.client.refresh();
@@ -408,7 +408,7 @@ test("a check that finds no Cloud for this account ends it, for the microphone a
 });
 
 test("a stopped Cloud named without its address is still this account's Cloud", async () => {
-  // OpenMausBot Cloud still names the machine, so the Server menu's My Cloud
+  // Hattera Cloud still names the machine, so the Server menu's My Cloud
   // keeps opening through the Cloud's own connection (cloud-home.mjs isCloudHomeEntry).
   const f = myCloudFixture();
   await f.restore();

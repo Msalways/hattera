@@ -68,7 +68,7 @@ export type RuntimeEvent = RuntimeEventBase &
          * The one figure the harness accumulates — thread.token-usage.updated
          * is a live indicator whose meaning differs per driver (a per-call
          * delta, a thread total, a per-step figure) and must never be summed. */
-        usage?: { input: number; output: number; cachedInput?: number };
+        usage?: import("./token-usage.ts").TokenUsage;
       }
     | {
         /** A resumable terminal: the turn exhausted its model/tool budget,
@@ -172,6 +172,8 @@ export type RuntimeEvent = RuntimeEventBase &
       }
     | {
         type: "thread.token-usage.updated"; input: number; output: number; cachedInput?: number;
+        /** False when any token field or model step was unreported. */
+        tokensReported?: boolean;
         /** What the model's window held on the most recent model call — the
          * whole prompt, cache reads included — and the window's size when the
          * driver knows it. The figure that predicts the next message's cost. */

@@ -4,7 +4,7 @@
 // script. The release asset is verified before extraction and the executable
 // is verified again on every reuse.
 // Nothing is installed globally and cloudflared's own updater stays disabled;
-// OpenMausBot updates this dependency with an ordinary reviewed app release.
+// Hattera updates this dependency with an ordinary reviewed app release.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -89,7 +89,7 @@ export function parsePrepareCloudflaredArgs(args = []) {
     if (argument === "--current" && !options.current) {
       options.current = true;
     } else if (argument === "--root" && !options.root && typeof next === "string" && next !== "") {
-      // `openmausbot serve --tunnel` stages into its data dir, not a checkout.
+      // `hattera serve --tunnel` stages into its data dir, not a checkout.
       options.root = next;
       index += 1;
     } else {

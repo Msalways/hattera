@@ -329,7 +329,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       expect(recorder.events.filter(event => event.type === "runtime.error")).toEqual([]);
       const seen = JSON.parse(readFileSync(dump, "utf8"));
       const config = seen.calls.find((call: { method: string }) => call.method === (resumeCursor ? "thread/resume" : "thread/start")).params.config.mcp_servers;
-      // OpenMausBot's own coordination tools never ask; a person's own server still does.
+      // Hattera's own coordination tools never ask; a person's own server still does.
       expect(config.agents.default_tools_approval_mode).toBe("approve");
       expect(config.notes.default_tools_approval_mode).toBe("prompt");
       for (const [name, tool] of [["agents", "list_bots"], ["notes", "read_notes"]]) {
@@ -585,7 +585,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       "turn.started",
       "session.started",
       "item.started", // commandExecution ls -la
-      "item.started", // webSearch OpenMausBot
+      "item.started", // webSearch Hattera
       "item.completed", // commandExecution done
       "item.completed", // webSearch done
       "content.delta",
@@ -672,7 +672,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       const input = calls.find((c) => c.method === "turn/start")?.params?.input as Array<{ text?: string }> | undefined;
       return input?.[0]?.text;
     };
-    expect(turnText(first)).toBe("Context from OpenMausBot updated since this conversation started; it replaces any earlier copy:\n\nMemory: likes quiet hours.\n\nfirst");
+    expect(turnText(first)).toBe("Context from Hattera updated since this conversation started; it replaces any earlier copy:\n\nMemory: likes quiet hours.\n\nfirst");
     expect(turnText(second)).toBe("second");
     expect(turnText(third)).toContain("Memory: moved to Toronto.");
     expect(turnText(third)).toContain("third");
@@ -1150,7 +1150,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     expect(argv).toContain("mcp_servers.notes.command");
   });
 
-  it("reaches a url server through OpenMausBot's connector on Codex's own login, header values off argv", async () => {
+  it("reaches a url server through Hattera's connector on Codex's own login, header values off argv", async () => {
     await create();
     const dump = join(scratch, "remote-mcp.json");
     process.env.FAKE_CODEX_DUMP = dump;
@@ -1189,7 +1189,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
   // Codex's own client can add (a Voluum server: "Unrecognized field
   // 'schemaValidation'"), and Codex then runs the thread without its tools.
   // The fake starts each mount as codex-cli 0.160.1 does and sends that
-  // handshake: only OpenMausBot's connector gets through.
+  // handshake: only Hattera's connector gets through.
   describe("a strict URL server", () => {
     const STRICT_TOOLS = [{ name: "report", inputSchema: { type: "object" } }, { name: "campaigns", inputSchema: { type: "object" } }];
     const SCHEMA_VALIDATION = { protocolVersion: "2025-06-18", capabilities: { elicitation: { form: { schemaValidation: true }, url: {} } }, clientInfo: { name: "codex-mcp-client", title: "Codex", version: "0.160.1" } };
@@ -1212,7 +1212,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       const seen = JSON.parse(readFileSync(dump, "utf8"));
       expect(seen.mcpStartup.voluum).toEqual({ status: "ready", tools: ["report", "campaigns"] });
       // upstream saw only the minimal handshake, never Codex's own
-      expect(strict.initializes).toEqual([{ protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "OpenMausBot tool proxy", version: "1" } }]);
+      expect(strict.initializes).toEqual([{ protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "Hattera tool proxy", version: "1" } }]);
       expect(seen.argv.join(" ")).not.toContain("tok-voluum");
     });
 
@@ -1248,7 +1248,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       expect(await recorder.until((event) => event.type === "turn.completed")).toMatchObject({ ok: true });
       const seen = JSON.parse(readFileSync(dump, "utf8"));
       expect(seen.mcpStartup.voluum).toEqual({ status: "ready", tools: ["report"] });
-      expect(strict.initializes).toEqual([{ protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "OpenMausBot tool proxy", version: "1" } }]);
+      expect(strict.initializes).toEqual([{ protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "Hattera tool proxy", version: "1" } }]);
     });
   });
 
@@ -1887,7 +1887,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
   it("reports local ChatGPT sign-out with a warning when remote revocation is unconfirmed", async () => {
     vi.spyOn(ChatGptPlanAuthController.prototype, "models").mockResolvedValue({ default: "gpt-6.1-sol", options: [{ id: "gpt-6.1-sol", label: "GPT-6.1 Sol" }] });
     vi.spyOn(ChatGptPlanAuthController.prototype, "snapshot").mockResolvedValue({ authenticated: false });
-    const message = "Signed out locally, but remote revocation was not confirmed. Disconnect OpenMausBot in ChatGPT Settings → Usage to end access there.";
+    const message = "Signed out locally, but remote revocation was not confirmed. Disconnect Hattera in ChatGPT Settings → Usage to end access there.";
     vi.spyOn(ChatGptPlanAuthController.prototype, "signOut").mockRejectedValue(Object.assign(new Error(message), { code: "chatgpt_revocation_unconfirmed" }));
     await create({ authMode: "chatgpt-plan" });
     await expect(instance.signOut!()).resolves.toBeUndefined();
@@ -2104,7 +2104,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       if (index > 0) expect(threadCalls[0].method).toBe("thread/resume");
       const updates = calls.filter((call) => call.method === "thread/inject_items");
       expect(updates).toHaveLength(index === 2 || index === 3 ? 1 : 0);
-      if (updates.length) expect(JSON.stringify(updates[0].params)).toContain(system || "No OpenMausBot bot-specific instructions remain.");
+      if (updates.length) expect(JSON.stringify(updates[0].params)).toContain(system || "No Hattera bot-specific instructions remain.");
       for (const call of calls.filter((call) => call.method === "turn/start")) {
         expect(call.params.input).toEqual([{ type: "text", text: `message-${index}` }]);
       }
@@ -2126,7 +2126,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       await expect(recorder.until((event) => event.type === "turn.completed" && event.turnId === turnId)).resolves.toMatchObject({ ok: true });
       const calls = JSON.parse(readFileSync(dump, "utf8")).calls;
       const threadCall = calls.find((call: { method: string }) => call.method === (index ? "thread/resume" : "thread/start"));
-      expect(threadCall.params.developerInstructions).toBe(`${system || "No OpenMausBot bot-specific instructions remain."}\n\nPrivate native rules.`);
+      expect(threadCall.params.developerInstructions).toBe(`${system || "No Hattera bot-specific instructions remain."}\n\nPrivate native rules.`);
       expect(calls.filter((call: { method: string }) => call.method === "thread/inject_items")).toHaveLength(index === 1 ? 1 : 0);
       expect(calls.find((call: { method: string }) => call.method === "turn/start").params.input).toEqual([{ type: "text", text: `message-${index}` }]);
     }

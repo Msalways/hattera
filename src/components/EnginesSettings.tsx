@@ -13,8 +13,9 @@ import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
 import { t } from "@/lib/i18n";
 import { ApiKeyEngineManage, EngineSetup, EngineUpdateNotice, EngineWarningNotice, ServerEngineInstall, isApiKeyEngine } from "./EngineSetup";
-import { AddClaudeAccount, ClaudeAccountSettings } from "./ClaudeAccountSettings";
-import { AddProviderAccount, CodexAccountSettings } from "./CodexAccountSettings";
+import { ClaudeAccountSettings } from "./ClaudeAccountSettings";
+import { CodexAccountSettings } from "./CodexAccountSettings";
+import { ProviderProfiles } from "./ProviderProfiles";
 import { DEVICE_SIGN_IN_COPY, deviceSignInProvider } from "./DeviceSignIn";
 import { AntigravityFreeSpace } from "./AntigravityFreeSpace";
 import { providerAccountForm } from "../../shared/provider-account-setup";
@@ -275,14 +276,14 @@ function EngineRow({ instance }: { instance: InstanceInfo }) {
     <EngineCard instance={instance}>
       {policyNote}
       {!engineReady(instance) && <EngineSetup instance={instance} intent={needsConfiguredRoute(instance) ? "cloud" : instance.access === "custom" ? "inject" : "cloud"} unframed />}
-      {engineReady(instance) && (providerAccountForm(instance.driverKind, instance.instanceId)
+      {engineReady(instance) && (providerAccountForm(instance.driverKind, instance.instanceId, instance.accountSetup)
         ? <details className="mt-3"><summary className="cursor-pointer text-[12px] text-ink-secondary">{t("engineSetup.account.change")}</summary><ProviderAccountSetup instance={instance} /></details>
         : <ApiKeyEngineManage instance={instance} className="mt-3" />)}
       {instance.snapshot.update && <EngineUpdateNotice update={instance.snapshot.update} instance={instance} className="mt-3" />}
       {instance.snapshot.warning && <EngineWarningNotice warning={instance.snapshot.warning} className="mt-3" />}
-      {instance.claudeAccount && <ClaudeAccountSettings instance={instance} />}
+      {instance.claudeAccount && !instance.accountProfile?.isolated && <ClaudeAccountSettings instance={instance} />}
       {engineReady(instance) && instance.snapshot.authenticated === true && (
-        (instance.authentication?.method === "device-code" || instance.authentication?.method === "browser-pkce") && deviceSignInProvider(instance.driverKind) === "codex"
+        instance.authentication?.signOut && (!instance.claudeAccount || instance.accountProfile?.isolated)
           ? <CodexAccountSettings instance={instance} />
           : instance.authentication?.method === "device-code"
           ? <p className="flex items-center gap-1.5 text-[12px] text-success"><Check size={13} />{t(DEVICE_SIGN_IN_COPY[deviceSignInProvider(instance.driverKind)].connectedAccount)}</p>
@@ -291,22 +292,16 @@ function EngineRow({ instance }: { instance: InstanceInfo }) {
           )
       )}
       {instance.freeUpSpace && <AntigravityFreeSpace instance={instance} />}
-      {instance.driverKind === "antigravityAgent" && (
+      {instance.driverKind === "antigravityAgent" && !instance.authentication?.signOut && (
         <div className="mt-3 space-y-3">
           {instance.snapshot.authenticated && <p className="break-words text-[12px] text-ink-secondary">{instance.snapshot.account?.email ?? t("engineSetup.antigravity.emailUnavailable")}</p>}
-          <AddProviderAccount antigravityInstanceId={instance.instanceId} />
         </div>
       )}
-      {instance.driverKind === "opencodeGo" && instance.snapshot.state === "available" && <details className="mt-3">
+      {instance.driverKind === "opencodeGo" && !instance.accountProfile?.isolated && instance.snapshot.state === "available" && <details className="mt-3">
         <summary className="cursor-pointer text-[12px] text-ink-secondary">{t("engineSetup.account.providerKeys")}</summary>
         <div className="mt-3 space-y-3"><ApiKeyRow section="opencodeGo" /><OpenCodeProviderKeys /></div>
       </details>}
-      {instance.driverKind === "claudeAgent" && instance.access !== "custom" && (
-        <div className="mt-3"><AddClaudeAccount /></div>
-      )}
-      {instance.snapshot.chatgptPlan && !instance.snapshot.authenticationUnavailableReason && (
-        <div className="mt-3"><AddProviderAccount /></div>
-      )}
+      <ProviderProfiles instance={instance} />
       {!instance.runtimeRemoval?.removed && (instance.cli || instance.cliDefault || instance.install?.command || instance.install?.server || instance.install?.managed) && <details className="mt-4 border-t border-hairline/40 pt-3">
         <summary className="cursor-pointer rounded-md py-1 text-[12px] font-medium text-ink-secondary outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent">{t("engines.library.advanced")}</summary>
         {instance.snapshot.state === "available" && instance.install?.server && instance.driverKind !== "claudeAgent" && !instance.cli && !instance.snapshot.update && (

@@ -38,9 +38,9 @@ Run the permanent isolated HTTP checks:
 pnpm exec vitest run server/guarded-messages-api.test.ts
 ```
 
-Each case launches the prescribed `control-omb` verification server in a fresh
+Each case launches the prescribed `control-hattera` verification server in a fresh
 home and uses only its gated fake provider. The test records the exact HTTP
-requests, `control:omb` commands, bounded transcripts and wait results next to
+requests, `control:hattera` commands, bounded transcripts and wait results next to
 the server log in a `.log.guarded-messages.json` receipt. Temporary homes and
 their child processes are closed by each fixture.
 

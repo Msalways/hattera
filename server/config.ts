@@ -1,6 +1,7 @@
 // Config + data dirs. One file, ~/.openmausbot/config.json, env fallbacks:
 //   { "xai": {"key":"xai-…"}, "composio": {"apiKey":"ak_…"}, "box": {"token":"…"},
 //     "instances": { "<instanceId>": {"driver":"grok", …} } }
+import productCompatibility from "../shared/product-compat.mjs";
 import { readFileSync, mkdirSync, existsSync, renameSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +10,7 @@ import { z } from "zod";
 import { normalizeImageGenerationUrl, type ImageGenerationConfig } from "../shared/image-generation.ts";
 
 import { writeFileAtomic } from "./atomic.ts";
+import { isolatedProfileEnvironment } from "./provider-profiles.ts";
 import { withoutComputerEngine } from "./computer-engine-removal.ts";
 import { newBotDefaultsSchema, type NewBotDefaults } from "./new-bot-defaults.ts";
 import { EFFORT_LEVELS, type EffortLevel, type LiveSettings } from "../shared/wire.ts";
@@ -369,6 +371,7 @@ const instanceConfigSchema = z.object({
       .refine((icon) => providerIconError(icon) === null, { message: "Invalid provider icon" }),
   ]).optional(),
   environment: z.record(z.string(), z.string()).optional(),
+  accountProfile: z.literal("isolated").optional(),
   enabled: z.boolean().optional(),
   access: z.enum(["subscription", "custom", "api"]).optional(),
   config: z.json().optional(),
@@ -977,7 +980,7 @@ export function changedInstanceIds(before: Record<string, unknown>, after: Recor
 }
 
 // OMB_DATA_DIR isolates test/soak rigs from the user's real fleet.
-export const DATA_DIR = process.env.OMB_DATA_DIR ?? join(homedir(), ".openmausbot");
+export const DATA_DIR = process.env.OMB_DATA_DIR ?? productCompatibility.defaultDataDirectory(homedir());
 const LEGACY_DATA_DIR = join(homedir(), ".opengrokbot");
 export const EVENTS_DIR = join(DATA_DIR, "events");
 export const NATIVE_DIR = join(DATA_DIR, "native");
@@ -1811,6 +1814,10 @@ export function instanceConfigs(cfg: AppConfig): InstanceConfigMap {
     // would turn the first workspace URL into a stale per-instance override.
     const entry = { ...sourceEntry };
     map[id] = entry;
+    if (entry.accountProfile === "isolated") {
+      entry.environment = isolatedProfileEnvironment(DATA_DIR, id, entry, process.env, [...PROVIDER_CREDENTIAL_ENV, ...WORKSPACE_CREDENTIAL_ENV]);
+      continue;
+    }
     const environment = { ...entry.environment };
     // Main's rule: an instance that brought its own key or host gets no
     // workspace credential. Built-in per-provider routing is a default,

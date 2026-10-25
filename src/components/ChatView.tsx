@@ -1505,6 +1505,15 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
       </div>
 
       <BotActivityPicker bot={bot} />
+      {!remoteClient && <div data-chat-route className="mx-3 mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-xs text-ink-secondary sm:mx-5">
+        <span className="min-w-0 break-words" title={bot.modelSelection.instanceId}>{t("execution.nextLocal", {
+          account: state.instances.find(instance => instance.instanceId === bot.modelSelection.instanceId)?.displayName ?? bot.modelSelection.instanceId,
+          model: bot.modelSelection.model,
+        })}</span>
+        {state.groups.some(group => group.sharedGroupId) ? state.groups.filter(group => group.sharedGroupId).map(group =>
+          <button key={group.id} type="button" onClick={() => dispatch({ type: "select", id: group.id })} className="min-w-0 break-words text-accent hover:underline">{t("execution.openTeam", { name: group.name })}</button>
+        ) : <span>{t("execution.noGroups")}</span>}
+      </div>}
       {routineExecution && <div className="mx-5 mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-[11.5px] text-ink-secondary">
         <span className="min-w-0 flex-1 truncate">{t("routines.executionDetails", { name: routineExecution.routineName })}</span>
         {canOpenResults && resultsThreadId && <button type="button" onClick={() => openNotificationTarget(dispatch, { botId: bot.id, threadId: resultsThreadId }, state, showThreads)} className="rounded px-2 py-1 text-accent hover:bg-raised">{t("routines.results.back")}</button>}

@@ -4,7 +4,7 @@
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelCatalog } from "../contracts.ts";
 import { activeEngineBinDir } from "../engine-install.ts";
@@ -14,6 +14,74 @@ import { makeFakeDriver } from "../testing/fake-driver.ts";
 import { ProviderRegistry } from "./registry.ts";
 
 describe("ProviderRegistry", () => {
+  it("coalesces concurrent account probes across discovery callers and keeps other accounts independent", async () => {
+    const registry = new ProviderRegistry([makeFakeDriver().driver]);
+    await registry.load({ a: { driver: "fake" }, b: { driver: "fake" } });
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const probe = vi.fn(async () => { await gate; return { state: "available" as const, version: "slow" }; });
+    registry.get("a")!.snapshot = probe;
+    const direct = registry.snapshot("a"), anotherBot = registry.snapshot("a", true), picker = registry.describe();
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(await anotherBot).toMatchObject({ state: "unavailable", reason: expect.stringContaining("Checking") });
+    expect((await registry.snapshot("b")).state).toBe("available");
+    release();
+    await Promise.all([direct, anotherBot, picker]);
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect((await registry.snapshot("a", true)).version).toBe("slow");
+    expect(probe).toHaveBeenCalledTimes(1);
+    registry.get("a")!.snapshot = vi.fn(async () => ({ state: "available" as const, authenticated: false }));
+    expect((await registry.snapshot("a")).authenticated).toBe(false);
+    expect((await registry.snapshot("a", true)).authenticated).toBe(false);
+    await registry.disposeAll();
+  });
+
+  it("expires discovery health and invalidates it when an account is replaced", async () => {
+    const clock = vi.spyOn(Date, "now");
+    try {
+      clock.mockReturnValue(1000);
+      const registry = new ProviderRegistry([makeFakeDriver().driver]);
+      await registry.load({ a: { driver: "fake" } });
+      const probe = vi.fn(async () => ({ state: "unavailable" as const, reason: "account signed out" }));
+      await registry.snapshot("a");
+      registry.get("a")!.snapshot = probe;
+      clock.mockReturnValue(1001);
+      expect((await registry.snapshot("a", true)).state).toBe("available");
+      expect(probe).not.toHaveBeenCalled();
+      clock.mockReturnValue(9001);
+      expect((await registry.snapshot("a", true)).state).toBe("available");
+      expect((await registry.snapshot("a", true)).state).toBe("unavailable");
+      expect(probe).toHaveBeenCalledTimes(1);
+      await registry.load({ a: { driver: "fake", displayName: "Replacement account" } });
+      expect((await registry.snapshot("a")).state).toBe("available");
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      registry.get("a")!.snapshot = async () => { await gate; return { state: "unavailable", reason: "expired account" }; };
+      clock.mockReturnValue(18_000);
+      expect((await registry.snapshot("a", true)).state).toBe("available");
+      clock.mockReturnValue(50_002);
+      expect(await registry.snapshot("a", true)).toMatchObject({ state: "unavailable", reason: expect.stringContaining("Checking") });
+      release();
+      expect((await registry.snapshot("a")).state).toBe("unavailable");
+      await registry.disposeAll();
+    } finally { clock.mockRestore(); }
+  });
+
+  it("cannot let an old in-flight account probe overwrite a replacement's health", async () => {
+    const registry = new ProviderRegistry([makeFakeDriver().driver]);
+    await registry.load({ a: { driver: "fake" } });
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    registry.get("a")!.snapshot = async () => { await gate; return { state: "unavailable", reason: "old account" }; };
+    const old = registry.snapshot("a");
+    await registry.load({ a: { driver: "fake", displayName: "New account" } });
+    expect((await registry.snapshot("a")).state).toBe("available");
+    release(); await old;
+    expect(registry.lastSnapshot("a")?.state).toBe("available");
+    expect((await registry.snapshot("a", true)).state).toBe("available");
+    await registry.disposeAll();
+  });
+
   it("does not offer an npm button for a provider without a CLI to verify", async () => {
     const fake = makeFakeDriver();
     Object.assign(fake.driver, { install: { command: { [process.platform]: "npm install -g fixture-api-helper" } } });

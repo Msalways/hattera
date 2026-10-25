@@ -5,6 +5,7 @@
 // compatible — do not remove it); dispose tears an instance down without
 // touching its siblings.
 import { findCliCandidates } from "../env-path.ts";
+import { clearObservedMetrics } from "../account-metrics.ts";
 import { installNpmEngine, npmAvailable, serverInstallFor } from "../engine-install.ts";
 import { installOfficialEngine, officialEngineFor } from "../official-engine-install.ts";
 import { engineRuntime, engineRemoved, hasOwnedEngineFiles, markEngineRemoved, removeEngineFiles, restoreEngine, type EngineRuntime } from "../engine-removal.ts";
@@ -74,6 +75,7 @@ export class ProviderRegistry {
   /** What describe() last read of each live instance. A turn's start checks
    * a thread's own engine against it without waiting on that engine's CLI. */
   private lastSnapshots = new Map<InstanceId, ProviderSnapshot>();
+  private snapshotReads = new Map<InstanceId, { instance: ProviderInstance; at: number; value?: ProviderSnapshot; pending?: Promise<ProviderSnapshot> }>();
   private driversByKind: Map<string, AnyProviderDriver>;
   /** Where Settings-driven npm installs go; the data directory by default. */
   private readonly enginesBaseDir: string | undefined;
@@ -125,6 +127,7 @@ export class ProviderRegistry {
   ): Promise<RegistryEntry> {
     // Account edits replace only their own process/session state.
     await this.dispose(instanceId);
+    clearObservedMetrics(instanceId);
     const driver = this.driversByKind.get(entry.driver);
     if (!driver) {
       return {
@@ -182,6 +185,33 @@ export class ProviderRegistry {
    * the first read, or for an instance that is not live. */
   lastSnapshot(instanceId: InstanceId): ProviderSnapshot | undefined {
     return this.byId.get(instanceId)?.live ? this.lastSnapshots.get(instanceId) : undefined;
+  }
+
+  /** Discovery/admission share a short account-level probe; explicit checks and
+   * native dispatch ask for a fresh result. Concurrent callers never spawn
+   * duplicate CLI probes, including when several shared bots use one account. */
+  async snapshot(instanceId: InstanceId, cached = false): Promise<ProviderSnapshot> {
+    const instance = this.get(instanceId);
+    if (!instance) return { state: "unavailable", reason: "Provider account is unavailable." };
+    const previous = this.snapshotReads.get(instanceId);
+    const read = previous?.instance === instance ? previous : { instance, at: 0 } as NonNullable<typeof previous>;
+    if (cached && read.value && Date.now() - read.at < 8000) return read.value;
+    const lastKnown = () => read.value && Date.now() - read.at < 40_000 ? read.value
+      : { state: "unavailable" as const, reason: "Checking provider account. Refresh status shortly." };
+    if (read.pending) return cached ? lastKnown() : read.pending;
+    this.snapshotReads.set(instanceId, read);
+    read.pending = (async () => {
+      let value: ProviderSnapshot;
+      try { value = await instance.snapshot(); }
+      catch (error) { value = { state: "unavailable", reason: error instanceof Error ? error.message : String(error) }; }
+      if (this.get(instanceId) === instance) {
+        read.value = value; read.at = Date.now(); this.lastSnapshots.set(instanceId, value);
+      }
+      return value;
+    })().finally(() => { read.pending = undefined; });
+    // A CLI probe can take longer than the peer RPC deadline. Do not hold
+    // discovery/admission requests or peer slots open while it runs.
+    return cached ? lastKnown() : read.pending;
   }
 
   /** How the instance's driver is presented and paid for (EngineAccess). */
@@ -360,15 +390,7 @@ export class ProviderRegistry {
           };
         }
         const inst = entry.live;
-        let snapshot: ProviderSnapshot;
-        try {
-          snapshot = await inst.snapshot();
-        } catch (e) {
-          snapshot = { state: "unavailable", reason: e instanceof Error ? e.message : String(e) };
-        }
-        // Only while this is still the live instance: a reload may have
-        // replaced it during the read.
-        if (this.byId.get(inst.instanceId)?.live === inst) this.lastSnapshots.set(inst.instanceId, snapshot);
+        const snapshot = await this.snapshot(inst.instanceId);
         return {
           instanceId: inst.instanceId,
           driverKind: inst.driverKind,
@@ -420,6 +442,7 @@ export class ProviderRegistry {
     this.byId.clear();
     this.cliByInstance.clear();
     this.lastSnapshots.clear();
+    this.snapshotReads.clear();
     this.configurations.clear();
   }
 
@@ -429,6 +452,7 @@ export class ProviderRegistry {
     this.cliByInstance.delete(instanceId);
     this.accessByInstance.delete(instanceId);
     this.lastSnapshots.delete(instanceId);
+    this.snapshotReads.delete(instanceId);
     this.configurations.delete(instanceId);
     await entry?.live?.dispose();
   }

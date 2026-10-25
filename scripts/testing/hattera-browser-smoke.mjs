@@ -8,6 +8,7 @@ import { resolve, join, sep } from 'node:path';
 const [previewUrl, chromePath] = process.argv.slice(2);
 if (!previewUrl || !chromePath) throw new Error('Pass the printed preview URL and Chrome executable path');
 const base = new URL(previewUrl);
+const screenshotRoot = resolve(process.env.OMB_E2E_ARTIFACT_DIR ? join(process.env.OMB_E2E_ARTIFACT_DIR, 'app-screenshots') : 'output/playwright');
 if (base.hostname !== '127.0.0.1') throw new Error('Only an isolated loopback preview is allowed');
 const profile = await mkdtemp(join(tmpdir(), 'hattera-ui-smoke-'));
 const chrome = spawn(chromePath, [
@@ -111,8 +112,8 @@ try {
   if (contrastOf(modelColors) < 4.5) throw new Error(`OpenCode model text is unreadable: ${JSON.stringify(modelColors)}`);
   const providerColors = await evaluate('(() => { const button = document.querySelector("[data-simple-provider=opencodeGo]"); return { text: getComputedStyle(button).color, background: getComputedStyle(button).backgroundColor }; })()');
   if (contrastOf(providerColors) < 4.5) throw new Error(`Selected OpenCode provider is unreadable: ${JSON.stringify(providerColors)}`);
-  await mkdir(resolve('output/playwright'), { recursive: true });
-  const pickerScreenshot = resolve('output/playwright/hattera-opencode-picker.png');
+  await mkdir(screenshotRoot, { recursive: true });
+  const pickerScreenshot = join(screenshotRoot, 'hattera-opencode-picker.png');
   await pause(800);
   const pickerShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(pickerScreenshot, Buffer.from(pickerShot.data, 'base64'));
@@ -142,8 +143,8 @@ try {
   }
   await evaluate('document.querySelector("[data-engine-card=opencodeGo]").scrollIntoView({block:"center"})');
   await pause(500);
-  await mkdir(resolve('output/playwright'), { recursive: true });
-  const providerScreenshot = resolve('output/playwright/hattera-opencode-provider.png');
+  await mkdir(screenshotRoot, { recursive: true });
+  const providerScreenshot = join(screenshotRoot, 'hattera-opencode-provider.png');
   const providerShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(providerScreenshot, Buffer.from(providerShot.data, 'base64'));
   await evaluate('document.querySelector("[data-engine-card=minimax] summary").click()');
@@ -154,7 +155,7 @@ try {
   }
   await evaluate('document.querySelector("[data-engine-card=minimax]").scrollIntoView({block:"center"})');
   await pause(500);
-  const miniMaxScreenshot = resolve('output/playwright/hattera-minimax-setup.png');
+  const miniMaxScreenshot = join(screenshotRoot, 'hattera-minimax-setup.png');
   const miniMaxShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(miniMaxScreenshot, Buffer.from(miniMaxShot.data, 'base64'));
   await evaluate('document.querySelector("[data-engine-card=qwen] summary").click()');
@@ -165,7 +166,7 @@ try {
   }
   await evaluate('document.querySelector("[data-engine-card=qwen]").scrollIntoView({block:"center"})');
   await pause(500);
-  const qwenScreenshot = resolve('output/playwright/hattera-qwen-setup.png');
+  const qwenScreenshot = join(screenshotRoot, 'hattera-qwen-setup.png');
   const qwenShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(qwenScreenshot, Buffer.from(qwenShot.data, 'base64'));
   await evaluate('document.querySelector("[data-engine-card=bedrock] summary").click()');
@@ -184,14 +185,45 @@ try {
   }
   await evaluate('document.querySelector("[data-engine-card=codex]").scrollIntoView({block:"center"})');
   await pause(500);
-  const codexScreenshot = resolve('output/playwright/hattera-codex-auth-options.png');
+  const codexScreenshot = join(screenshotRoot, 'hattera-codex-auth-options.png');
   const codexShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(codexScreenshot, Buffer.from(codexShot.data, 'base64'));
   await evaluate('Array.from(document.querySelectorAll("[data-engine-card=codex] button")).find(button => button.textContent.includes("One-time code")).click()');
   await until(() => evaluate('!!Array.from(document.querySelectorAll("[data-engine-card=codex] button[aria-pressed=true]")).find(button => button.textContent.includes("One-time code"))'), 10_000, 'Codex device-code choice');
-  const codexCodeScreenshot = resolve('output/playwright/hattera-codex-auth-code.png');
+  const codexCodeScreenshot = join(screenshotRoot, 'hattera-codex-auth-code.png');
   const codexCodeShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(codexCodeScreenshot, Buffer.from(codexCodeShot.data, 'base64'));
+  await evaluate('document.querySelector("[data-settings-page=account]").click()');
+  await until(() => evaluate('!!document.querySelector("[data-account-usage=opencodeGo]") && !!document.querySelector("[data-account-usage=codex]")'), 25_000, 'all configured accounts in usage');
+  const report = await (await fetch(new URL('/api/plan-usage', base))).json();
+  const visibleAccountIds = await evaluate('Array.from(document.querySelectorAll("[data-account-usage]")).map(row => row.dataset.accountUsage)');
+  if (report.providers.some(provider => !visibleAccountIds.includes(provider.id))) throw new Error('Usage omitted a configured account');
+  // This journey deliberately leaves Codex signed out to exercise its setup UI.
+  // Native successful snapshots are checked by verify-account-network.ts.
+  await until(() => evaluate('document.querySelector("[data-account-usage=codex]")?.innerText.includes("Account reporting could not refresh")'), 40_000, 'signed-out account reporting state');
+  if (await evaluate('!!document.querySelector("[data-account-usage=codex] [role=meter]")')) throw new Error('Signed-out account displayed a fabricated allowance');
+  await evaluate('document.querySelector("[data-settings-block=usage]").scrollIntoView({block:"start"})');
+  const accountScreenshot = join(screenshotRoot, 'hattera-account-usage.png');
+  await writeFile(accountScreenshot, Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })).data, 'base64'));
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await pause(300);
+  if (await evaluate('document.documentElement.scrollWidth > window.innerWidth')) throw new Error('Account usage overflows the mobile viewport');
+  const mobileAccountScreenshot = join(screenshotRoot, 'hattera-account-usage-mobile.png');
+  await writeFile(mobileAccountScreenshot, Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })).data, 'base64'));
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  await evaluate('document.querySelector("[data-settings-page=computers]").click()');
+  await until(() => evaluate('Array.from(document.querySelectorAll("button")).some(button => button.textContent.trim() === "Connect Tailscale" && !button.disabled)'), 15_000, 'packaged private network control');
+  const disconnected = await (await fetch(new URL('/api/private-network', base))).json();
+  if (!disconnected.available || disconnected.enabled) throw new Error('Private network was missing or unexpectedly enabled');
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.textContent.trim() === "Connect Tailscale").scrollIntoView({block:"center"})');
+  const networkScreenshot = join(screenshotRoot, 'hattera-private-network.png');
+  await writeFile(networkScreenshot, Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })).data, 'base64'));
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await pause(300);
+  if (await evaluate('document.documentElement.scrollWidth > window.innerWidth')) throw new Error('Private network settings overflow the mobile viewport');
+  const mobileNetworkScreenshot = join(screenshotRoot, 'hattera-private-network-mobile.png');
+  await writeFile(mobileNetworkScreenshot, Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })).data, 'base64'));
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await evaluate(`document.querySelector(${JSON.stringify('button[aria-label="Close settings"]')}).click()`);
   await until(() => evaluate('!document.querySelector("[role=dialog] [data-settings-page=ai]")'), 10_000, 'Settings closure');
   await evaluate('document.querySelector("button[data-tour=computer]").click()');
@@ -220,8 +252,8 @@ try {
   // A page visit precedes the navigation reply. Close an idle panel so this
   // check exercises explicit hand-back, rather than server disconnect cleanup.
   await until(() => evaluate(`!!document.querySelector(${JSON.stringify('button[aria-label="New tab"]:not(:disabled)')})`), 45_000, 'completed browser navigation');
-  const output = resolve('output/playwright/hattera-browser-smoke.png');
-  await mkdir(resolve('output/playwright'), { recursive: true });
+  const output = join(screenshotRoot, 'hattera-browser-smoke.png');
+  await mkdir(screenshotRoot, { recursive: true });
   const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(output, Buffer.from(shot.data, 'base64'));
   await evaluate('document.querySelector("button[data-tour=computer]").click()');
@@ -307,7 +339,7 @@ try {
   if (mobileLayout.overflow || mobileLayout.sidebarRight > 1 || mobileLayout.composerLeft < 0) {
     throw new Error(`Mobile chat is obscured or overflows: ${JSON.stringify(mobileLayout)}`);
   }
-  const mobileScreenshot = resolve('output/playwright/hattera-mobile-smoke.png');
+  const mobileScreenshot = join(screenshotRoot, 'hattera-mobile-smoke.png');
   const mobileShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(mobileScreenshot, Buffer.from(mobileShot.data, 'base64'));
   const pairing = await fetch(new URL('/api/auth/pairing', base), {
@@ -334,17 +366,17 @@ try {
   }
   await evaluate("localStorage.setItem('omb-skin', 'midnight')");
   await send('Page.reload');
-  await until(() => evaluate('document.documentElement.dataset.skin === "midnight" && !!document.querySelector("#pair-code")'), 20_000, 'saved dark pairing skin');
-  const darkPairScreenshot = resolve('output/playwright/hattera-pair-dark-smoke.png');
+  await until(() => evaluate('document.documentElement?.dataset.skin === "midnight" && !!document.querySelector("#pair-code")'), 20_000, 'saved dark pairing skin');
+  const darkPairScreenshot = join(screenshotRoot, 'hattera-pair-dark-smoke.png');
   const darkPairShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(darkPairScreenshot, Buffer.from(darkPairShot.data, 'base64'));
   await evaluate("localStorage.setItem('omb-skin', 'hattera')");
   await send('Page.reload');
-  await until(() => evaluate('document.documentElement.dataset.skin === "hattera" && !!document.querySelector("#pair-code")'), 20_000, 'saved Hattera pairing skin');
+  await until(() => evaluate('document.documentElement?.dataset.skin === "hattera" && !!document.querySelector("#pair-code")'), 20_000, 'saved Hattera pairing skin');
   await evaluate('document.querySelector("#pair-code").focus(); document.querySelector("#pair-code").select()');
   await send('Input.insertText', { text: code });
   await until(() => evaluate(`document.querySelector("#pair-code")?.value === ${JSON.stringify(code)}`), 10_000, 'pairing code entry');
-  const pairScreenshot = resolve('output/playwright/hattera-pair-smoke.png');
+  const pairScreenshot = join(screenshotRoot, 'hattera-pair-smoke.png');
   const pairShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(pairScreenshot, Buffer.from(pairShot.data, 'base64'));
   await evaluate('Array.from(document.querySelectorAll("form button[type=submit]")).find(button => button.textContent?.trim() === "Connect").click()');
@@ -375,7 +407,7 @@ try {
   await until(() => evaluate('document.querySelector("[data-device-sign-in=cline]")?.innerText.includes("cancelled")'), 10_000, 'Cline auth cancellation');
   await evaluate('Array.from(document.querySelectorAll("[data-device-sign-in=cline] button")).find(button => button.textContent?.includes("Try again")).click()');
   await until(() => evaluate('!!document.querySelector("[data-device-sign-in=cline] a")'), 10_000, 'Cline auth retry');
-  const clineAuthScreenshot = resolve('output/playwright/hattera-cline-browser-sign-in.png');
+  const clineAuthScreenshot = join(screenshotRoot, 'hattera-cline-browser-sign-in.png');
   await evaluate('document.querySelector("[data-device-sign-in=cline]").scrollIntoView({ block: "center" })');
   const clineAuthShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(clineAuthScreenshot, Buffer.from(clineAuthShot.data, 'base64'));
@@ -392,19 +424,25 @@ try {
   const dialogButton = async text => {
     await until(() => evaluate('!!document.querySelector("[role=alertdialog]")'), 5_000, 'engine removal confirmation');
     await evaluate(`Array.from(document.querySelectorAll('[role=alertdialog] button')).find(button => button.textContent?.trim() === ${JSON.stringify(text)}).click()`);
-    await until(() => evaluate('!document.querySelector("[role=alertdialog]")'), 10_000, 'engine removal confirmation closed');
+    // Runtime disposal and Windows file release are asynchronous. Require the
+    // actual completion (and the disk/account assertions below), using the
+    // same bounded budget as installation rather than a ten-second UI budget.
+    await until(() => evaluate('!document.querySelector("[role=alertdialog]")'), text === 'Cancel' ? 10_000 : 90_000, 'engine removal confirmation closed');
   };
   if (!(await runtimeStatus()).installed) throw new Error('No managed Cline runtime before uninstall');
   await cardButton('cline', 'Uninstall engine');
   await until(() => evaluate('document.activeElement?.textContent === "Cancel"'), 5_000, 'safe uninstall confirmation focus');
   const removalShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
-  await writeFile(resolve('output/playwright/hattera-engine-uninstall.png'), Buffer.from(removalShot.data, 'base64'));
+  await writeFile(join(screenshotRoot, 'hattera-engine-uninstall.png'), Buffer.from(removalShot.data, 'base64'));
   await dialogButton('Cancel');
   if (!(await runtimeStatus()).installed) throw new Error('Cancel removed the engine');
   await cardButton('cline', 'Uninstall engine');
   await dialogButton('Uninstall engine');
   const afterRemoval = await runtimeStatus();
-  if (afterRemoval.installed || !afterRemoval.accountKept) throw new Error(`Uninstall did not remove software and preserve the account: ${JSON.stringify(afterRemoval)}`);
+  if (afterRemoval.installed || !afterRemoval.accountKept) {
+    const feedback = await evaluate('document.querySelector("[data-engine-card=cline] [data-engine-runtime-removal]")?.innerText');
+    throw new Error(`Uninstall did not remove software and preserve the account: ${JSON.stringify(afterRemoval)}; feedback: ${feedback}`);
+  }
   await send('Page.reload');
   await until(() => evaluate('!!document.querySelector("[data-sidebar] button[aria-haspopup=menu]")'), 15_000, 'chat after reload');
   await evaluate('Array.from(document.querySelectorAll("[data-sidebar] button[aria-haspopup=menu]")).at(-1).click()');
@@ -425,7 +463,50 @@ try {
   if (!qwenRemoved?.runtimeRemoval?.removed || qwenRemoved.models.options.length) throw new Error('External runtime remained selectable after disable');
   await cardButton('qwen', 'Enable existing server installation');
   await until(async () => !(await (await fetch(new URL('/api/instances', base))).json()).instances.find(instance => instance.instanceId === 'qwen')?.runtimeRemoval?.removed, 10_000, 'explicit external runtime restore');
-  console.log(JSON.stringify({ ok: true, checks: ['chat-reply', 'opencode-model-picker', 'opencode-acp-reply', 'opencode-provider-card', 'minimax-setup-card', 'qwen-setup-card', 'codex-auth-choices', 'cline-browser-server-install', 'cline-browser-device-auth', 'engine-removal-sign-in-guard', 'engine-uninstall-cancel', 'engine-uninstall-reinstall-account-preserved', 'external-engine-disable-restore', 'bedrock-provider-setup', 'browser-navigation', 'browser-release', 'bot-settings-navigation', 'bot-browser-permission', 'bot-creation', 'bot-identity-edit', 'bot-memory-edit', 'bot-tool-selection', 'bot-skill-authoring', 'bot-approval-level', 'mobile-chat-layout', 'pairing-skin-contrast', 'remote-browser-pairing'], previewUrl: base.href, testPage, screenshots: [pickerScreenshot, providerScreenshot, miniMaxScreenshot, qwenScreenshot, codexScreenshot, codexCodeScreenshot, output, mobileScreenshot, darkPairScreenshot, pairScreenshot, clineAuthScreenshot] }));
+  stage = 'independent account profiles';
+  await cardButton('cline', 'Add another account');
+  await evaluate('document.querySelector("[data-provider-profiles=cline] form input").focus()');
+  await send('Input.insertText', { text: 'Independent Cline account' });
+  await evaluate('document.querySelector("[data-provider-profiles=cline] form").requestSubmit()');
+  const profileId = await until(async () => (await (await fetch(new URL('/api/instances', base))).json()).instances.find(instance => instance.displayName === 'Independent Cline account')?.instanceId, 20_000, 'new independent account');
+  await until(() => evaluate(`!!document.querySelector('[data-engine-card="${profileId}"]')`), 10_000, 'new account card');
+  await evaluate(`document.querySelector('[data-engine-card="${profileId}"] > summary').click()`);
+  await evaluate(`Array.from(document.querySelectorAll('[data-engine-card="${profileId}"] summary')).find(item => item.textContent.trim() === 'Manage account profile').click()`);
+  await evaluate(`document.querySelector('[data-provider-profiles="${profileId}"] form input').focus(); document.querySelector('[data-provider-profiles="${profileId}"] form input').select()`);
+  await send('Input.insertText', { text: 'Renamed Cline account' });
+  await evaluate(`document.querySelector('[data-provider-profiles="${profileId}"] form').requestSubmit()`);
+  await until(async () => (await (await fetch(new URL('/api/instances', base))).json()).instances.find(instance => instance.instanceId === profileId)?.displayName === 'Renamed Cline account', 20_000, 'renamed account');
+  const profileScreenshot = join(screenshotRoot, 'hattera-account-profile.png');
+  await writeFile(profileScreenshot, Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })).data, 'base64'));
+  await cardButton(profileId, 'Remove account');
+  await dialogButton('Remove account');
+  await until(async () => !(await (await fetch(new URL('/api/instances', base))).json()).instances.some(instance => instance.instanceId === profileId), 20_000, 'removed account');
+  if (!(await runtimeStatus()).installed || !(await runtimeStatus()).accountKept) throw new Error('Removing an account changed the shared engine or its original login');
+  await evaluate('document.querySelector(\'button[aria-label="Close settings"]\').click()');
+  await until(() => evaluate('!document.querySelector("[role=dialog] [data-settings-page=ai]")'), 10_000, 'Settings closure for group sharing');
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  const sharingResponse = await fetch(new URL('/api/groups', base), { method: 'POST', headers: { 'content-type': 'application/json', origin: base.origin }, body: JSON.stringify({ name: 'Sharing fixture group', memberIds: [createdBot.id], setup: { bulletin: '', defaultResponder: { kind: 'mentions' } } }) });
+  if (sharingResponse.status !== 201) throw new Error(`Could not prepare sharing fixture: ${sharingResponse.status}`);
+  const sharingGroup = (await sharingResponse.json()).group;
+  await until(() => evaluate(`!!document.querySelector('[data-sidebar-group-row="${sharingGroup.id}"]')`), 10_000, 'shared group in existing sidebar');
+  await evaluate(`document.querySelector('[data-sidebar-group-row="${sharingGroup.id}"]').click()`);
+  await until(() => evaluate('!!document.querySelector(\'button[aria-label="Share this group"]\')'), 10_000, 'group sharing control');
+  await evaluate('document.querySelector(\'button[aria-label="Share this group"]\').click()');
+  const sharingPanel = 'section[aria-label="Share this group"]';
+  await until(() => evaluate(`!!document.querySelector(${JSON.stringify(`${sharingPanel} input[autocomplete=name]`)})`), 10_000, 'group sharing setup');
+  const startSharingState = await evaluate(`(() => { const panel = document.querySelector(${JSON.stringify(sharingPanel)}); const button = Array.from(panel.querySelectorAll('button')).find(item => item.textContent.trim() === 'Start sharing this group'); return { disabled: button?.disabled, history: panel.querySelector('input[type=checkbox]')?.checked, privateNotice: panel.innerText.includes('credentials') }; })()`);
+  if (!startSharingState.disabled || startSharingState.history !== false || !startSharingState.privateNotice) throw new Error(`Sharing ignored consent or network state: ${JSON.stringify(startSharingState)}`);
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await pause(300);
+  const sharingLayout = await evaluate(`(() => { const panel = document.querySelector(${JSON.stringify(sharingPanel)}); const rect = panel.getBoundingClientRect(); return { left: rect.left, right: rect.right, overflow: panel.scrollWidth > panel.clientWidth + 1 }; })()`);
+  if (sharingLayout.left < 0 || sharingLayout.right > 390 || sharingLayout.overflow) throw new Error(`Sharing panel does not fit a phone: ${JSON.stringify(sharingLayout)}`);
+  const sharingScreenshot = join(screenshotRoot, 'hattera-group-sharing-mobile.png');
+  await writeFile(sharingScreenshot, Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })).data, 'base64'));
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
+  await until(() => evaluate(`!document.querySelector(${JSON.stringify(sharingPanel)})`), 10_000, 'sharing panel keyboard closure');
+  if (!(await evaluate('document.activeElement?.getAttribute("aria-label") === "Share this group"'))) throw new Error('Closing group sharing did not return keyboard focus to its trigger');
+  console.log(JSON.stringify({ ok: true, checks: ['group-sharing-consent-network-mobile', 'independent-account-create-rename-remove', 'all-account-reporting', 'packaged-private-network-controls', 'chat-reply', 'opencode-model-picker', 'opencode-acp-reply', 'opencode-provider-card', 'minimax-setup-card', 'qwen-setup-card', 'codex-auth-choices', 'cline-browser-server-install', 'cline-browser-device-auth', 'engine-removal-sign-in-guard', 'engine-uninstall-cancel', 'engine-uninstall-reinstall-account-preserved', 'external-engine-disable-restore', 'bedrock-provider-setup', 'browser-navigation', 'browser-release', 'bot-settings-navigation', 'bot-browser-permission', 'bot-creation', 'bot-identity-edit', 'bot-memory-edit', 'bot-tool-selection', 'bot-skill-authoring', 'bot-approval-level', 'mobile-chat-layout', 'pairing-skin-contrast', 'remote-browser-pairing'], previewUrl: base.href, testPage, screenshots: [sharingScreenshot, profileScreenshot, accountScreenshot, mobileAccountScreenshot, networkScreenshot, mobileNetworkScreenshot, pickerScreenshot, providerScreenshot, miniMaxScreenshot, qwenScreenshot, codexScreenshot, codexCodeScreenshot, output, mobileScreenshot, darkPairScreenshot, pairScreenshot, clineAuthScreenshot] }));
 } catch (error) {
   throw new Error(`Browser check failed during ${stage}: ${error.message}`, { cause: error });
 } finally {

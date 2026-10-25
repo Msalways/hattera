@@ -1,0 +1,70 @@
+{
+  "ok": true,
+  "runId": "hattera-team-367f725f",
+  "recordedAt": "2026-10-25T04:02:48.180Z",
+  "transport": "Simulated Tailscale transport; real signed/encrypted application packets over Docker bridge",
+  "provider": "Real OpenCode 1.19.0 and public free MiMo model; separate profiles, not paid vendor identities",
+  "localGroupIds": [
+    "56d1b666-d56c-47f7-8fd9-13f351f9f489",
+    "c600dc5b-dda2-4153-9299-72fe026c1bff",
+    "68cb57bf-bd3f-4845-92bf-483c59254bec"
+  ],
+  "unavailableLinksRejected": 3,
+  "freshLaunches": 3,
+  "authenticatedReloads": 3,
+  "groupId": "b50fa2f1-3073-432d-a7de-f34bd33c256f",
+  "execution": {
+    "id": "091628fc-8ef3-4096-8afe-96546d0bb3f0",
+    "owner": "Bob",
+    "account": "bob OpenCode",
+    "model": "opencode/mimo-v2.6-flash-free",
+    "nativeTurns": [
+      "352c394a-bd8e-4d30-8c3a-6a54c4034196"
+    ],
+    "result": "BOB_UPDATED_ed3e7b42a8c346cab7e3669901dfc7de",
+    "usage": {
+      "input": 27833,
+      "output": 33,
+      "tokensReported": true,
+      "costUsd": null
+    },
+    "promptContainsExpectedFact": false,
+    "repliesPerInstallation": 1,
+    "requester": "Alice",
+    "driver": "opencodeGo"
+  },
+  "posterTimeMs": 137837,
+  "sharingViewportChecks": [
+    390,
+    640,
+    768,
+    1280
+  ],
+  "video": {
+    "file": "three-cli-team.mp4",
+    "durationSeconds": 143.25,
+    "captureDurationSeconds": 143.27,
+    "width": 1920,
+    "height": 1080,
+    "fps": 12,
+    "framesCapturedPerBrowser": 272,
+    "cuts": false,
+    "droppedSamples": 0,
+    "audio": false,
+    "sha256": "2b8a91ec064e4f6ff1de2fe5338e9f23f02fe7ddb879bd9df5ee552a15839035",
+    "decode": "FFmpeg full-file decode passed"
+  },
+  "validation": {
+    "pairingAndRequestAuthTests": 58,
+    "frontendBuild": "passed",
+    "frontendTypecheck": "passed",
+    "e2eScriptsTypecheck": "passed",
+    "focusedLint": "passed",
+    "responsiveSharingPanelWidths": [
+      390,
+      640,
+      768,
+      1280
+    ]
+  }
+}

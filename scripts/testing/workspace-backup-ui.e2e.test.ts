@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { resolveAgentBrowserBinary } from "../../server/browser-engine.ts";
 import { waitForExit } from "../../server/testing/cleanup.ts";
-import { runControlOmb } from "../control-omb.ts";
-import { UI_TOOLS_DIR } from "./control-omb-ui.ts";
+import { runControlOmb } from "../control-hattera.ts";
+import { UI_TOOLS_DIR } from "./control-hattera-ui.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const binary = resolveAgentBrowserBinary({ dataDir: UI_TOOLS_DIR, env: process.env });
@@ -26,7 +26,7 @@ describe("full backup Settings in the real renderer", () => {
   (enabled ? it : it.skip)("uses passwords, a file preview and explicit replacement without leaking secrets", async () => {
     let stdout = "";
     let stderr = "";
-    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-omb.ts"), "ui", "launch"], {
+    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-hattera.ts"), "ui", "launch"], {
       cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"],
     });
     child.stdout!.on("data", (chunk: Buffer) => { stdout += String(chunk); });
@@ -124,7 +124,7 @@ describe("full backup Settings in the real renderer", () => {
     const evidence = join(ROOT, ".omb-scratch", "verify-evidence", "workspace-backup-preview.png");
     await ui("screenshot", "--out", evidence);
     await click("Replace installation");
-    await expect.poll(snapshot, { timeout: 10_000 }).toContain("Fully quit OpenMausBot");
+    await expect.poll(snapshot, { timeout: 10_000 }).toContain("Fully quit Hattera");
     expect(await evaluate("window.backupFixture.calls.find(call => call.path.endsWith('/restore')).body")).toEqual({ id: "validated-stage", confirmation: "REPLACE" });
     expect(await evaluate("window.backupFixture.calls.find(call => call.path.endsWith('/upload')).rawFile")).toBe(true);
     expect(await evaluate("localStorage.getItem('omb-pending-workspace-restore')")).toBe("validated-stage");

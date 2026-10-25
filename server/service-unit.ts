@@ -1,6 +1,6 @@
-// `openmausbot service install`: keep the server running across reboots.
+// `hattera service install`: keep the server running across reboots.
 // Renders a systemd unit (Linux) or a launchd agent (macOS) that runs the
-// same `openmausbot serve …` the operator just used, and either installs it
+// same `hattera serve …` the operator just used, and either installs it
 // (when allowed to) or writes it next to the data and prints the two
 // commands that install it. Pure rendering lives here so it is testable;
 // the CLI decides where the file goes.
@@ -44,9 +44,9 @@ export function serviceCommand(spec: Pick<ServiceSpec, "node" | "script" | "serv
 
 export function systemdUnit(spec: ServiceSpec): string {
   const lines = [
-    "# Written by `openmausbot service install`. Re-run it to change the options.",
+    "# Written by `hattera service install`. Re-run it to change the options.",
     "[Unit]",
-    `Description=OpenMausBot${spec.label ? ` (${spec.label})` : ""}`,
+    `Description=Hattera${spec.label ? ` (${spec.label})` : ""}`,
     "After=network-online.target",
     "Wants=network-online.target",
     "",
@@ -117,7 +117,7 @@ export function launchdPlist(spec: ServiceSpec): string {
 export function unstableInstallWarning(script: string): string | null {
   const normalized = script.replace(/\\/g, "/");
   if (/\/_npx\//.test(normalized) || /\/\.npm\/_npx\//.test(normalized)) {
-    return `this command runs from an npx cache (${dirname(script)}), which npm may delete at any time. Install it permanently first (npm install -g openmausbot) and run \`openmausbot service install\` from that install.`;
+    return `this command runs from an npx cache (${dirname(script)}), which npm may delete at any time. Install your Hattera release tarball permanently first (npm install -g ./hattera-VERSION.tgz) and run \`hattera service install\` from that install.`;
   }
   return null;
 }

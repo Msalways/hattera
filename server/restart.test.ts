@@ -1,6 +1,6 @@
 // Exit code 75, "start me again" (server/restart.ts): a server whose copied
 // workspace committed exits with it, and every launcher in this repo starts
-// it again: the `openmausbot serve` loop (systemd, launchd, fleet and a
+// it again: the `hattera serve` loop (systemd, launchd, fleet and a
 // terminal all run that) and the container launcher. The Cloud launcher and
 // the desktop's supervisor are covered where they live.
 import { EventEmitter } from "node:events";

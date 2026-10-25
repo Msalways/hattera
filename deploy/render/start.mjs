@@ -1,6 +1,10 @@
 import { spawn } from "node:child_process";
 import { superviseServer } from "../dist-server/server-launcher.js";
 
+// This entry point always hosts a server, even when invoked from a terminal.
+delete process.env.OMB_LOCAL_CLI;
+process.env.OMB_LOOPBACK_TRUST ??= "service";
+
 const publicUrl = process.env.RENDER_EXTERNAL_URL;
 const onRender = process.env.RENDER === "true" || Boolean(publicUrl);
 if (onRender && !publicUrl?.startsWith("https://")) {
@@ -38,6 +42,12 @@ if (edge) {
 }
 // Keep Caddy and the restart supervisor in one Node process. A separate
 // launcher costs tens of MB that OpenCode needs on a 512 MB Render instance.
-const code = await superviseServer(() => spawn(process.execPath, ["/app/dist-server/index.js"], { stdio: "inherit" }));
+// A non-GitHub self-hosted install still needs its first pairing code. Reuse
+// serve's private stdin bootstrap rather than granting the browser local owner
+// access. GitHub/Render hosting keeps its existing direct server supervisor.
+const entry = !onRender && !process.env.GITHUB_CLIENT_ID
+  ? ["/app/dist-server/hattera.js", "serve", "--no-open"]
+  : ["/app/dist-server/index.js"];
+const code = await superviseServer(() => spawn(process.execPath, entry, { stdio: "inherit" }));
 if (!stopping) stopEdge("SIGTERM");
 process.exitCode = edgeExitCode ?? code;

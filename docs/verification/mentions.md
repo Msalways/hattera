@@ -61,9 +61,9 @@ node --experimental-strip-types scripts/verify-mentions.ts --bot-mentions
 # English @Juniper review this
 # שלום @調査担当 תודה
 # Capture before/after and press Enter to send.
-node --experimental-strip-types scripts/control-omb.ts channels --url http://127.0.0.1:20657
-node --experimental-strip-types scripts/control-omb.ts wait --channel 18b5bfe7-deb0-4962-b3b4-414e9ab90492 --timeout 60 --url http://127.0.0.1:20657
-node --experimental-strip-types scripts/control-omb.ts messages --channel 18b5bfe7-deb0-4962-b3b4-414e9ab90492 --limit 20 --url http://127.0.0.1:20657
+node --experimental-strip-types scripts/control-hattera.ts channels --url http://127.0.0.1:20657
+node --experimental-strip-types scripts/control-hattera.ts wait --channel 18b5bfe7-deb0-4962-b3b4-414e9ab90492 --timeout 60 --url http://127.0.0.1:20657
+node --experimental-strip-types scripts/control-hattera.ts messages --channel 18b5bfe7-deb0-4962-b3b4-414e9ab90492 --limit 20 --url http://127.0.0.1:20657
 ```
 
 Printed log:
@@ -128,14 +128,14 @@ Run details (2026-09-07, isolated API `http://127.0.0.1:21621`, renderer
 
 ```sh
 node --experimental-strip-types scripts/verify-mentions.ts
-node --experimental-strip-types scripts/control-omb.ts channels --url http://127.0.0.1:21621
+node --experimental-strip-types scripts/control-hattera.ts channels --url http://127.0.0.1:21621
 # Fill the real channel composer with the following three lines, switch Light,
 # and press Enter. Refill the same draft after sending for screenshot comparison.
 # @Atlas first. @Juniper second. @調査担当 third.
 # @調査担当 reverse. @Juniper again. @Atlas last.
 # @everyone neutral. @Ghost plain.
-node --experimental-strip-types scripts/control-omb.ts wait --channel ec952c04-4e41-4a13-ba87-8c79b3137c05 --timeout 60 --url http://127.0.0.1:21621
-node --experimental-strip-types scripts/control-omb.ts messages --channel ec952c04-4e41-4a13-ba87-8c79b3137c05 --limit 20 --url http://127.0.0.1:21621
+node --experimental-strip-types scripts/control-hattera.ts wait --channel ec952c04-4e41-4a13-ba87-8c79b3137c05 --timeout 60 --url http://127.0.0.1:21621
+node --experimental-strip-types scripts/control-hattera.ts messages --channel ec952c04-4e41-4a13-ba87-8c79b3137c05 --limit 20 --url http://127.0.0.1:21621
 ```
 
 The printed server log was
@@ -166,12 +166,12 @@ This preview checks DM rendering only; no message was sent from that preview.
 
 ```sh
 node --experimental-strip-types scripts/verify-mentions.ts --bot-mentions
-node --experimental-strip-types scripts/control-omb.ts channels --url http://127.0.0.1:21580
+node --experimental-strip-types scripts/control-hattera.ts channels --url http://127.0.0.1:21580
 # In the printed previewUrl, fill the channel composer with
 # @Atlas Please ask the team to review.
 # and press Enter.
-node --experimental-strip-types scripts/control-omb.ts wait --channel 2ee9e176-5270-4211-9968-af5baa0eef39 --timeout 60 --url http://127.0.0.1:21580
-node --experimental-strip-types scripts/control-omb.ts messages --channel 2ee9e176-5270-4211-9968-af5baa0eef39 --limit 20 --url http://127.0.0.1:21580
+node --experimental-strip-types scripts/control-hattera.ts wait --channel 2ee9e176-5270-4211-9968-af5baa0eef39 --timeout 60 --url http://127.0.0.1:21580
+node --experimental-strip-types scripts/control-hattera.ts messages --channel 2ee9e176-5270-4211-9968-af5baa0eef39 --limit 20 --url http://127.0.0.1:21580
 ```
 
 Recorded on 2026-09-07; printed log:

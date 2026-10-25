@@ -787,6 +787,16 @@ describe("Store", () => {
     expect(bot).toMatchObject({ approvalMode: "full", autoApprove: false, alwaysAllow: ["old-tool"] });
   });
 
+  it("keeps incomplete native token subtotals incomplete through later turns and restart", () => {
+    const store = new Store(selection);
+    const bot = store.createBot();
+    store.addTaskUsage(bot.id, bot.threadId, { input: 12, output: 0, tokensReported: false, costUsd: 0.01 });
+    expect(store.taskByThread(bot.id, bot.threadId)?.usage).toMatchObject({ input: 12, tokensReported: false, lastTurn: { tokensReported: false } });
+    store.addTaskUsage(bot.id, bot.threadId, { input: 5, output: 3, costUsd: null });
+    expect(new Store(selection).taskByThread(bot.id, bot.threadId)?.usage).toMatchObject({ input: 17, output: 3, turns: 2, tokensReported: false });
+    expect(store.taskByThread(bot.id, bot.threadId)?.usage?.lastTurn?.tokensReported).toBeUndefined();
+  });
+
   it("addTaskUsage accumulates settled-turn totals per task and survives a restart", () => {
     const store = new Store(selection);
     const bot = store.createBot();
@@ -799,6 +809,7 @@ describe("Store", () => {
     });
     // a driver that never reports the cached share leaves it unchanged
     store.addTaskUsage(bot.id, bot.threadId, { input: 800, output: 100, costUsd: null });
+    expect(store.taskByThread(bot.id, bot.threadId)?.usage?.cachedInputReported).toBe(false);
     store.addTaskUsage(bot.id, bot.threadId, { input: Number.NaN, output: -20, cachedInput: -5, costUsd: null });
     // Providers occasionally report a cache count larger than input; keep the
     // persisted share physically possible so percentages cannot exceed 100%.

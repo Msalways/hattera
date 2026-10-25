@@ -33,6 +33,6 @@ export interface TurnDigest {
   memoryDropped?: number;
   /** First sentence of the terminal assistant text, at most REPLY_CHARS. */
   reply: string;
-  usage?: { input: number; output: number; cachedInput?: number; costUsd?: number | null };
+  usage?: { input: number; output: number; cachedInput?: number; tokensReported?: boolean; costUsd?: number | null };
   hookCoverage: HookCoverage;
 }

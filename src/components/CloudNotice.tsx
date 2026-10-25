@@ -19,7 +19,7 @@ import { NoticeCard, NotNowButton, PRIMARY_BUTTON } from "./NoticeCard";
 
 /** Not now on the My Cloud card, kept so it does not come back. */
 export const CLOUD_NOTICE_DISMISSED = "cloud-notice-my-cloud-dismissed";
-/** Not now on either sign-in card, kept the same way. Settings → OpenMausBot
+/** Not now on either sign-in card, kept the same way. Settings → Hattera
  * Cloud still shows the state and its one action. */
 export const CLOUD_NOTICE_SIGN_IN_DISMISSED = "cloud-notice-sign-in-dismissed";
 

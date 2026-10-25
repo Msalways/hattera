@@ -23,6 +23,15 @@ if (!window.ogb?.platform) document.documentElement.dataset.browserBrand = "hatt
 applySkin(readSkin());
 applyFont(readFont());
 
+// Browsers keep the current document when a new pairing link changes only its
+// fragment. Re-enter bootstrap so a fresh link replaces an expired attempt.
+// Credentials stay in the fragment until chooseRoot consumes them on reload.
+window.addEventListener("hashchange", () => {
+  if (location.pathname !== "/pair") return;
+  const values = new URLSearchParams(location.hash.slice(1));
+  if (values.has("code") || values.has("signin")) location.reload();
+});
+
 /** A pairing link lands on /pair. A remote browser without a session lands
  * there too, because every API call would otherwise fail with "pair this
  * device"; on the owner's own machine the server trusts loopback and this

@@ -33,7 +33,7 @@ function nvmBinDirs(): string[] {
  * temporary home. The machine-wide install dirs and the login shell's PATH
  * would hand it this computer's real CLIs — a Homebrew `codex` made the
  * fixture's ChatGPT plan engine "available" on a developer Mac (#2035).
- * Only the verification launcher (scripts/control-omb.ts) sets it. */
+ * Only the verification launcher (scripts/control-hattera.ts) sets it. */
 function sealedFixture(): boolean {
   return process.env.OMB_TEST_SEALED_PATH === "1";
 }
