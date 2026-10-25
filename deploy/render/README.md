@@ -18,6 +18,27 @@ For a custom image that includes selected CLIs, `ENGINES` is an optional
 build argument; the default image includes none.
 Remove any `ENGINES` value from an existing Render service to use this default.
 
+## Manual deployment from GitHub Actions
+
+The Blueprint sets `autoDeployTrigger: 'off'`, so Render does not deploy each
+commit. Apply/sync the updated Blueprint for an existing Blueprint-managed
+service. For a manually created service, set **Settings → Auto-Deploy → Off**
+once in Render; a repository edit alone cannot update that service's settings.
+
+1. Copy the service's secret **Deploy Hook** URL from its Render Settings page.
+2. In GitHub **Settings → Secrets and variables → Actions**, save it as the
+   repository secret **RENDER_DEPLOY_HOOK_URL**. Do not add it to Git or chat.
+3. Open **Actions → Deploy to Render → Run workflow** and select the branch or
+   tag to deploy. This workflow has no push or release trigger.
+
+The action sends Render the selected commit SHA using the hook's `ref`
+parameter. Render documents that this also disables automatic deployments for
+the Git-backed service. See [Render deploy hooks](https://render.com/docs/deploy-hooks)
+and [specific-commit deployment behavior](https://render.com/docs/deploys#deploying-a-specific-commit).
+A successful action means Render accepted or queued the request. Follow its
+build logs and health status in the Render dashboard to confirm the app is live.
+CI, Docker image builds and npm publication do not invoke this deploy hook.
+
 ## If deployment reports 502 or out of memory
 
 Check the runtime log before changing proxy ports. `dial tcp

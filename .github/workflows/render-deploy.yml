@@ -1,0 +1,47 @@
+name: Deploy to Render
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Request Render deployment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Deploy the selected commit
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          const hook = process.env.RENDER_DEPLOY_HOOK_URL;
+          if (!hook) throw new Error('Set the RENDER_DEPLOY_HOOK_URL repository secret from the Render service Settings page.');
+          let url;
+          try { url = new URL(hook); } catch { throw new Error('The Render deploy hook URL is invalid.'); }
+          if (url.origin !== 'https://api.render.com' || !/^\/deploy\/srv-[a-z0-9]+$/.test(url.pathname) || !url.searchParams.get('key') || url.username || url.password) {
+            throw new Error('Use the HTTPS deploy hook URL supplied by Render.');
+          }
+          // Pin the action's selected commit. Render also disables automatic
+          // Git deployments when a deploy hook specifies a commit ref.
+          url.searchParams.set('ref', process.env.GITHUB_SHA);
+          let response;
+          try { response = await fetch(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000) }); }
+          catch { throw new Error('Render did not accept the request; check connectivity and the deploy hook secret.'); }
+          await response.body?.cancel();
+          if (![200, 202].includes(response.status)) throw new Error(`Render rejected the deploy request (HTTP ${response.status}).`);
+          const message = `Render ${response.status === 202 ? 'queued' : 'accepted'} deployment of ${process.env.GITHUB_SHA}. Check the Render dashboard for build and health status.`;
+          console.log(message);
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, message + '\n');
+          NODE

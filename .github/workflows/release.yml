@@ -631,6 +631,7 @@ jobs:
         env:
           CANONICAL_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.prepare.outputs.version }}
+          NPM_PUBLISH: ${{ vars.HATTERA_NPM_PUBLISH_ENABLED == 'true' }}
         run: |
           # The bridge build points at the canonical feed. Publish and verify
           # that destination before making the build visible to legacy clients.
@@ -642,7 +643,6 @@ jobs:
           # Publishing created the tag with this workflow's token, and GitHub
           # starts no workflow from events that token creates. Start the two
           # tag-driven publishes by hand, on the tag, so they see refs/tags/v*.
-          for workflow in npm-package.yml docker.yml; do
-            GH_TOKEN="$CANONICAL_TOKEN" gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref "v$VERSION"
-          done
-          echo "dispatched the npm package and Docker image publishes on v$VERSION"
+          GH_TOKEN="$CANONICAL_TOKEN" gh workflow run npm-package.yml --repo "$GITHUB_REPOSITORY" --ref "v$VERSION" --field "publish=$NPM_PUBLISH"
+          GH_TOKEN="$CANONICAL_TOKEN" gh workflow run docker.yml --repo "$GITHUB_REPOSITORY" --ref "v$VERSION"
+          echo "dispatched npm qualification (publish=$NPM_PUBLISH) and Docker image publication on v$VERSION"

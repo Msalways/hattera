@@ -82,9 +82,12 @@ Linux x64. Every matrix installation must pass before the publish job can run.
 Cross-compiling a network helper does not qualify the application's runtime on
 that platform. A configured matrix is not evidence that its jobs have passed.
 
-Publication additionally requires this fork's npm package ownership/trusted
-publisher and the explicit `HATTERA_NPM_PUBLISH_ENABLED` repository setting.
-Neither a local test nor a manual qualification dispatch publishes to npm.
+Publication requires this fork's npm package ownership and authorized trusted
+publisher or bootstrap token. In **Actions → Publish npm package**, checking
+**Publish** explicitly enables publication after verification; leaving it
+unchecked performs qualification only. Matching version-tag pushes additionally
+require `HATTERA_NPM_PUBLISH_ENABLED=true` to publish automatically. See the
+[npm publishing setup](../releasing.md#publish-the-npm-package-from-actions).
 
 For current local evidence, use the JSON reports under `output/npm-install/`.
 Linux Docker checks and Windows checks must be reported separately. A Windows

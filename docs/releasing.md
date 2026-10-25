@@ -13,9 +13,37 @@ implied by the rebrand. macOS signing must match the new com.hattera.app identit
 
 Set the repository Actions variable HATTERA_RELEASE_ENABLED=true when the release
 configuration is ready. Without it the release jobs remain disabled. The default
-release is a draft for review. HATTERA_NPM_PUBLISH_ENABLED=true additionally
-permits registry publishing after the package name and npm trusted publisher are
-authorized for this repository. Local builds and tarballs need neither flag.
+release is a draft for review. HATTERA_NPM_PUBLISH_ENABLED=true enables automatic
+npm publishing for matching version tags after npm authorization is configured.
+Manual npm publication uses the Publish checkbox described below and does not
+require the desktop release flag. Local builds and tarballs need neither flag.
+
+## Publish the npm package from Actions
+
+1. Confirm you own the npm name `hattera`. Update the version in `package.json`
+   before publishing a new release; npm versions cannot be overwritten.
+2. Configure npm trusted publishing for GitHub owner **Msalways**, repository
+   **hattera**, workflow **npm-package.yml**, with **Allow npm publish** enabled.
+   See [npm's trusted publisher setup](https://docs.npmjs.com/trusted-publishers/).
+   For a first publication before a trusted publisher exists, add a granular npm
+   publishing token as the GitHub repository secret **NPM_TOKEN**, with the
+   package creation/write and CI 2FA permissions your npm account requires.
+   Remove that secret after switching to trusted publishing. Never put tokens in
+   source files or workflow inputs.
+3. Open **Actions → Publish npm package → Run workflow**. Select `main` or a
+   `vVERSION` tag matching `package.json`, and check **Publish**. Leaving it
+   unchecked always performs verification only, including when running on a tag.
+4. The workflow builds one tarball and runs all eight native installation jobs.
+   Only their success permits publication of that same artifact, with provenance.
+   Stable versions use the `latest` npm tag; prereleases use `next`.
+
+An optional `v*` tag push publishes automatically only when
+**HATTERA_NPM_PUBLISH_ENABLED=true**. The desktop Release workflow forwards that
+same setting explicitly when dispatching npm publication. The npm token is
+available only to the publish step, never to package builds or provider fixtures.
+
+Render deployment is a separate, optional manual action. See the
+[Render deployment guide](../deploy/render/README.md#manual-deployment-from-github-actions).
 
 ## Build and verify
 
