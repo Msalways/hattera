@@ -55,7 +55,10 @@ HATTERA_VERIFY_NPM_PROVIDERS=1 HATTERA_VERIFY_NPM_BROWSER=1 node scripts/testing
 
 On PowerShell, set those variables with `$env:NAME = '1'` for the command's
 session. Use a disposable Linux container for this check: Linux browser setup
-uses `--with-deps`, which installs OS libraries and requires root or working sudo.
+uses `--with-deps`, which installs OS libraries. The current vendor installer
+requires working `sudo` even for root, plus system CA certificates. A minimal
+Debian Node image needs `apt-get update && apt-get install -y sudo ca-certificates`
+before this check. Neither engines nor Chromium should be preinstalled.
 The provider check enumerates every offered npm engine installer and requests
 each download through the same HTTP route used by Settings, starting without
 managed engines. Alias accounts are not duplicate downloads. Official shell

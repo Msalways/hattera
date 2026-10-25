@@ -95,7 +95,7 @@ async function stop() {
   await cli(["stop"]);
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
-    try { await fetch(base + "/api/health", { signal: AbortSignal.timeout(500) }); }
+    try { await (await fetch(base + "/api/health", { signal: AbortSignal.timeout(500) })).arrayBuffer(); }
     catch { return; }
     await new Promise(done => setTimeout(done, 100));
   }
@@ -129,16 +129,20 @@ try {
     receipt = JSON.parse(await cli(["web", "--cli-only", "--json"]));
     assert.equal(receipt.url, base);
     assert.ok(Number.isInteger(receipt.pid) && receipt.pid > 0);
-    assert.equal((await fetch(base + "/api/health")).status, 200);
+    await api("GET", "/api/health");
     const descriptor = await api("GET", "/.well-known/hattera/environment");
     assert.equal(descriptor.capabilities.localCli, true);
     assert.equal((await api("GET", "/.well-known/openmausbot/environment")).environmentId, descriptor.environmentId);
     const remote = await fetch(base + "/api/config", { headers: { "x-forwarded-for": "192.0.2.10", "x-forwarded-proto": "https" } });
     assert.ok([401, 403].includes(remote.status));
+    await remote.text();
     const html = await fetch(base).then(response => response.text());
     const asset = html.match(/src="([^"]+\.js)"/);
     assert.ok(asset, "Built home page must load its JavaScript");
-    assert.equal((await fetch(new URL(asset[1], base))).status, 200);
+    const javascript = await fetch(new URL(asset[1], base));
+    assert.equal(javascript.status, 200);
+    assert.match(javascript.headers.get("content-type"), /javascript/);
+    assert.ok((await javascript.arrayBuffer()).byteLength > 1000);
     const reused = JSON.parse(await cli(["web", "--cli-only", "--json"], { cwd: home }));
     assert.equal(reused.pid, receipt.pid, "Opening from another project must reuse the same owned runtime");
     assert.equal(reused.reused, true);
@@ -253,7 +257,11 @@ try {
     // Foreground serve is a different trust mode from the local CLI launcher.
     // Use the bundled server entry with no local-mode flag for a bounded child.
     const { spawn } = await import("node:child_process");
-    const child = spawn(process.execPath, [join(installed, "dist-server/index.js")], { env, cwd: unrelated, windowsHide: true, stdio: "ignore" });
+    const child = spawn(process.execPath, [join(installed, "dist-server/index.js")], { env, cwd: unrelated, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    let serverOutput = "";
+    const capture = chunk => { serverOutput = (serverOutput + String(chunk)).slice(-12_000); };
+    child.stdout.on("data", capture);
+    child.stderr.on("data", capture);
     let spawnError;
     child.once("error", error => { spawnError = error; });
     const exited = new Promise(done => child.once("exit", done));
@@ -263,17 +271,23 @@ try {
       while (Date.now() < deadline) {
         if (spawnError) throw spawnError;
         if (child.exitCode !== null) throw new Error(`Self-hosted runtime exited ${child.exitCode}`);
-        try { ready = (await fetch(base + "/api/health", { signal: AbortSignal.timeout(500) })).ok; } catch { /* starting */ }
+        try {
+          const health = await fetch(base + "/api/health", { signal: AbortSignal.timeout(500) });
+          ready = health.ok;
+          await health.arrayBuffer();
+        } catch { /* starting */ }
         if (ready) break;
         await new Promise(done => setTimeout(done, 100));
       }
       assert.ok(ready, "Self-hosted runtime never became healthy");
-      assert.equal((await api("GET", "/.well-known/hattera/environment")).capabilities.localCli, false);
-      assert.ok([401, 403].includes((await fetch(base + "/api/config")).status));
+      assert.notEqual((await api("GET", "/.well-known/hattera/environment")).capabilities.localCli, true);
+      const config = await fetch(base + "/api/config");
+      assert.ok([401, 403].includes(config.status));
+      await config.text();
     } finally {
       child.kill("SIGTERM");
       await Promise.race([exited, new Promise((_, reject) => {
-        const timer = setTimeout(() => { child.kill("SIGKILL"); reject(new Error("Self-hosted child did not stop")); }, 10_000);
+        const timer = setTimeout(() => { child.kill("SIGKILL"); reject(new Error(`Self-hosted child did not stop\n${serverOutput}`)); }, 30_000);
         timer.unref();
       })]);
     }

@@ -62,6 +62,8 @@ jobs:
         node: [24]
         include:
           - os: ubuntu-24.04
+            node: 24.0.0
+          - os: ubuntu-24.04
             node: 26
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
