@@ -1,6 +1,7 @@
 // Assemble the `hattera` npm package: the self-contained server bundle,
 // the built UI, the bundled skills and the CLI, with a package.json of its
-// own. `npx hattera serve` then needs Node 24+ and nothing else.
+// own. npm installs the platform-specific Data bindings alongside the bundle.
+// Provider engines and browser tools have their own in-app setup.
 //
 //   pnpm build:server && pnpm exec vite build && node scripts/build-npm-package.mjs
 //   cd release/npm && npm pack        # or npm publish --access public
@@ -64,6 +65,16 @@ writeFileSync(
       bin: { hattera: "cli.js", openmausbot: "cli.js" },
       files: ["cli.js", "dist-server", "dist", "network", "skills", "enterprise", "LICENSE", "NOTICE", "README.md"],
       engines: { node: ">=24" },
+      os: ["darwin", "linux", "win32"],
+      cpu: ["x64", "arm64"],
+      // These are deliberately loaded at runtime (engine.ts / render.ts).
+      // Bundling cannot inline native addons; npm selects their native optional
+      // subpackages for the installation platform. Keep pins identical to dev.
+      dependencies: Object.fromEntries(["@duckdb/node-api", "@resvg/resvg-js"].map(name => {
+        const version = app.dependencies[name];
+        if (!/^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(version ?? "")) throw new Error(`Pin ${name} before npm packaging`);
+        return [name, version];
+      })),
       repository: app.repository,
       homepage: app.homepage,
       keywords: ["hattera", "agents", "self-hosted", "server"],

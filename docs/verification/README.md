@@ -6,6 +6,8 @@ reports, the platform matrix and optional Docker/live-network challenge checks.
 
 The [Hattera rebrand record](rebranding.md) covers identity, compatibility,
 packaging and the release checks that still require native platform qualification.
+The [npm installation check](npm.md) installs the real tarball outside the
+checkout and exercises Data, charts, runtime persistence and authentication.
 The [provider setup audit](provider-setup-audit.md),
 [Codex authentication audit](codex-auth-audit.md) and
 [collaboration audit](collaboration-audit.md) record their tested scope and gaps.

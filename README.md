@@ -114,6 +114,11 @@ hattera web
 Use a Hattera artifact built from this repository. A public npm publication or
 signed desktop release is not implied by the source checkout.
 
+npm installs the native Data and chart dependencies automatically. Provider
+engines, their account authorization and browser tools have their own setup.
+See [npm installation qualification](docs/verification/npm.md) for the actual
+install checks, platform release gate and remaining limits.
+
 ### Run as a self-hosted service with Docker
 
 With Docker's Linux engine running:
