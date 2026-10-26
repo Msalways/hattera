@@ -20,8 +20,7 @@ require the desktop release flag. Local builds and tarballs need neither flag.
 
 ## Publish the npm package from Actions
 
-1. Confirm you own the npm name `hattera`. Update the version in `package.json`
-   before publishing a new release; npm versions cannot be overwritten.
+1. Confirm you own the npm name `hattera`. npm versions cannot be overwritten.
 2. Configure npm trusted publishing for GitHub owner **Msalways**, repository
    **hattera**, workflow **npm-package.yml**, with **Allow npm publish** enabled.
    See [npm's trusted publisher setup](https://docs.npmjs.com/trusted-publishers/).
@@ -30,12 +29,32 @@ require the desktop release flag. Local builds and tarballs need neither flag.
    package creation/write and CI 2FA permissions your npm account requires.
    Remove that secret after switching to trusted publishing. Never put tokens in
    source files or workflow inputs.
-3. Open **Actions → Publish npm package → Run workflow**. Select `main` or a
-   `vVERSION` tag matching `package.json`, and check **Publish**. Leaving it
-   unchecked always performs verification only, including when running on a tag.
-4. The workflow builds one tarball and runs all eight native installation jobs.
-   Only their success permits publication of that same artifact, with provenance.
-   Stable versions use the `latest` npm tag; prereleases use `next`.
+3. Open **Actions → Publish npm package → Run workflow**, select `main`, choose
+   **Version change** and check **Publish**. The default is **patch**:
+
+   | Selection | Example from 0.1.107 |
+   | --- | --- |
+   | patch | 0.1.108 |
+   | minor | 0.2.0 |
+   | major | 1.0.0 |
+   | current | 0.1.107, unchanged |
+
+   Version arithmetic uses npm's own SemVer rules. Choose **current** when
+   publishing an already prepared version tag. Leaving **Publish** unchecked
+   previews and tests the selected version without committing or publishing it.
+4. The chosen version is applied before building the UI, server and npm tarball.
+   All eight native installation jobs test that artifact. After they pass, a
+   separate job commits `package.json` and creates `vVERSION` on `main` for a
+   bump, using one atomic push. Builds and tests have read-only repository access.
+   Only then is the same tested tarball published, with provenance. Stable
+   versions use `latest`; prereleases use `next`.
+
+Repository rules must permit the workflow's version commit/tag. A rejected push
+or a main branch that changes during qualification stops publication without
+overwriting anyone's changes. If npm authentication/publication fails after the
+version was recorded, fix that issue and rerun on the created `vVERSION` tag with
+**current**; do not increment again merely to retry. The separate **Prepare next
+release** PR flow remains available when main requires a reviewed version change.
 
 An optional `v*` tag push publishes automatically only when
 **HATTERA_NPM_PUBLISH_ENABLED=true**. The desktop Release workflow forwards that

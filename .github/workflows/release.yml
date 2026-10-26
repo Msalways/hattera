@@ -643,6 +643,6 @@ jobs:
           # Publishing created the tag with this workflow's token, and GitHub
           # starts no workflow from events that token creates. Start the two
           # tag-driven publishes by hand, on the tag, so they see refs/tags/v*.
-          GH_TOKEN="$CANONICAL_TOKEN" gh workflow run npm-package.yml --repo "$GITHUB_REPOSITORY" --ref "v$VERSION" --field "publish=$NPM_PUBLISH"
+          GH_TOKEN="$CANONICAL_TOKEN" gh workflow run npm-package.yml --repo "$GITHUB_REPOSITORY" --ref "v$VERSION" --field "publish=$NPM_PUBLISH" --field version_bump=current
           GH_TOKEN="$CANONICAL_TOKEN" gh workflow run docker.yml --repo "$GITHUB_REPOSITORY" --ref "v$VERSION"
           echo "dispatched npm qualification (publish=$NPM_PUBLISH) and Docker image publication on v$VERSION"

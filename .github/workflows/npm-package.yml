@@ -10,6 +10,16 @@ on:
         type: boolean
         required: false
         default: false
+      version_bump:
+        description: "Version change (use main for a bump; current retries an existing version/tag)"
+        type: choice
+        required: true
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+          - current
   push:
     tags: [ "v*" ]
   pull_request:
@@ -27,11 +37,16 @@ on:
       - server/web-launcher.ts
       - scripts/testing/verify-npm-install.mjs
       - scripts/build-npm-package.mjs
+      - scripts/npm-release.mjs
       - scripts/bundle-server.mjs
       - .github/workflows/npm-package.yml
 
 permissions:
   contents: read
+
+concurrency:
+  group: npm-package-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   pack-and-prove:
@@ -41,6 +56,8 @@ jobs:
     outputs:
       publish: ${{ steps.release.outputs.publish }}
       dist_tag: ${{ steps.release.outputs.dist_tag }}
+      base_version: ${{ steps.release.outputs.base_version }}
+      version: ${{ steps.release.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,23 +70,8 @@ jobs:
         env:
           MANUAL_PUBLISH: ${{ inputs.publish || false }}
           TAG_PUBLISH_ENABLED: ${{ vars.HATTERA_NPM_PUBLISH_ENABLED || 'false' }}
-        run: |
-          node --input-type=module <<'NODE'
-          import { appendFileSync, readFileSync } from 'node:fs';
-          const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
-          const { GITHUB_EVENT_NAME: event, GITHUB_REF: ref, GITHUB_REPOSITORY: repo } = process.env;
-          const releaseRef = `refs/tags/v${version}`;
-          if (ref.startsWith('refs/tags/v') && ref !== releaseRef) throw new Error('The release tag must match package.json version.');
-          const publish = event === 'workflow_dispatch'
-            ? process.env.MANUAL_PUBLISH === 'true'
-            : event === 'push' && ref === releaseRef && process.env.TAG_PUBLISH_ENABLED === 'true';
-          if (publish && (repo !== 'Msalways/hattera' || !['refs/heads/main', releaseRef].includes(ref))) {
-            throw new Error('Publish from Msalways/hattera main or the matching version tag.');
-          }
-          const tag = version.includes('-') ? 'next' : 'latest';
-          appendFileSync(process.env.GITHUB_OUTPUT, `publish=${publish}\ndist_tag=${tag}\n`);
-          console.log(publish ? `Will publish hattera@${version} as ${tag} after qualification.` : 'Verification only; npm publishing is disabled for this run.');
-          NODE
+          VERSION_BUMP: ${{ inputs.version_bump || 'current' }}
+        run: node scripts/npm-release.mjs plan
       - uses: pnpm/action-setup@ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3 # v6.0.10
       - run: pnpm install --frozen-lockfile
         env:
@@ -134,9 +136,32 @@ jobs:
           tar -xzf release/npm/hattera-*.tgz -C /tmp/hattera-fleet-package
           node scripts/testing/verify-fleet-shutdown.mjs /tmp/hattera-fleet-package/package/cli.js
 
+  record-version:
+    name: Record the qualified version and tag
+    needs: [pack-and-prove, install-and-prove]
+    if: needs.pack-and-prove.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Commit and tag only after qualification
+        env:
+          PUBLISH_REQUESTED: ${{ needs.pack-and-prove.outputs.publish }}
+          BASE_VERSION: ${{ needs.pack-and-prove.outputs.base_version }}
+          RELEASE_VERSION: ${{ needs.pack-and-prove.outputs.version }}
+        run: node scripts/npm-release.mjs record
+
   publish-npm:
     name: publish to npm
-    needs: [pack-and-prove, install-and-prove]
+    needs: [pack-and-prove, install-and-prove, record-version]
     if: needs.pack-and-prove.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5

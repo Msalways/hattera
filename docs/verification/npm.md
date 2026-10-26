@@ -85,7 +85,9 @@ that platform. A configured matrix is not evidence that its jobs have passed.
 Publication requires this fork's npm package ownership and authorized trusted
 publisher or bootstrap token. In **Actions → Publish npm package**, checking
 **Publish** explicitly enables publication after verification; leaving it
-unchecked performs qualification only. Matching version-tag pushes additionally
+unchecked performs qualification only. **Version change** selects patch, minor,
+major or current. Version bumps are included in the tested artifact and committed
+and tagged atomically after qualification, before publication. Matching version-tag pushes additionally
 require `HATTERA_NPM_PUBLISH_ENABLED=true` to publish automatically. See the
 [npm publishing setup](../releasing.md#publish-the-npm-package-from-actions).
 
