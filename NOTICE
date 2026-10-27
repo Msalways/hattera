@@ -5,7 +5,7 @@ Original attribution and dependency notices follow.
 Original Hattera additions and modifications are Copyright 2026 Hattera
 contributors, under LICENSE to the extent those contributors hold the
 licensing rights. Inherited code and third-party components retain their
-respective licenses. Inherited OpenMausBot code is under LICENSE-APACHE.
+respective licenses. Inherited OpenMausBot code is under third_party/openmausbot/LICENSE.
 See LICENSING.md.
 
 OpenMausBot

@@ -113,7 +113,7 @@ try {
     for (const name of ["hattera", "openmausbot"]) assert.ok(existsSync(join(binDir, name + (process.platform === "win32" ? ".cmd" : ""))));
     const manifest = JSON.parse(readFileSync(join(installed, "package.json"), "utf8"));
     for (const name of ["@duckdb/node-api", "@resvg/resvg-js"]) assert.ok(manifest.dependencies[name]);
-    for (const name of ["LICENSE", "LICENSE-APACHE", "LICENSING.md", "NOTICE", "dist/index.html", "dist-server/index.js", "dist-server/tunnel-guardian.js", "enterprise/server/index.js", "enterprise/LICENSE"]) {
+    for (const name of ["LICENSE", "third_party/openmausbot/LICENSE", "LICENSING.md", "NOTICE", "dist/index.html", "dist-server/index.js", "dist-server/tunnel-guardian.js", "enterprise/server/index.js", "enterprise/LICENSE"]) {
       assert.ok(existsSync(join(installed, name)), `Missing ${name}`);
     }
     for (const platform of ["win32", "darwin", "linux"]) for (const arch of ["x64", "arm64"]) {

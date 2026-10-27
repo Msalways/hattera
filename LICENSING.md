@@ -3,15 +3,22 @@
 Hattera is a fork of OpenMausBot. Hattera's own product name, CLI and assets do
 not replace upstream attribution or grant additional rights to third-party
 components. The upstream licensing explanation below is retained; the original
-license texts in `LICENSE`, `LICENSE-APACHE`, `enterprise/LICENSE` and third-party notices govern
-their respective code. Upstream contribution and partnership guidance describes
+license texts in `LICENSE`, `third_party/openmausbot/LICENSE`, `enterprise/LICENSE`
+and third-party notices govern their respective code. Upstream contribution and partnership guidance describes
 the upstream project, not a change to the Apache license for this fork.
 
 ## Hattera changes and inherited code
 
+| Component | Applicable terms |
+| --- | --- |
+| Original Hattera additions and modifications, where contributors hold the rights | [MIT](LICENSE) |
+| Inherited OpenMausBot source throughout this repository, including inherited portions of modified files | [Apache License 2.0](third_party/openmausbot/LICENSE) |
+| Optional `enterprise/` code | [OpenMausBot Enterprise License](enterprise/LICENSE), source-available with separate restrictions |
+| Other bundled third-party code and assets | Their preserved licenses and the attributions in [NOTICE](NOTICE) |
+
 Original Hattera additions and modifications, to the extent Hattera contributors
 hold the licensing rights, are licensed under the [MIT License](LICENSE).
-Inherited OpenMausBot code remains under [Apache License 2.0](LICENSE-APACHE). In a
+Inherited OpenMausBot code remains under [Apache License 2.0](third_party/openmausbot/LICENSE). In a
 modified upstream file, MIT covers the Hattera changes, not the inherited code.
 These are licenses for different portions, not a choice to use the entire
 repository under MIT. Redistribution must retain the applicable licenses,
@@ -22,6 +29,24 @@ Apache License 2.0 section 4 permits different terms for modifications while
 requiring the upstream license and notices to be retained. The `enterprise/`
 and third-party exceptions below remain in force. In particular, adding MIT
 does not authorize redistribution of `enterprise/`.
+
+## Machine detection and submission scope
+
+The root `LICENSE` contains standard MIT text, with component scope documented
+here and in the README. The unchanged upstream Apache text is retained under
+`third_party/openmausbot/`. Additional root license files can cause GitHub's
+Licensee detector to report "Other" even when each individual license is valid.
+See [GitHub's detection guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository#detecting-a-license).
+
+GitHub's displayed license identifies the main license file; it does not make
+inherited code or enterprise components MIT-licensed. npm metadata points to this
+guide, and npm, Docker and desktop packages retain the applicable component texts.
+The brand check guards the standard text and retained upstream license hashes.
+
+For an open-source hackathon test build, use the OSS edition without `enterprise/`,
+or establish the permissions required for any separately licensed code included.
+A detectable license does not establish the event's other eligibility or runtime
+requirements. See the [hackathon review](docs/hackathon-nebius-review.md).
 
 ## The carve-out: `enterprise/`
 

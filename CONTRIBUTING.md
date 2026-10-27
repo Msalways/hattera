@@ -289,5 +289,5 @@ Provider fakes under `server/testing/fake-*.ts` must stay dependency-free: they 
 - [ ] UI changes include before/after screenshots
 
 Original Hattera contributions are licensed under [MIT](LICENSE). Inherited
-OpenMausBot code retains [Apache License 2.0](LICENSE-APACHE), and optional
+OpenMausBot code retains [Apache License 2.0](third_party/openmausbot/LICENSE), and optional
 enterprise code retains its separate license. See [LICENSING.md](LICENSING.md).

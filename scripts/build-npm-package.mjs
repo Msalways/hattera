@@ -47,9 +47,12 @@ if (existsSync(enterpriseBundle)) {
     if (existsSync(join(root, "enterprise", file))) copyFileSync(join(root, "enterprise", file), join(out, "enterprise", file));
   }
 }
-for (const file of ["LICENSE", "LICENSE-APACHE", "LICENSING.md", "NOTICE"]) {
+for (const file of ["LICENSE", "LICENSING.md", "NOTICE"]) {
   cpSync(join(root, file), join(out, file));
 }
+
+mkdirSync(join(out, "third_party", "openmausbot"), { recursive: true });
+cpSync(join(root, "third_party", "openmausbot", "LICENSE"), join(out, "third_party", "openmausbot", "LICENSE"));
 
 // The bin lives next to the bundle so serverEntry() finds index.js by path.
 writeFileSync(join(out, "cli.js"), `#!/usr/bin/env node\nimport "./dist-server/hattera.js";\n`);
@@ -64,7 +67,7 @@ writeFileSync(
       license: "SEE LICENSE IN LICENSING.md",
       type: "module",
       bin: { hattera: "cli.js", openmausbot: "cli.js" },
-      files: ["cli.js", "dist-server", "dist", "network", "skills", "enterprise", "LICENSE", "LICENSE-APACHE", "LICENSING.md", "NOTICE", "README.md"],
+      files: ["cli.js", "dist-server", "dist", "network", "skills", "enterprise", "LICENSE", "third_party/openmausbot/LICENSE", "LICENSING.md", "NOTICE", "README.md"],
       engines: { node: ">=24" },
       os: ["darwin", "linux", "win32"],
       cpu: ["x64", "arm64"],
@@ -85,5 +88,5 @@ writeFileSync(
   ) + "\n",
 );
 
-writeFileSync(join(out, "README.md"), "# Hattera\n\nYour own team of AI agents. Requires Node.js 24 or later.\n\nInstall the tarball built from https://github.com/Msalways/hattera (the public npm name must be configured before registry publishing):\n\n```sh\nnpm install -g ./hattera-VERSION.tgz\nhattera web\n```\n\nThe local web launcher opens the app directly and keeps a background runtime. `hattera web --cli-only` starts without opening a browser. Provider accounts still require their own authorization. The legacy `openmausbot` command remains an alias.\n\nFor self-hosting, use `hattera serve`. Hosted sign-in and pairing remain required; local CLI mode does not disable remote authentication. Use `hattera --help` for setup, pairing, sessions, service and browser-engine commands.\n\nNew installations use ~/.hattera. Existing ~/.openmausbot workspaces are reused without moving or deleting data. HATTERA_* environment settings take precedence over matching OMB_* settings; legacy OMB_* remains supported.\n\nSource, setup and capabilities: https://github.com/Msalways/hattera\n\nOriginal Hattera additions and modifications are under MIT to the extent contributors hold the licensing rights (LICENSE). Inherited OpenMausBot code by Milind Soni and contributors remains under Apache-2.0 (LICENSE-APACHE). See LICENSING.md and NOTICE. The optional enterprise components retain their separate license; renaming does not change those terms.\n" );
+writeFileSync(join(out, "README.md"), "# Hattera\n\nYour own team of AI agents. Requires Node.js 24 or later.\n\nInstall the tarball built from https://github.com/Msalways/hattera (the public npm name must be configured before registry publishing):\n\n```sh\nnpm install -g ./hattera-VERSION.tgz\nhattera web\n```\n\nThe local web launcher opens the app directly and keeps a background runtime. `hattera web --cli-only` starts without opening a browser. Provider accounts still require their own authorization. The legacy `openmausbot` command remains an alias.\n\nFor self-hosting, use `hattera serve`. Hosted sign-in and pairing remain required; local CLI mode does not disable remote authentication. Use `hattera --help` for setup, pairing, sessions, service and browser-engine commands.\n\nNew installations use ~/.hattera. Existing ~/.openmausbot workspaces are reused without moving or deleting data. HATTERA_* environment settings take precedence over matching OMB_* settings; legacy OMB_* remains supported.\n\nSource, setup and capabilities: https://github.com/Msalways/hattera\n\nOriginal Hattera additions and modifications are under MIT to the extent contributors hold the licensing rights (LICENSE). Inherited OpenMausBot code by Milind Soni and contributors remains under Apache-2.0 (third_party/openmausbot/LICENSE). See LICENSING.md and NOTICE. The optional enterprise components retain their separate license; renaming does not change those terms.\n" );
 console.log(`npm package assembled at ${out} (${app.name}@${app.version})`);

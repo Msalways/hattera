@@ -1,5 +1,6 @@
 // Guard release identity without rejecting attribution or legacy wire contracts.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,4 +29,15 @@ for(const path of [".github/workflows/release.yml",".github/workflows/sync-publi
 }
 assert.match(read("NOTICE"),/Copyright 2026 Milind Soni and OpenMausBot contributors/);
 assert.ok(existsSync(join(root,"enterprise/LICENSE")));
+// Keep standard license texts detectable and preserve component terms verbatim.
+for (const [file, expected] of [
+  ["LICENSE", "2d17a32cbe049c5536a7fd031cf4ec51e268e6a18dbd8e2d13556537b72fc8a7"],
+  ["third_party/openmausbot/LICENSE", "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"],
+  ["enterprise/LICENSE", "2168215aaa38b7739adbf028da7504ee85aa5822f09339b10a084aeca0808a0b"],
+]) {
+  assert.equal(createHash("sha256").update(read(file).replace(/\r\n/g, "\n")).digest("hex"), expected, `${file}: review licensing changes before updating the recorded text hash`);
+}
+const rootLicenses = readdirSync(root).filter(name => /^(?:(?:un)?licen[sc]e|copying|copyright|patents|ofl)(?:$|[-_.])/i.test(name));
+assert.deepEqual(rootLicenses, ["LICENSE"], "Additional root license files make GitHub detection ambiguous; preserve component terms under third_party instead");
+assert.ok(!existsSync(join(root, "LICENSES")), "Review GitHub detection before adding a REUSE license directory");
 console.log("Hattera package, desktop, locale, icon, release and attribution checks passed.");

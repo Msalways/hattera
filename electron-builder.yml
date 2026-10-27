@@ -58,13 +58,13 @@ extraResources:
     to: licenses/LICENSE
   - from: LICENSING.md
     to: licenses/LICENSING.md
-  - from: LICENSE-APACHE
-    to: licenses/LICENSE-APACHE
+  - from: third_party/openmausbot/LICENSE
+    to: licenses/third_party/openmausbot/LICENSE
   - from: NOTICE
     to: licenses/NOTICE
   # cloudflared is distributed under Apache-2.0 as a separate executable.
   # Ship the Apache text independently of Hattera's own MIT license.
-  - from: LICENSE-APACHE
+  - from: third_party/openmausbot/LICENSE
     to: licenses/cloudflared-LICENSE.txt
   - from: third_party/cloudflared/README.md
     to: licenses/cloudflared-README.md

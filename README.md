@@ -418,7 +418,7 @@ Hattera's work builds on that foundation, with upstream attribution preserved.
 
 Original Hattera additions and modifications are under [MIT](LICENSE), to the
 extent contributors hold the licensing rights. Inherited OpenMausBot code retains
-[Apache License 2.0](LICENSE-APACHE). Optional `enterprise/` components keep their
+[Apache License 2.0](third_party/openmausbot/LICENSE). Optional `enterprise/` components keep their
 [separate license](enterprise/LICENSE). [LICENSING.md](LICENSING.md) and
 [NOTICE](NOTICE) describe the scope and third-party notices. Upstream services and
 releases are operated separately from this project.

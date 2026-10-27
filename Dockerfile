@@ -115,7 +115,8 @@ ENV AGENT_BROWSER_EXECUTABLE_PATH=/opt/openmausbot-browser/chrome \
     OMB_WEBHOOK_PORT=8800 \
     NODE_ENV=production
 WORKDIR /app
-COPY --from=build /src/LICENSE /src/LICENSE-APACHE /src/LICENSING.md /src/NOTICE ./
+COPY --from=build /src/LICENSE /src/LICENSING.md /src/NOTICE ./
+COPY --from=build /src/third_party/openmausbot/LICENSE ./third_party/openmausbot/LICENSE
 
 FROM runtime AS cloud-home
 # Caddy and Grok are pinned, so they sit beneath the engines, which change
