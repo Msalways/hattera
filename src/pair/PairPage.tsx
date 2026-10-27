@@ -152,7 +152,7 @@ export function PairPage({ initialCode, initialEmail = null, reason }: { initial
   }
 
   return (
-    <main className="hattera-pair min-h-screen bg-app text-ink">
+    <main className="hattera-pair bg-app text-ink">
       <aside className="hattera-pair-hero">
         <div className="hattera-pair-logo"><img src={brand().logo ?? "/hattera-mark.svg"} alt="" /><span>{brand().name}</span></div>
         <DesktopWorkspaceSwitcher />

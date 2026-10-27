@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
 .hattera-pair {
-  min-height: 100vh;
+  /* The chat shell locks body scrolling; pairing needs its own scroll area. */
+  height: 100%;
+  overflow-y: auto;
   background: radial-gradient(ellipse at 50% 76%, color-mix(in srgb, #ef6354 8%, transparent), transparent 60%), var(--color-app);
 }
 .hattera-pair-hero {

@@ -351,6 +351,22 @@ try {
   await send('Page.navigate', { url: new URL(`/pair#code=${code}`, base).href });
   await until(() => evaluate('!!document.querySelector("#pair-code") && !document.querySelector("#pair-code").disabled'), 20_000, 'remote pairing page');
   if (await evaluate('document.querySelector("#pair-code").value') !== code) throw new Error('Pairing link did not populate its code');
+  const pairingViewport = await evaluate('({ width: innerWidth, height: innerHeight })');
+  for (const [width, height] of [[1280, 600], [640, 360], [390, 360]]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 680 });
+    await evaluate('document.querySelector(".hattera-pair").scrollTop = 0');
+    await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: width / 2, y: height / 2, deltaX: 0, deltaY: 2000 });
+    await until(() => evaluate(`(() => {
+      const page = document.querySelector('.hattera-pair');
+      return page.clientHeight <= innerHeight && page.scrollWidth <= innerWidth
+        && ['#pair-code', '.hattera-pair-card button[type="submit"]'].every(selector => {
+          const box = document.querySelector(selector).getBoundingClientRect();
+          return box.height > 0 && box.top >= 0 && box.bottom <= innerHeight;
+        });
+    })()`), 10_000, `pairing controls reachable at ${width}x${height}`);
+  }
+  await send('Emulation.setDeviceMetricsOverride', { ...pairingViewport, deviceScaleFactor: 1, mobile: pairingViewport.width < 680 });
+  await evaluate('document.querySelector(".hattera-pair").scrollTop = 0');
   for (const skin of ['hattera', 'midnight', 'atelier', 'foundry', 'lagoon', 'graphite', 'linen', 'dusk', 'daylight', 'meadow']) {
     const colors = await evaluate(`(() => {
       document.documentElement.dataset.skin = ${JSON.stringify(skin)};

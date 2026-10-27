@@ -86,6 +86,11 @@ For adjacent features that require more setup than the browser smoke, run their 
 
 This suite covers routine continuity, team persistence through restart, backup HTTP/auth controls, per-bot MCP selection, connected-app caching, and routine rendering. It uses disposable homes and local substitutes; it does not exercise those features as full Hattera browser journeys.
 
+The pairing journey also scrolls the real page at 1280×600, 640×360 and 390×360
+and requires both the code field and Connect button to fit in the viewport.
+This guards against the chat shell's body scroll lock hiding the pairing form
+on short windows, landscape phones or reduced-height views.
+
 ## Coverage inventory
 
 The unified [E2E command](e2e.md) saves this smoke's screenshots in its unique run
