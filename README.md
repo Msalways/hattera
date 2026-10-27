@@ -17,7 +17,7 @@ bot/account when requesting work. Each installation remains independently operat
 
 [Demo](#demo) · [Capabilities](#capabilities) · [Architecture](#architecture) ·
 [Team collaboration](#private-team-collaboration) · [Get started](#get-started) ·
-[Development](#development) · [Credits](#credits-and-license)
+[Development](#development) · [License](#license-and-notices)
 
 ## Demo
 
@@ -408,17 +408,8 @@ Additional guides cover [storage/recovery](docs/storage-and-recovery.md),
 [contributing](CONTRIBUTING.md). The [hackathon review](docs/hackathon-nebius-review.md)
 tracks the remaining Nebius/NVIDIA submission requirements.
 
-## Credits and license
+## License and notices
 
-Hattera is built on **[OpenMausBot](https://github.com/milind-soni/OpenMausBot)**
-by **Milind Soni and the OpenMausBot contributors**. Their work supplied the base
-application and much of its bots, Chief orchestration, memory, tools, skills,
-provider integrations, desktop infrastructure and verification foundation.
-Hattera's work builds on that foundation, with upstream attribution preserved.
-
-Original Hattera additions and modifications are under [MIT](LICENSE), to the
-extent contributors hold the licensing rights. Inherited OpenMausBot code retains
-[Apache License 2.0](third_party/openmausbot/LICENSE). Optional `enterprise/` components keep their
-[separate license](enterprise/LICENSE). [LICENSING.md](LICENSING.md) and
-[NOTICE](NOTICE) describe the scope and third-party notices. Upstream services and
-releases are operated separately from this project.
+Original Hattera contributions are under [MIT](LICENSE), where contributors hold
+the licensing rights. Component-specific license terms and copyright notices are
+documented in [LICENSING.md](LICENSING.md) and [NOTICE](NOTICE).
