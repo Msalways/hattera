@@ -3,12 +3,25 @@
 Hattera is a fork of OpenMausBot. Hattera's own product name, CLI and assets do
 not replace upstream attribution or grant additional rights to third-party
 components. The upstream licensing explanation below is retained; the original
-license texts in `LICENSE`, `enterprise/LICENSE` and third-party notices govern
+license texts in `LICENSE`, `LICENSE-APACHE`, `enterprise/LICENSE` and third-party notices govern
 their respective code. Upstream contribution and partnership guidance describes
 the upstream project, not a change to the Apache license for this fork.
 
-OpenMausBot is open source under the [Apache License 2.0](LICENSE), with one
-carve-out and a few notes.
+## Hattera changes and inherited code
+
+Original Hattera additions and modifications, to the extent Hattera contributors
+hold the licensing rights, are licensed under the [MIT License](LICENSE).
+Inherited OpenMausBot code remains under [Apache License 2.0](LICENSE-APACHE). In a
+modified upstream file, MIT covers the Hattera changes, not the inherited code.
+These are licenses for different portions, not a choice to use the entire
+repository under MIT. Redistribution must retain the applicable licenses,
+upstream attribution and [NOTICE](NOTICE).
+
+Rebranding does not change copyright ownership or remove upstream obligations.
+Apache License 2.0 section 4 permits different terms for modifications while
+requiring the upstream license and notices to be retained. The `enterprise/`
+and third-party exceptions below remain in force. In particular, adding MIT
+does not authorize redistribution of `enterprise/`.
 
 ## The carve-out: `enterprise/`
 

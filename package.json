@@ -9,7 +9,7 @@
     "url": "https://github.com/Msalways/hattera.git"
   },
   "author": "Hattera contributors",
-  "license": "Apache-2.0",
+  "license": "SEE LICENSE IN LICENSING.md",
   "desktopName": "com.hattera.app.desktop",
   "type": "module",
   "main": "electron/main.mjs",

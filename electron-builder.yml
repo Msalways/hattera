@@ -53,15 +53,18 @@ files:
 asar: true
 
 extraResources:
-  # Ship the app's own license terms in every desktop distribution.
+  # Hattera changes and inherited OpenMausBot code retain separate terms.
   - from: LICENSE
-    to: licenses/OpenMausBot-LICENSE.txt
+    to: licenses/LICENSE
+  - from: LICENSING.md
+    to: licenses/LICENSING.md
+  - from: LICENSE-APACHE
+    to: licenses/LICENSE-APACHE
   - from: NOTICE
-    to: licenses/OpenMausBot-NOTICE.txt
+    to: licenses/NOTICE
   # cloudflared is distributed under Apache-2.0 as a separate executable.
-  # OpenMausBot itself uses the same full license text; ship another named
-  # copy so the third-party executable's terms remain unambiguous.
-  - from: LICENSE
+  # Ship the Apache text independently of Hattera's own MIT license.
+  - from: LICENSE-APACHE
     to: licenses/cloudflared-LICENSE.txt
   - from: third_party/cloudflared/README.md
     to: licenses/cloudflared-README.md

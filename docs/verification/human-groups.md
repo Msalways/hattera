@@ -88,10 +88,20 @@ creator-offline conversation, phone roster, restart, pause/resume and revocation
 using visible controls. The ordinary smoke also checks disconnected-network UI.
 Neither completes a real tailnet invitation.
 
+## Manual Tailscale confirmation
+
+On October 26, 2026, the maintainer reported personally testing a Tailscale
+connection and confirming that group collaboration worked. This is a manual
+user report, separate from the automated fixtures and simulated Docker recording.
+No device/OS matrix, recording or detailed scenario report accompanied it.
+It confirms the reported group connection; it does not establish remote provider
+account execution, credential isolation, restart/revocation recovery, or all
+supported platforms.
+
 ## Remaining acceptance work
 
-Real signed-in Tailscale communication between physical devices and all supported
-OS packages remains unqualified. Authorized attachment transfer, UI task assignment,
+Group connectivity has the manual confirmation above; comprehensive multi-device
+and OS qualification remains pending. Authorized attachment transfer, UI task assignment,
 consistent transcript ordering across concurrent arrivals, live bot activity,
 membership repair/rejoin after removal, and project
 registration/documentation/worktree workflows remain unfinished. Do not describe

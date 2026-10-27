@@ -288,5 +288,6 @@ Provider fakes under `server/testing/fake-*.ts` must stay dependency-free: they 
 - [ ] macOS-only code is platform-gated; nothing breaks the packaged app
 - [ ] UI changes include before/after screenshots
 
-By contributing you agree your contributions are licensed under the
-[Apache License, Version 2.0](LICENSE).
+Original Hattera contributions are licensed under [MIT](LICENSE). Inherited
+OpenMausBot code retains [Apache License 2.0](LICENSE-APACHE), and optional
+enterprise code retains its separate license. See [LICENSING.md](LICENSING.md).

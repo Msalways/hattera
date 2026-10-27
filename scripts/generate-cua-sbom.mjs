@@ -657,7 +657,7 @@ The shipped build graph contains exactly the following MPL-2.0 components. Their
 
 ${mplSourceRows.join("\n")}
 
-The complete MPL-2.0 text and package copyright notices appear in \`THIRD_PARTY_LICENSES.html\`. These files remain under their original licenses; Hattera's Apache-2.0 license and Cua's MIT license do not replace them.
+The complete MPL-2.0 text and package copyright notices appear in \`THIRD_PARTY_LICENSES.html\`. These files remain under their original licenses; Hattera's MIT terms, inherited Apache-2.0 terms and Cua's MIT license do not replace them.
 
 ## Scope and method
 
