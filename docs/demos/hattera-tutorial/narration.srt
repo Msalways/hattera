@@ -1,0 +1,83 @@
+1
+00:00:00,000 --> 00:00:12,000
+In this tutorial, ms1, ms2, and ms3 are Docker profiles. I ask Chief to fix a sample duplicate-webhook bug.
+
+2
+00:00:12,000 --> 00:00:24,000
+Chief uses NVIDIA Nemotron Ultra through Nebius. I review Builder and Reviewer, their models, working folder, and team access.
+
+3
+00:00:24,000 --> 00:00:32,000
+I apply the setup. Both specialists appear in Engineering with the approved model and Ask permissions.
+
+4
+00:00:32,000 --> 00:00:40,000
+Chief’s accepted receipts link to both tasks. A follow-up here made the actual assignments happen.
+
+5
+00:00:40,000 --> 00:00:50,000
+I open Builder’s returned tool output. The duplicate event produced two invoices where the test expected one.
+
+6
+00:00:50,000 --> 00:00:58,000
+Builder records event IDs and ignores repeats. All three regression tests now pass.
+
+7
+00:00:58,000 --> 00:01:06,000
+Reviewer separately ran the same regression suite. Here is its returned output.
+
+8
+00:01:06,000 --> 00:01:16,000
+The review checks the actual handler diff and explains the sample’s limits: deduplication is held in memory.
+
+9
+00:01:16,000 --> 00:01:25,000
+I open Share group, start sharing, and create an invitation. Codes are hidden here.
+
+10
+00:01:25,000 --> 00:01:35,000
+On ms2, I paste that invitation and join. Each installation keeps its own copy of the conversation.
+
+11
+00:01:35,000 --> 00:01:39,000
+All three members now appear.
+
+12
+00:01:39,000 --> 00:01:42,600
+Now I send a message.
+
+13
+00:01:42,600 --> 00:01:46,100
+ms2 receives it and replies.
+
+14
+00:01:46,100 --> 00:01:50,600
+ms2 selects a bot, permitted people, and approval.
+
+15
+00:01:50,600 --> 00:02:02,300
+I select ms2’s account under Run with and request the check. I supplied the patch separately; joining the group does not copy files.
+
+16
+00:02:02,300 --> 00:02:11,300
+On ms2, I review the request and approve it. The bot uses ms2’s own workspace.
+
+17
+00:02:11,300 --> 00:02:20,300
+Native tools still ask for approval. I use Allow once for these sample commands.
+
+18
+00:02:20,300 --> 00:02:25,800
+I open the completed result on ms1.
+
+19
+00:02:25,800 --> 00:02:31,300
+ms2 sees the same completed reply.
+
+20
+00:02:31,300 --> 00:02:36,800
+ms3 can read it too.
+
+21
+00:02:36,800 --> 00:02:44,800
+I keep the coding assignments, review evidence, and shared check available in their conversations.

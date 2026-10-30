@@ -21,6 +21,15 @@ bot/account when requesting work. Each installation remains independently operat
 
 ## Demo
 
+[Watch the coding-team and shared-group tutorial](docs/demos/hattera-tutorial/README.md)
+(2:45, silent). Follow `ms1`, `ms2` and `ms3` through approved team setup,
+Nebius/Nemotron coordination, a sample fix and independent review, then group
+messages and owner-approved execution. The tutorial uses three Docker
+installations with simulated Tailscale transport. Narration and redacted
+execution evidence accompany the video.
+
+**Earlier collaboration recording (archived)**
+
 **Three installations. One group. Work executed through the selected owner's account.**
 
 https://github.com/user-attachments/assets/7d905a98-7675-42ac-a4cb-eaff42bc4a12

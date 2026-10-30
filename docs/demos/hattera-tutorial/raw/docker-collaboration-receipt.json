@@ -1,0 +1,49 @@
+{
+  "groupId": "cbe23c5e-70ba-44cd-9b58-912d690ad494",
+  "request": "f8764db4-90a2-414e-b7e2-9ae9bde1ea19",
+  "owner": "ms2",
+  "requester": "ms1",
+  "ownerApproval": true,
+  "selectedBotGrant": "4d276fe5-c7a4-499d-95c4-57afdc40367f",
+  "target": {
+    "id": "4d276fe5-c7a4-499d-95c4-57afdc40367f",
+    "label": "ms2 sample review",
+    "botName": "ms2 Review bot",
+    "account": "ms2 OpenCode",
+    "driver": "opencodeGo",
+    "model": "opencode/mimo-v2.6-flash-free",
+    "approval": true,
+    "ready": true
+  },
+  "nativeTurns": [
+    "298a0cab-2664-4aeb-931f-e0c5d473edc5"
+  ],
+  "ownerThreadId": "e4670cb4-f559-4786-a266-528951d1d5e5",
+  "result": "Review of sample 3ce90b86 complete.\n\n**Commands & exit codes**\n\n1. `node --test test/webhook.test.mjs` (in `/data/project`, before change) → **exit 1**\n   - ✖ `repeated webhook event creates one invoice` — `AssertionError: 2 !== 1` at `test/webhook.test.mjs:9`, `actual: 2, expected: 1, operator: strictEqual`\n   - ✔ `distinct events continue processing`\n   - ✔ `invoice amount is preserved`\n   - totals: 3 tests, 2 pass, 1 fail\n\n2. Inspection of `proposed/webhook.mjs` (405 bytes): adds a `seenEventIds` `Set`; `handle()` returns `{ accepted: true, duplicate: true }` for an already-seen `eventId` without pushing, otherwise records the invoice and returns `{ accepted: true }`.\n\n3. `cp proposed/webhook.mjs src/webhook.mjs && node --test test/webhook.test.mjs` → **exit 0**\n   - 3 tests, 3 pass, 0 fail\n\n**Findings**\n- The defect was unbounded duplicate handling: the original handler pushed every event, so a replay of `evt-001` produced 2 invoices.\n- The proposed fix dedupes by `eventId` per handler instance and correctly keeps distinct events and amount preservation working.\n- Behavior note: duplicates now return `accepted: true` with an added `duplicate: true` flag — a response-shape change callers may notice, though no test asserts on it.\n- Scope check: `git status --porcelain` shows only `M src/webhook.mjs` (5 insertions) plus the pre-existing untracked `proposed/`. Tests, README, logs, and other files untouched.",
+  "usage": {
+    "input": 22428,
+    "output": 390,
+    "cachedInput": 22272,
+    "tokensReported": true,
+    "costUsd": null
+  },
+  "projected": [
+    {
+      "owner": "ms1",
+      "threadId": "146ec7f5-c2f9-4478-8425-e83f95e869f2",
+      "replies": 1
+    },
+    {
+      "owner": "ms2",
+      "threadId": "9283835a-1c9a-4ce6-8f2b-862d990533eb",
+      "replies": 1
+    },
+    {
+      "owner": "ms3",
+      "threadId": "595dae58-98a3-4831-8b48-47beaab62a2c",
+      "replies": 1
+    }
+  ],
+  "sampleFilesTransferredManually": true,
+  "physicalTailnetQualified": false
+}

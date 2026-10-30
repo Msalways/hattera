@@ -1,0 +1,11 @@
+✔ repeated webhook event creates one invoice (1.994279ms)
+✔ distinct events continue processing (0.508397ms)
+✔ invoice amount is preserved (1.647413ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 111.092813

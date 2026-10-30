@@ -1,0 +1,4 @@
+SYNTHETIC SAMPLE DATA
+2026-10-29T08:00:00Z received eventId=evt-001 amount=4800 attempt=1
+2026-10-29T08:00:01Z received eventId=evt-001 amount=4800 attempt=2
+2026-10-29T08:00:01Z invoice_count=2

@@ -1,0 +1,466 @@
+{
+  "recordedAt": "2026-10-30T02:13:23.029Z",
+  "purpose": "Tutorial showing team setup, orchestration and permissioned group collaboration",
+  "realNebiusInference": true,
+  "nebiusTeamProposal": true,
+  "nebiusCoordination": true,
+  "chiefSetupApproved": true,
+  "implementationAssigned": true,
+  "reviewAssigned": true,
+  "failingTestObserved": true,
+  "patchApplied": true,
+  "testsUnchanged": true,
+  "passingTestObserved": true,
+  "independentReviewExecuted": true,
+  "crossOwnerApproval": true,
+  "actualOwnerExecution": true,
+  "resultReplicated": true,
+  "tutorialComplete": true,
+  "submissionReady": false,
+  "nvidiaModelId": "nvidia/Nemotron-3-Ultra-550b-a55b",
+  "nebiusEndpoint": "https://api.tokenfactory.us-central1.nebius.com/v1/",
+  "chiefDriver": "openai-compat",
+  "chiefRole": "Team setup and coordination",
+  "specialistProvider": "OpenCode Zen",
+  "specialistModel": "opencode/mimo-v2.6-flash-free",
+  "fixture": {
+    "runId": "hattera-team-b0a07e9e",
+    "containers": [
+      "hattera-team-b0a07e9e-ms1",
+      "hattera-team-b0a07e9e-ms2",
+      "hattera-team-b0a07e9e-ms3"
+    ],
+    "ports": [
+      18081,
+      18082,
+      18083
+    ],
+    "baselineChecks": [
+      "three-independent-profiles-and-human-memberships",
+      "ms1-uses-ms2s-persistent-memory-through-real-opencode",
+      "owner-memory-remains-local",
+      "ms2-uses-ms1s-persistent-memory-in-reverse",
+      "ms2-uses-ms3-memory-with-creator-stopped",
+      "fresh-remote-memory-survives-owner-container-restart",
+      "all-three-group-copies-have-every-shared-reply-once"
+    ],
+    "baselineOk": true
+  },
+  "transport": {
+    "coding": "ms1 isolated Docker installation",
+    "collaboration": "ms1/ms2/ms3 separate Docker installations with simulated Tailscale transport",
+    "physicalTailnetQualified": false
+  },
+  "physicalTailnetQualified": false,
+  "scriptedDockerParticipants": [
+    "ms1",
+    "ms2",
+    "ms3"
+  ],
+  "credentials": "Temporary Nebius key is configured only inside the ms1 isolated profile and is omitted from deliverables.",
+  "executions": [
+    {
+      "owner": "ms1",
+      "bot": "Reviewer",
+      "threadId": "ae454e64-b3a2-4d92-9c35-fe4117163c97",
+      "callId": "call_5c7c9ebc59cd474e941cf81a",
+      "command": "git log --oneline -15 && git status && git diff HEAD --stat",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:38:20.522Z",
+      "output": "3684647 Sample duplicate-webhook fixture\nOn branch master\nnothing to commit, working tree clean\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Reviewer",
+      "threadId": "ae454e64-b3a2-4d92-9c35-fe4117163c97",
+      "callId": "call_b3c60451106a44678f774802",
+      "command": "node --test test/webhook.test.mjs 2>&1; echo \"exit=$?\"",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:41:00.180Z",
+      "output": "✔ repeated webhook event creates one invoice (3.79516ms)\n✔ distinct events continue processing (0.612682ms)\n✔ invoice amount is preserved (2.554087ms)\nℹ tests 3\nℹ suites 0\nℹ pass 3\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 680.042364\nexit=0\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Reviewer",
+      "threadId": "ae454e64-b3a2-4d92-9c35-fe4117163c97",
+      "callId": "call_f16600125c62491a99f2d8ff",
+      "command": "node -e \"import('./src/webhook.mjs').then(m => { const s = m.createWebhookHandler(); s.handle({eventId:'evt-001',amount:4800}); s.handle({eventId:'evt-001',amount:4800}); console.log('invoices:', JSON.stringify(s.invoices)); })\"",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:41:10.975Z",
+      "output": "invoices: [{\"eventId\":\"evt-001\",\"amount\":4800}]\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Reviewer",
+      "threadId": "ae454e64-b3a2-4d92-9c35-fe4117163c97",
+      "callId": "call_17f277aeff1c48f78ea46313",
+      "command": "git log --all --oneline; git stash list; git diff; ls -la src test; node --version",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:41:11.601Z",
+      "output": "3684647 Sample duplicate-webhook fixture\ndiff --git a/src/webhook.mjs b/src/webhook.mjs\nindex 55f69c2..d7924cf 100755\n--- a/src/webhook.mjs\n+++ b/src/webhook.mjs\n@@ -1,8 +1,13 @@\n export function createWebhookHandler() {\n   const invoices = [];\n+  const seenEventIds = new Set();\n   return {\n     invoices,\n     handle(event) {\n+      if (seenEventIds.has(event.eventId)) {\n+        return { accepted: true, duplicate: true };\n+      }\n+      seenEventIds.add(event.eventId);\n       invoices.push({ eventId: event.eventId, amount: event.amount });\n       return { accepted: true };\n     },\nsrc:\ntotal 12\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 .\ndrwxr-xr-x 6 maus maus 4096 Oct 30 01:08 ..\n-rwxr-xr-x 1 maus maus  405 Oct 30 01:40 webhook.mjs\n\ntest:\ntotal 12\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 .\ndrwxr-xr-x 6 maus maus 4096 Oct 30 01:08 ..\n-rwxr-xr-x 1 maus maus  872 Oct 29 02:42 webhook.test.mjs\nv24.22.1\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Reviewer",
+      "threadId": "ae454e64-b3a2-4d92-9c35-fe4117163c97",
+      "callId": "call_1bfda0ad7a5647b7b9f0e909",
+      "command": "git status --porcelain; git diff --stat",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:41:28.333Z",
+      "output": " M src/webhook.mjs\n src/webhook.mjs | 5 +++++\n 1 file changed, 5 insertions(+)\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Reviewer",
+      "threadId": "ae454e64-b3a2-4d92-9c35-fe4117163c97",
+      "callId": "call_d07eec0bb03c414bb399e00a",
+      "command": "node --test 2>&1; echo \"exit=$?\"",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:41:29.659Z",
+      "output": "✔ repeated webhook event creates one invoice (2.205745ms)\n✔ distinct events continue processing (0.350711ms)\n✔ invoice amount is preserved (52.093462ms)\nℹ tests 3\nℹ suites 0\nℹ pass 3\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 478.084847\nexit=0\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Reviewer",
+      "threadId": "ae454e64-b3a2-4d92-9c35-fe4117163c97",
+      "callId": "call_8df3047c3d49418abbe2976e",
+      "command": "node -e \"\nimport('./src/webhook.mjs').then(m => {\n  const a = m.createWebhookHandler();\n  const r1 = a.handle({eventId:'e1',amount:100});\n  const r2 = a.handle({eventId:'e1',amount:100});\n  const b = m.createWebhookHandler();\n  const r3 = b.handle({eventId:'e1',amount:100});\n  console.log('first:', JSON.stringify(r1), 'dup:', JSON.stringify(r2), 'fresh-instance-count:', b.invoices.length, 'a-count:', a.invoices.length);\n})\"",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:41:38.191Z",
+      "output": "first: {\"accepted\":true} dup: {\"accepted\":true,\"duplicate\":true} fresh-instance-count: 1 a-count: 1\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Builder",
+      "threadId": "d2468e11-79d2-480f-bcbd-002c47567934",
+      "callId": "call_4f01c8b066ae5d829ee8735eafb7e59e",
+      "command": "ls -la /data/project",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:38:18.852Z",
+      "output": "total 28\ndrwxr-xr-x 6 maus maus 4096 Oct 30 01:08 .\ndrwxr-xr-x 8 maus maus 4096 Oct 30 01:04 ..\ndrwxr-xr-x 8 maus maus 4096 Oct 30 01:38 .git\n-rwxr-xr-x 1 maus maus  297 Oct 29 02:42 README.md\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 logs\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 src\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 test\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Builder",
+      "threadId": "d2468e11-79d2-480f-bcbd-002c47567934",
+      "callId": "call_0f17a74e2467d08ff849384c21777592",
+      "command": "ls -la src test logs && cat README.md",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:39:29.025Z",
+      "output": "logs:\ntotal 12\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 .\ndrwxr-xr-x 6 maus maus 4096 Oct 30 01:08 ..\n-rwxr-xr-x 1 maus maus  195 Oct 29 02:42 payment-retries.log\n\nsrc:\ntotal 12\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 .\ndrwxr-xr-x 6 maus maus 4096 Oct 30 01:08 ..\n-rwxr-xr-x 1 maus maus  227 Oct 29 02:42 webhook.mjs\n\ntest:\ntotal 12\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 .\ndrwxr-xr-x 6 maus maus 4096 Oct 30 01:08 ..\n-rwxr-xr-x 1 maus maus  872 Oct 29 02:42 webhook.test.mjs\n# Sample webhook service\n\nDisposable demo fixture; all data is synthetic.\n\nRun `node --test test/webhook.test.mjs` from this directory. A repeated event\ncurrently creates two invoices. Fix the handler, preserve tests, and have a\nseparate reviewer run the regression checks and inspect the change.\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Builder",
+      "threadId": "d2468e11-79d2-480f-bcbd-002c47567934",
+      "callId": "call_221caf7c769f8338039079efd46e5b70",
+      "command": "node --test 2>&1 | tail -30; echo \"EXIT=$?\"; git log --oneline -5",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:40:33.736Z",
+      "output": "✔ invoice amount is preserved (2.967203ms)\nℹ tests 3\nℹ suites 0\nℹ pass 2\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 519.918797\n\n✖ failing tests:\n\ntest at test/webhook.test.mjs:5:1\n✖ repeated webhook event creates one invoice (4.420889ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  2 !== 1\n  \n      at TestContext.<anonymous> (file:///data/project/test/webhook.test.mjs:9:10)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.start (node:internal/test_runner/test:1262:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\nEXIT=0\n3684647 Sample duplicate-webhook fixture\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Builder",
+      "threadId": "d2468e11-79d2-480f-bcbd-002c47567934",
+      "callId": "call_21d297944551d6f1664cca67d2dd9fb4",
+      "command": "node --test 2>&1 | tail -20; echo \"EXIT=${PIPESTATUS[0]}\"; git status --short; git diff",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:40:47.284Z",
+      "output": "✔ repeated webhook event creates one invoice (3.214043ms)\n✔ distinct events continue processing (0.375343ms)\n✔ invoice amount is preserved (1.609802ms)\nℹ tests 3\nℹ suites 0\nℹ pass 3\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 576.553413\nEXIT=0\n M src/webhook.mjs\ndiff --git a/src/webhook.mjs b/src/webhook.mjs\nindex 55f69c2..68d29e4 100755\n--- a/src/webhook.mjs\n+++ b/src/webhook.mjs\n@@ -1,10 +1,15 @@\n export function createWebhookHandler() {\n   const invoices = [];\n+  const seenEventIds = new Set();\n   return {\n     invoices,\n     handle(event) {\n+      if (seenEventIds.has(event.eventId)) {\n+        return { accepted: true, duplicate: true };\n+      }\n+      seenEventIds.add(event.eventId);\n       invoices.push({ eventId: event.eventId, amount: event.amount });\n       return { accepted: true };\n     },\n   };\n-}\n+}\n\\ No newline at end of file\n"
+    },
+    {
+      "owner": "ms1",
+      "bot": "Builder",
+      "threadId": "d2468e11-79d2-480f-bcbd-002c47567934",
+      "callId": "call_01268d827df116472c9b2b8444b9c81d",
+      "command": "printf '\\n' >> src/webhook.mjs && git diff --stat && git status --short && node --test 2>&1 | grep -E \"^(ℹ (tests|pass|fail))|✖\"",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T01:40:56.274Z",
+      "output": " src/webhook.mjs | 5 +++++\n 1 file changed, 5 insertions(+)\n M src/webhook.mjs\nℹ tests 3\nℹ pass 3\nℹ fail 0\n"
+    },
+    {
+      "owner": "ms2",
+      "bot": "ms2 Review bot",
+      "threadId": "e4670cb4-f559-4786-a266-528951d1d5e5",
+      "callId": "call_af7b15f523c54222b993e2ac",
+      "command": "ls -la /data/project 2>&1; echo \"---\"; ls -la /data/project/test /data/project/src /data/project/proposed 2>&1",
+      "workdir": "/data/profile/task-workspaces/72c32efb-b823-410a-850b-58ef38f8706c/e4670cb4-f559-4786-a266-528951d1d5e5",
+      "exitCode": 0,
+      "at": "2026-10-30T02:01:30.754Z",
+      "output": "total 32\ndrwxr-xr-x 7 maus maus 4096 Oct 30 01:49 .\ndrwxr-xr-x 8 maus maus 4096 Oct 30 01:02 ..\ndrwxr-xr-x 8 maus maus 4096 Oct 30 01:08 .git\n-rwxr-xr-x 1 maus maus  297 Oct 29 02:42 README.md\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 logs\ndrwxr-xr-x 2 maus maus 4096 Oct 30 01:59 proposed\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 src\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 test\n---\n/data/project/proposed:\ntotal 12\ndrwxr-xr-x 2 maus maus 4096 Oct 30 01:59 .\ndrwxr-xr-x 7 maus maus 4096 Oct 30 01:49 ..\n-rwxr-xr-x 1 root root  405 Oct 30 01:40 webhook.mjs\n\n/data/project/src:\ntotal 12\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 .\ndrwxr-xr-x 7 maus maus 4096 Oct 30 01:49 ..\n-rwxr-xr-x 1 maus maus  227 Oct 29 02:42 webhook.mjs\n\n/data/project/test:\ntotal 12\ndrwxr-xr-x 2 maus maus 4096 Oct 29 02:42 .\ndrwxr-xr-x 7 maus maus 4096 Oct 30 01:49 ..\n-rwxr-xr-x 1 maus maus  872 Oct 29 02:42 webhook.test.mjs\n"
+    },
+    {
+      "owner": "ms2",
+      "bot": "ms2 Review bot",
+      "threadId": "e4670cb4-f559-4786-a266-528951d1d5e5",
+      "callId": "call_b4826d0071dc4b05a573d155",
+      "command": "cat /data/project/src/webhook.mjs; echo \"=== PROPOSED ===\"; cat /data/project/proposed/webhook.mjs; echo \"=== TEST ===\"; cat /data/project/test/webhook.test.mjs; echo \"=== README ===\"; cat /data/project/README.md; node --version",
+      "workdir": "/data/profile/task-workspaces/72c32efb-b823-410a-850b-58ef38f8706c/e4670cb4-f559-4786-a266-528951d1d5e5",
+      "exitCode": 0,
+      "at": "2026-10-30T02:03:37.033Z",
+      "output": "export function createWebhookHandler() {\n  const invoices = [];\n  return {\n    invoices,\n    handle(event) {\n      invoices.push({ eventId: event.eventId, amount: event.amount });\n      return { accepted: true };\n    },\n  };\n}\n=== PROPOSED ===\nexport function createWebhookHandler() {\n  const invoices = [];\n  const seenEventIds = new Set();\n  return {\n    invoices,\n    handle(event) {\n      if (seenEventIds.has(event.eventId)) {\n        return { accepted: true, duplicate: true };\n      }\n      seenEventIds.add(event.eventId);\n      invoices.push({ eventId: event.eventId, amount: event.amount });\n      return { accepted: true };\n    },\n  };\n}\n=== TEST ===\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { createWebhookHandler } from '../src/webhook.mjs';\n\ntest('repeated webhook event creates one invoice', () => {\n  const service = createWebhookHandler();\n  service.handle({ eventId: 'evt-001', amount: 4800 });\n  service.handle({ eventId: 'evt-001', amount: 4800 });\n  assert.equal(service.invoices.length, 1);\n});\n\ntest('distinct events continue processing', () => {\n  const service = createWebhookHandler();\n  service.handle({ eventId: 'evt-001', amount: 4800 });\n  service.handle({ eventId: 'evt-002', amount: 7200 });\n  assert.equal(service.invoices.length, 2);\n});\n\ntest('invoice amount is preserved', () => {\n  const service = createWebhookHandler();\n  service.handle({ eventId: 'evt-003', amount: 1250 });\n  assert.deepEqual(service.invoices, [{ eventId: 'evt-003', amount: 1250 }]);\n});\n=== README ===\n# Sample webhook service\n\nDisposable demo fixture; all data is synthetic.\n\nRun `node --test test/webhook.test.mjs` from this directory. A repeated event\ncurrently creates two invoices. Fix the handler, preserve tests, and have a\nseparate reviewer run the regression checks and inspect the change.\nv24.22.1\n"
+    },
+    {
+      "owner": "ms2",
+      "bot": "ms2 Review bot",
+      "threadId": "e4670cb4-f559-4786-a266-528951d1d5e5",
+      "callId": "call_9ac74bc2a3874ecc9707b444",
+      "command": "node --test test/webhook.test.mjs; echo \"EXIT=$?\"",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T02:11:06.517Z",
+      "output": "✖ repeated webhook event creates one invoice (14.174691ms)\n✔ distinct events continue processing (0.898332ms)\n✔ invoice amount is preserved (10.629668ms)\nℹ tests 3\nℹ suites 0\nℹ pass 2\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 426.192252\n\n✖ failing tests:\n\ntest at test/webhook.test.mjs:5:1\n✖ repeated webhook event creates one invoice (14.174691ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  2 !== 1\n  \n      at TestContext.<anonymous> (file:///data/project/test/webhook.test.mjs:9:10)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.start (node:internal/test_runner/test:1262:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\nEXIT=1\n"
+    },
+    {
+      "owner": "ms2",
+      "bot": "ms2 Review bot",
+      "threadId": "e4670cb4-f559-4786-a266-528951d1d5e5",
+      "callId": "call_44f9eede98364bfcb0b7fcaa",
+      "command": "cp proposed/webhook.mjs src/webhook.mjs && ls -la src/webhook.mjs && node --test test/webhook.test.mjs; echo \"EXIT=$?\"",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T02:11:26.402Z",
+      "output": "-rwxr-xr-x 1 maus maus 405 Oct 30 02:11 src/webhook.mjs\n✔ repeated webhook event creates one invoice (3.418304ms)\n✔ distinct events continue processing (0.434164ms)\n✔ invoice amount is preserved (1.805767ms)\nℹ tests 3\nℹ suites 0\nℹ pass 3\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 370.696211\nEXIT=0\n"
+    },
+    {
+      "owner": "ms2",
+      "bot": "ms2 Review bot",
+      "threadId": "e4670cb4-f559-4786-a266-528951d1d5e5",
+      "callId": "call_eaa28cdd5a8b4cdcb7aa0036",
+      "command": "git status --porcelain; echo \"---\"; git diff --stat",
+      "workdir": "/data/project",
+      "exitCode": 0,
+      "at": "2026-10-30T02:11:51.291Z",
+      "output": " M src/webhook.mjs\n?? proposed/\n---\n src/webhook.mjs | 5 +++++\n 1 file changed, 5 insertions(+)\n"
+    }
+  ],
+  "collaboration": {
+    "groupId": "cbe23c5e-70ba-44cd-9b58-912d690ad494",
+    "request": "f8764db4-90a2-414e-b7e2-9ae9bde1ea19",
+    "owner": "ms2",
+    "requester": "ms1",
+    "ownerApproval": true,
+    "selectedBotGrant": "4d276fe5-c7a4-499d-95c4-57afdc40367f",
+    "target": {
+      "id": "4d276fe5-c7a4-499d-95c4-57afdc40367f",
+      "label": "ms2 sample review",
+      "botName": "ms2 Review bot",
+      "account": "ms2 OpenCode",
+      "driver": "opencodeGo",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "approval": true,
+      "ready": true
+    },
+    "nativeTurns": [
+      "298a0cab-2664-4aeb-931f-e0c5d473edc5"
+    ],
+    "ownerThreadId": "e4670cb4-f559-4786-a266-528951d1d5e5",
+    "result": "Review of sample 3ce90b86 complete.\n\n**Commands & exit codes**\n\n1. `node --test test/webhook.test.mjs` (in `/data/project`, before change) → **exit 1**\n   - ✖ `repeated webhook event creates one invoice` — `AssertionError: 2 !== 1` at `test/webhook.test.mjs:9`, `actual: 2, expected: 1, operator: strictEqual`\n   - ✔ `distinct events continue processing`\n   - ✔ `invoice amount is preserved`\n   - totals: 3 tests, 2 pass, 1 fail\n\n2. Inspection of `proposed/webhook.mjs` (405 bytes): adds a `seenEventIds` `Set`; `handle()` returns `{ accepted: true, duplicate: true }` for an already-seen `eventId` without pushing, otherwise records the invoice and returns `{ accepted: true }`.\n\n3. `cp proposed/webhook.mjs src/webhook.mjs && node --test test/webhook.test.mjs` → **exit 0**\n   - 3 tests, 3 pass, 0 fail\n\n**Findings**\n- The defect was unbounded duplicate handling: the original handler pushed every event, so a replay of `evt-001` produced 2 invoices.\n- The proposed fix dedupes by `eventId` per handler instance and correctly keeps distinct events and amount preservation working.\n- Behavior note: duplicates now return `accepted: true` with an added `duplicate: true` flag — a response-shape change callers may notice, though no test asserts on it.\n- Scope check: `git status --porcelain` shows only `M src/webhook.mjs` (5 insertions) plus the pre-existing untracked `proposed/`. Tests, README, logs, and other files untouched.",
+    "usage": {
+      "input": 22428,
+      "output": 390,
+      "cachedInput": 22272,
+      "tokensReported": true,
+      "costUsd": null
+    },
+    "projected": [
+      {
+        "owner": "ms1",
+        "threadId": "146ec7f5-c2f9-4478-8425-e83f95e869f2",
+        "replies": 1
+      },
+      {
+        "owner": "ms2",
+        "threadId": "9283835a-1c9a-4ce6-8f2b-862d990533eb",
+        "replies": 1
+      },
+      {
+        "owner": "ms3",
+        "threadId": "595dae58-98a3-4831-8b48-47beaab62a2c",
+        "replies": 1
+      }
+    ],
+    "sampleFilesTransferredManually": true,
+    "physicalTailnetQualified": false
+  },
+  "proof": [
+    "raw/docker-transcripts.json",
+    "raw/docker-native-tool-receipts.json",
+    "raw/docker-ms1-fix.diff",
+    "raw/docker-collaboration-receipt.json"
+  ],
+  "archivedVideoSha256": "2b8a91ec064e4f6ff1de2fe5338e9f23f02fe7ddb879bd9df5ee552a15839035",
+  "notes": [
+    "All participants are demo profiles on three Docker installations; no physical tailnet or real colleague recording is claimed.",
+    "The before-fix assertion output proves the duplicate-event failure. Its shell pipeline ended with tail/echo/git and returned 0, so that shell status is not claimed as the test process exit code.",
+    "The owner supplied a Nebius key and authorized Nemotron Ultra as Chief. Model discovery and real harness receipts qualify the demonstrated role.",
+    "The original preflight conversations were removed before tutorial recording; their original report remains retained."
+  ],
+  "video": {
+    "file": "hattera-demo-silent.mp4",
+    "durationSeconds": 164.833333,
+    "width": 1920,
+    "height": 1080,
+    "codec": "h264",
+    "audioStreams": 0,
+    "fps": "12/1",
+    "sha256": "5e3f7114eff140e64365582d68f8c4d570fbc316ea8538297c69bb087ecb1d5a",
+    "fullDecodePassed": true,
+    "decodeLog": "raw/edit/decode.log",
+    "visualQa": "Exported frames inspected for text, captions and genuine UI."
+  },
+  "capture": [
+    {
+      "name": "docker-tutorial-01",
+      "frames": 4320,
+      "durationMs": 1628487,
+      "droppedSamples": [],
+      "statusErrors": [],
+      "failedActions": [],
+      "error": "Error: Browser command timed out: Runtime.evaluate"
+    },
+    {
+      "name": "docker-tutorial-02",
+      "frames": 786,
+      "durationMs": 495423,
+      "droppedSamples": [],
+      "statusErrors": [],
+      "failedActions": [
+        {
+          "id": "group-tutorial-flow-02",
+          "action": "group-flow",
+          "view": "ms1",
+          "timeMs": 173928,
+          "ok": false,
+          "error": "Error: Isolated ms3 API GET /.well-known/openmausbot/environment failed (exit unknown); request payload omitted."
+        },
+        {
+          "id": "group-tutorial-flow-retry-03",
+          "action": "group-flow",
+          "view": "ms3",
+          "timeMs": 441193,
+          "ok": false,
+          "error": "Error: Browser timed out: three member roster. Visible page: Hattera\nGroup chats\nWebhook team\nNo messages yet\nBots\nms2 Review bot\nHi, I'm ms2 Review bot. What would you like me to do?\n\nM\nms2\nWebhook team\nAll threads\n1\nDefault (5 min)\n30 minutes\n60 minutes\n120 minutes\nCustom…\nPeople · 2\nShare this group\n\nShare this group's text conversations and bot names with people you invite. Each device keeps its own copy. Files, private quotes, credentials, tool details and execution permissions stay local.\n\nSharing enabled · 0 event deliveries pending\n\nLast exchange: 30/10/2026, 7:19:57 am\n\nms1\nCan invite people\nLast contact: 7:20:00 am\nms2 · This device\nMember\nShared bot profiles\nms2 Review bot · ms2\nChief · ms1\nPause this device\nLead: ms2 Review bot\nAuto\nEveryone responds\nOnly when mentioned\nSample webhook fix and separate regression checks. Each owner keeps its own workspace.\nWebhook team\nMention a bot with @ to bring them in.\n\nRun with\nMy local group bots\nRefresh\n\nNext request: this server · Local group accounts: ms2 OpenCode\n\nShared providers and requests\nGoal\n\n\nThis is where you talk to your bots. Type anything and press Enter. Every chat is a real agent on your machine.\nNext\nStep 1 of 9\nSkip tour"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "docker-tutorial-03",
+      "frames": 197,
+      "durationMs": 151368,
+      "droppedSamples": [
+        {
+          "timeMs": 52751,
+          "error": "Error: Browser command timed out: Page.captureScreenshot"
+        }
+      ],
+      "statusErrors": [],
+      "failedActions": [
+        {
+          "id": "group-resume-ready-03",
+          "action": "group-flow",
+          "view": "ms1",
+          "timeMs": 101733,
+          "ok": false,
+          "error": "Error: Browser timed out: field section[aria-label=\"Share this group\"] input:not([type=checkbox]). Visible page: modified.\nGroup chats\nWebhook team\nNo messages yet\nEngineering\nReviewer\n, Code Reviewer\nBuilder\n, Software Engineer\nAdd or remove bots\n\nM\nms1\nWebhook team\nAll threads\n1\nDefault (5 min)\n30 minutes\n60 minutes\n120 minutes\nCustom…\nPeople · 3\nShare this group\n\nShare this group's text conversations and bot names with people you invite. Each device keeps its own copy. Files, private quotes, credentials, tool details and execution permissions stay local.\n\nSharing enabled · 0 event deliveries pending\n\nLast exchange: 30/10/2026, 7:24:58 am\n\nms1 · This device\nCan invite people\nms2\nMember\nLast contact: 7:24:58 am\nRemove\nms3\nMember\nLast contact: 7:24:57 am\nRemove\nShared bot profiles\nChief · ms1\nms2 Review bot · ms2\nms3 Assistant · ms3\nAllow this person to invite others and manage the memberships they invite\nCreate invitation\nPause this device\nLead: Chief\nAuto\nEveryone responds\nOnly when mentioned\nSample webhook fix and separate regression checks. Each owner keeps its own workspace.\nWebhook team\nMention a bot with @ to bring them in.\n\nRun with\nMy local group bots\nRefresh\n\nNext request: this server · Local group accounts: Nebius Token Factory · Nemotron Ultra\n\nShared providers and requests\nGoal\n\n"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "docker-tutorial-04",
+      "frames": 0,
+      "durationMs": 9503,
+      "droppedSamples": [],
+      "statusErrors": [],
+      "failedActions": [],
+      "error": "Error: Fixture browser exited: "
+    },
+    {
+      "name": "docker-tutorial-05",
+      "frames": 3530,
+      "durationMs": 2366009,
+      "droppedSamples": [],
+      "statusErrors": [],
+      "failedActions": [
+        {
+          "id": "group-resume-05-start",
+          "action": "group-flow",
+          "view": "ms2",
+          "timeMs": 85145,
+          "ok": false,
+          "error": "AssertionError [ERR_ASSERTION]: Locate the intended ms1 member explicitly."
+        },
+        {
+          "id": "group-resume-05-ready",
+          "action": "group-flow",
+          "view": "ms2",
+          "timeMs": 122875,
+          "ok": false,
+          "error": "Error: Browser timed out: click [data-execution-share] > summary. Visible page: Hattera\nGroup chats\nWebhook team\nI have the sample files locally. I will share m…\njust now\nNew task\n50 min ago\nBots\nms2 Review bot\nHi, I'm ms2 Review bot. What would you like me to do?\n\nM\nms2\nWebhook team\nAll threads\n2\nDefault (5 min)\n30 minutes\n60 minutes\n120 minutes\nCustom…\nPeople · 3\nLead: ms2 Review bot\nAuto\nEveryone responds\nOnly when mentioned\nSample webhook fix and separate regression checks. Each owner keeps its own workspace.\nToday 7:27 am\nEdge on Windows\nThe webhook fix and separate review are complete. ms2, can you check the sample patch on your installation?\n7:27 am\nI have the sample files locally. I will share my review bot so you can request its regression check.\n7:27 am\nEdge on Windows\nThe webhook fix and separate review are complete. ms2, can you check the sample patch on your installation?\n7:28 am\nI have the sample files locally. I will share my review bot so you can request its regression check.\n7:28 am\n\nRun with\nMy local group bots\nRefresh\n\nNext request: this server · Local group accounts: ms2 OpenCode\n\nShared providers and requests\nGoal\n\n"
+        },
+        {
+          "id": "group-resume-05-selected-bot",
+          "action": "group-flow",
+          "view": "ms2",
+          "timeMs": 519582,
+          "ok": false,
+          "error": "Error: Browser timed out: real owner-side model execution. Visible page: es locally. I will share my review bot so you can request its regression check.\n7:28 am\n\nRun with\nMy local group bots\nms2 (fH5F5nIVLWg) · ms2 sample review · ms2 OpenCode · opencode/mimo-v2.6-flash-free\nRefresh\n\nNext request: ms2's server · Account profile: ms2 OpenCode · opencode/mimo-v2.6-flash-free. Uses their bot and memory.\n\nThis request will wait for approval on the owner's computer. Native tool permissions still apply.\n\nSend execution request\nShared providers and requests\nms2\nApp reachable · 7:35:11 am\nms3\nApp reachable · 7:35:11 am\nShare a bot and its provider account\nRequests on this computer\nRequests sent to other people\nms1 → ms2 · ms2 sample review\nWaiting for native tool approval\n\nSample review 3ce90b86: In /data/project, reproduce the original failure with node --test test/webhook.test.mjs. Inspect the supplied proposed/webhook.mjs, copy it to src/webhook.mjs, and run the tests again. Do not edit tests or unrelated files. Report the exact commands, exit codes, and findings. The sample handler was copied into your own proposed folder for this demo; group joining did not copy files.\n\nms2 OpenCode · opencode/mimo-v2.6-flash-free\n\nCancel execution\nOpen shared conversation"
+        },
+        {
+          "id": "group-finish-05-native",
+          "action": "group-flow",
+          "view": "ms2",
+          "timeMs": 936542,
+          "ok": false,
+          "error": "Error: TypeError: Cannot set properties of null (setting 'open')\n    at <anonymous>:1:55"
+        }
+      ],
+      "error": null
+    }
+  ],
+  "limitationDetails": {
+    "humanNarration": "Silent master; human recording and measured audio duration check remain for the owner.",
+    "physicalDevices": "Docker profiles are automated demo participants; no physical tailnet or human colleague participation is qualified.",
+    "publication": "Hackathon submission and external deployment are outside this artifact."
+  },
+  "ownerTestsUnchanged": true,
+  "colleagueParticipated": false,
+  "automatedDockerParticipants": true,
+  "sourceVersion": "d5b4d04f",
+  "artifactReview": {
+    "checkedShots": 21,
+    "frames": "raw/qa/shot-01.jpg through shot-21.jpg",
+    "contactSheets": [
+      "raw/qa/contact-01.jpg",
+      "raw/qa/contact-02.jpg",
+      "raw/qa/contact-03.jpg"
+    ],
+    "narrationWords": 266,
+    "estimatedCueRateWpm": 130,
+    "humanReadAloudMeasured": false,
+    "secretScan": {
+      "textFiles": 149,
+      "matches": 0
+    }
+  },
+  "distribution": {
+    "included": "Final video, poster, narration, shot manifest, redacted proof and synthetic before/after sample.",
+    "localOnly": "Uncut screenshot takes, QA frames, private runtime and one-off recording/recovery tools.",
+    "rawCapturePaths": "Source directories in shots.json refer to the retained local capture set, which is not committed."
+  }
+}

@@ -1,0 +1,603 @@
+{
+  "status": "Completed Docker tutorial silent master",
+  "durationSeconds": 164.8,
+  "disclosure": "Docker demo · simulated Tailscale",
+  "scope": "Three automated Docker profiles; no real human colleague or physical-tailnet claim.",
+  "editing": "Only genuine timestamped frames. Preparation, model steering and waits are cut. Returned tool reports are viewed after execution; receipts preserve chronology.",
+  "shots": [
+    {
+      "id": "task",
+      "sourceDirectory": "raw/docker-tutorial-01",
+      "sourceStartMs": 983500,
+      "sourceEndMs": 995500,
+      "finalStartSeconds": 0,
+      "finalEndSeconds": 12,
+      "title": "1. Ask Chief for a sample coding task",
+      "caption": "Reproduce the duplicate-webhook bug, fix it, test it, and obtain a separate review.",
+      "identity": "ms1 · Chief · Nebius / NVIDIA Nemotron-3-Ultra-550b-a55b · inference: us-central1 · tools: ms1 Docker",
+      "narration": "In this tutorial, ms1, ms2, and ms3 are Docker profiles. I ask Chief to fix a sample duplicate-webhook bug.",
+      "owner": "ms1",
+      "actor": "Chief",
+      "provider": "Nebius Token Factory",
+      "model": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "engine": "openai-compat",
+      "executionLocation": {
+        "inference": "Nebius us-central1",
+        "tools": "ms1 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "proposal",
+      "sourceDirectory": "raw/docker-tutorial-01",
+      "sourceStartMs": 1215000,
+      "sourceEndMs": 1227000,
+      "finalStartSeconds": 12,
+      "finalEndSeconds": 24,
+      "title": "2. Review the proposed coding team",
+      "caption": "Builder + Reviewer: OpenCode/MiMo, /data/project, and reviewed team access.",
+      "identity": "ms1 · Chief · Nebius / NVIDIA Nemotron-3-Ultra-550b-a55b · inference: us-central1 · tools: ms1 Docker",
+      "narration": "Chief uses NVIDIA Nemotron Ultra through Nebius. I review Builder and Reviewer, their models, working folder, and team access.",
+      "owner": "ms1",
+      "actor": "Chief",
+      "provider": "Nebius Token Factory",
+      "model": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "engine": "openai-compat",
+      "executionLocation": {
+        "inference": "Nebius us-central1",
+        "tools": "ms1 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "approve",
+      "sourceDirectory": "raw/docker-tutorial-01",
+      "sourceStartMs": 1227400,
+      "sourceEndMs": 1235400,
+      "finalStartSeconds": 24,
+      "finalEndSeconds": 32,
+      "title": "2. Apply the team setup",
+      "caption": "Apply setup creates the approved specialists in Engineering.",
+      "identity": "ms1 · Chief · Nebius / NVIDIA Nemotron-3-Ultra-550b-a55b · inference: us-central1 · tools: ms1 Docker",
+      "narration": "I apply the setup. Both specialists appear in Engineering with the approved model and Ask permissions.",
+      "owner": "ms1",
+      "actor": "Chief",
+      "provider": "Nebius Token Factory",
+      "model": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "engine": "openai-compat",
+      "executionLocation": {
+        "inference": "Nebius us-central1",
+        "tools": "ms1 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "dispatch",
+      "sourceDirectory": "raw/docker-tutorial-01",
+      "sourceStartMs": 1545000,
+      "sourceEndMs": 1553000,
+      "finalStartSeconds": 32,
+      "finalEndSeconds": 40,
+      "title": "3. Follow accepted task assignments",
+      "caption": "Check accepted handoff receipts; the follow-up triggered the actual assignments.",
+      "identity": "ms1 · Chief · Nebius / NVIDIA Nemotron-3-Ultra-550b-a55b · inference: us-central1 · tools: ms1 Docker",
+      "narration": "Chief’s accepted receipts link to both tasks. A follow-up here made the actual assignments happen.",
+      "owner": "ms1",
+      "actor": "Chief",
+      "provider": "Nebius Token Factory",
+      "model": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "engine": "openai-compat",
+      "executionLocation": {
+        "inference": "Nebius us-central1",
+        "tools": "ms1 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "failure",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 1201696,
+      "sourceEndMs": 1211696,
+      "finalStartSeconds": 40,
+      "finalEndSeconds": 50,
+      "title": "3. Inspect the before-fix failure",
+      "caption": "Recorded Builder output: actual 2 invoices, expected 1. Assertion failed.",
+      "identity": "ms1 · Builder · OpenCode Zen / MiMo-V2.6-Flash Free · hosted inference · tools: ms1 Docker",
+      "narration": "I open Builder’s returned tool output. The duplicate event produced two invoices where the test expected one.",
+      "owner": "ms1",
+      "actor": "Builder",
+      "provider": "OpenCode Zen",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "engine": "OpenCode ACP",
+      "executionLocation": {
+        "inference": "OpenCode Zen hosted inference",
+        "tools": "ms1 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Returned evidence viewed after execution. Native receipts establish execution order; viewing order is edited.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "passing",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 1249782,
+      "sourceEndMs": 1257782,
+      "finalStartSeconds": 50,
+      "finalEndSeconds": 58,
+      "title": "3. Inspect the fix and passing tests",
+      "caption": "Actual handler diff and regression output: 3 pass, 0 fail. Tests unchanged.",
+      "identity": "ms1 · Builder · OpenCode Zen / MiMo-V2.6-Flash Free · hosted inference · tools: ms1 Docker",
+      "narration": "Builder records event IDs and ignores repeats. All three regression tests now pass.",
+      "owner": "ms1",
+      "actor": "Builder",
+      "provider": "OpenCode Zen",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "engine": "OpenCode ACP",
+      "executionLocation": {
+        "inference": "OpenCode Zen hosted inference",
+        "tools": "ms1 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Returned evidence viewed after execution. Native receipts establish execution order; viewing order is edited.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "review-tools",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 2225636,
+      "sourceEndMs": 2233636,
+      "finalStartSeconds": 58,
+      "finalEndSeconds": 66,
+      "title": "3. Open Reviewer’s own test output",
+      "caption": "A separate Reviewer task executed the regression suite and additional checks.",
+      "identity": "ms1 · Reviewer · OpenCode Zen / MiMo-V2.6-Flash Free · hosted inference · tools: ms1 Docker",
+      "narration": "Reviewer separately ran the same regression suite. Here is its returned output.",
+      "owner": "ms1",
+      "actor": "Reviewer",
+      "provider": "OpenCode Zen",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "engine": "OpenCode ACP",
+      "executionLocation": {
+        "inference": "OpenCode Zen hosted inference",
+        "tools": "ms1 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Returned evidence viewed after execution. Native receipts establish execution order; viewing order is edited.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "review-verdict",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 2290208,
+      "sourceEndMs": 2300208,
+      "finalStartSeconds": 66,
+      "finalEndSeconds": 76,
+      "title": "3. Read the independent review",
+      "caption": "Review the actual five-line addition, test verdict, and in-memory scope.",
+      "identity": "ms1 · Reviewer · OpenCode Zen / MiMo-V2.6-Flash Free · hosted inference · tools: ms1 Docker",
+      "narration": "The review checks the actual handler diff and explains the sample’s limits: deduplication is held in memory.",
+      "owner": "ms1",
+      "actor": "Reviewer",
+      "provider": "OpenCode Zen",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "engine": "OpenCode ACP",
+      "executionLocation": {
+        "inference": "OpenCode Zen hosted inference",
+        "tools": "ms1 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Returned evidence viewed after execution. Native receipts establish execution order; viewing order is edited.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "invite",
+      "sourceDirectory": "raw/docker-tutorial-02",
+      "sourceStartMs": 292900,
+      "sourceEndMs": 301900,
+      "finalStartSeconds": 76,
+      "finalEndSeconds": 85,
+      "title": "4. Start sharing a group",
+      "caption": "Choose Share group, start sharing, and create an invitation. Invitation codes are hidden.",
+      "identity": "ms1 Docker view · human group actions · no model execution",
+      "narration": "I open Share group, start sharing, and create an invitation. Codes are hidden here.",
+      "owner": "ms1",
+      "actor": "Human UI interaction",
+      "provider": null,
+      "model": null,
+      "engine": null,
+      "executionLocation": {
+        "inference": "none",
+        "tools": "none"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "join",
+      "sourceDirectory": "raw/docker-tutorial-02",
+      "sourceStartMs": 302800,
+      "sourceEndMs": 312800,
+      "finalStartSeconds": 85,
+      "finalEndSeconds": 95,
+      "title": "4. Join from ms2’s installation",
+      "caption": "ms2 pastes the invitation and chooses Join with invitation.",
+      "identity": "ms2 Docker view · human group actions · no model execution",
+      "narration": "On ms2, I paste that invitation and join. Each installation keeps its own copy of the conversation.",
+      "owner": "ms2",
+      "actor": "Human UI interaction",
+      "provider": null,
+      "model": null,
+      "engine": null,
+      "executionLocation": {
+        "inference": "none",
+        "tools": "none"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "roster",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 73426,
+      "sourceEndMs": 77426,
+      "finalStartSeconds": 95,
+      "finalEndSeconds": 99,
+      "title": "4. Check the shared group members",
+      "caption": "ms1, ms2 and ms3 appear as members on separate Docker installations.",
+      "identity": "ms1 Docker view · human group actions · no model execution",
+      "narration": "All three members now appear.",
+      "owner": "ms1",
+      "actor": "Human UI interaction",
+      "provider": null,
+      "model": null,
+      "engine": null,
+      "executionLocation": {
+        "inference": "none",
+        "tools": "none"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "message",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 77400,
+      "sourceEndMs": 81000,
+      "finalStartSeconds": 99,
+      "finalEndSeconds": 102.6,
+      "title": "4. Send a group message as ms1",
+      "caption": "Use the shared conversation to discuss the sample check.",
+      "identity": "ms1 Docker view · human group actions · no model execution",
+      "narration": "Now I send a message.",
+      "owner": "ms1",
+      "actor": "Human UI interaction",
+      "provider": null,
+      "model": null,
+      "engine": null,
+      "executionLocation": {
+        "inference": "none",
+        "tools": "none"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "reply",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 81400,
+      "sourceEndMs": 84900,
+      "finalStartSeconds": 102.6,
+      "finalEndSeconds": 106.1,
+      "title": "4. Reply from ms2",
+      "caption": "The other installation receives the message and replies.",
+      "identity": "ms2 Docker view · human group actions · no model execution",
+      "narration": "ms2 receives it and replies.",
+      "owner": "ms2",
+      "actor": "Human UI interaction",
+      "provider": null,
+      "model": null,
+      "engine": null,
+      "executionLocation": {
+        "inference": "none",
+        "tools": "none"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "grant",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 198100,
+      "sourceEndMs": 202600,
+      "finalStartSeconds": 106.1,
+      "finalEndSeconds": 110.6,
+      "title": "4. Share one selected bot",
+      "caption": "ms2 selects its bot, permits ms1, and keeps per-request approval enabled.",
+      "identity": "ms2 Docker view · human group actions · no model execution",
+      "narration": "ms2 selects a bot, permitted people, and approval.",
+      "owner": "ms2",
+      "actor": "Human UI interaction",
+      "provider": null,
+      "model": null,
+      "engine": null,
+      "executionLocation": {
+        "inference": "none",
+        "tools": "none"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    },
+    {
+      "id": "request",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 203254,
+      "sourceEndMs": 214954,
+      "finalStartSeconds": 110.6,
+      "finalEndSeconds": 122.3,
+      "title": "4. Choose ms2 under Run with",
+      "caption": "The patch was manually copied to ms2’s proposed folder. Joining does not copy files.",
+      "identity": "ms1 requests ms2 · OpenCode Zen / MiMo-V2.6-Flash Free · no inference before owner approval",
+      "narration": "I select ms2’s account under Run with and request the check. I supplied the patch separately; joining the group does not copy files.",
+      "owner": "ms1",
+      "actor": "Execution request",
+      "provider": "OpenCode Zen",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "engine": "OpenCode ACP",
+      "executionLocation": {
+        "inference": "OpenCode Zen hosted inference",
+        "tools": "ms2 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json",
+        "raw/docker-collaboration-receipt.json"
+      ]
+    },
+    {
+      "id": "owner-approval",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 215042,
+      "sourceEndMs": 224042,
+      "finalStartSeconds": 122.3,
+      "finalEndSeconds": 131.3,
+      "title": "4. Approve the request on ms2",
+      "caption": "The owner reviews the request and chooses Approve and run.",
+      "identity": "ms2 · ms2 Review bot · OpenCode Zen / MiMo-V2.6-Flash Free · tools: ms2 Docker",
+      "narration": "On ms2, I review the request and approve it. The bot uses ms2’s own workspace.",
+      "owner": "ms2",
+      "actor": "ms2 Review bot",
+      "provider": "OpenCode Zen",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "engine": "OpenCode ACP",
+      "executionLocation": {
+        "inference": "OpenCode Zen hosted inference",
+        "tools": "ms2 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json",
+        "raw/docker-collaboration-receipt.json"
+      ]
+    },
+    {
+      "id": "native-approval",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 876900,
+      "sourceEndMs": 885900,
+      "finalStartSeconds": 131.3,
+      "finalEndSeconds": 140.3,
+      "title": "4. Keep native tool approvals",
+      "caption": "Allow once approves the displayed sample command on ms2’s installation.",
+      "identity": "ms2 · ms2 Review bot · OpenCode Zen / MiMo-V2.6-Flash Free · tools: ms2 Docker",
+      "narration": "Native tools still ask for approval. I use Allow once for these sample commands.",
+      "owner": "ms2",
+      "actor": "ms2 Review bot",
+      "provider": "OpenCode Zen",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "engine": "OpenCode ACP",
+      "executionLocation": {
+        "inference": "OpenCode Zen hosted inference",
+        "tools": "ms2 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json",
+        "raw/docker-collaboration-receipt.json"
+      ]
+    },
+    {
+      "id": "result-ms1",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 969000,
+      "sourceEndMs": 974500,
+      "finalStartSeconds": 140.3,
+      "finalEndSeconds": 145.8,
+      "title": "5. Read the returned result on ms1",
+      "caption": "Completed on ms2: failure reproduced, supplied handler applied, all 3 tests pass.",
+      "identity": "View: ms1 · Executor: ms2 · OpenCode Zen / MiMo-V2.6-Flash Free · tools: ms2 Docker",
+      "narration": "I open the completed result on ms1.",
+      "owner": "ms1",
+      "actor": "Shared result from ms2",
+      "provider": "OpenCode Zen",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "engine": "OpenCode ACP",
+      "executionLocation": {
+        "inference": "OpenCode Zen hosted inference",
+        "tools": "ms2 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json",
+        "raw/docker-collaboration-receipt.json"
+      ]
+    },
+    {
+      "id": "result-ms2",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 975800,
+      "sourceEndMs": 981300,
+      "finalStartSeconds": 145.8,
+      "finalEndSeconds": 151.3,
+      "title": "5. See the same result on ms2",
+      "caption": "The owner-side result appears once in each installation’s shared conversation.",
+      "identity": "View: ms2 · Executor: ms2 · OpenCode Zen / MiMo-V2.6-Flash Free · tools: ms2 Docker",
+      "narration": "ms2 sees the same completed reply.",
+      "owner": "ms2",
+      "actor": "Shared result from ms2",
+      "provider": "OpenCode Zen",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "engine": "OpenCode ACP",
+      "executionLocation": {
+        "inference": "OpenCode Zen hosted inference",
+        "tools": "ms2 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json",
+        "raw/docker-collaboration-receipt.json"
+      ]
+    },
+    {
+      "id": "result-ms3",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 982750,
+      "sourceEndMs": 988250,
+      "finalStartSeconds": 151.3,
+      "finalEndSeconds": 156.8,
+      "title": "5. Other members can read the result",
+      "caption": "ms3 receives the shared reply; it was not granted permission to request ms2’s bot.",
+      "identity": "View: ms3 · Executor: ms2 · OpenCode Zen / MiMo-V2.6-Flash Free · tools: ms2 Docker",
+      "narration": "ms3 can read it too.",
+      "owner": "ms3",
+      "actor": "Shared result from ms2",
+      "provider": "OpenCode Zen",
+      "model": "opencode/mimo-v2.6-flash-free",
+      "engine": "OpenCode ACP",
+      "executionLocation": {
+        "inference": "OpenCode Zen hosted inference",
+        "tools": "ms2 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Actual captured interaction or result view. Idle waits and preparation are cut; source ranges are retained.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json",
+        "raw/docker-collaboration-receipt.json"
+      ]
+    },
+    {
+      "id": "finish",
+      "sourceDirectory": "raw/docker-tutorial-05",
+      "sourceStartMs": 995900,
+      "sourceEndMs": 1003900,
+      "finalStartSeconds": 156.8,
+      "finalEndSeconds": 164.8,
+      "title": "5. Keep the work and its evidence together",
+      "caption": "Chief’s coding reports and the owner-approved shared check remain in their conversations.",
+      "identity": "ms1 · Chief · Nebius / NVIDIA Nemotron-3-Ultra-550b-a55b · inference: us-central1 · tools: ms1 Docker",
+      "narration": "I keep the coding assignments, review evidence, and shared check available in their conversations.",
+      "owner": "ms1",
+      "actor": "Chief",
+      "provider": "Nebius Token Factory",
+      "model": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "engine": "openai-compat",
+      "executionLocation": {
+        "inference": "Nebius us-central1",
+        "tools": "ms1 Docker /data/project"
+      },
+      "classification": "Actual captured application UI with separate editorial header and footer",
+      "note": "Returned evidence viewed after execution. Native receipts establish execution order; viewing order is edited.",
+      "evidence": [
+        "evidence.json",
+        "raw/docker-transcripts.json",
+        "raw/docker-native-tool-receipts.json"
+      ]
+    }
+  ]
+}
