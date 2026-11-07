@@ -40,6 +40,7 @@ import { MarkdownImagePreview, MessageFolderFiles, OutsideWorkspaceFile, saveFai
 import { ThreadLink, ThreadRefsContext, threadLinkFromProps, type ThreadRefsValue } from "./ThreadRefs";
 import { MarkdownTable } from "./MarkdownTable";
 import { TableFileButton } from "./TableFilePreview";
+import { DocumentPreviewButton } from "./DocumentPreview";
 
 // highlighted code, so revisiting a thread doesn't re-tokenize settled
 // blocks; keys are content hashes. The two-theme HTML is about 20 to 28 times
@@ -690,6 +691,7 @@ function LocalFileLink({ filePath, name, children, message }: { filePath: string
 
   return (
     <span dir="ltr" className="inline-flex flex-wrap items-center gap-x-1.5 [unicode-bidi:isolate]">
+      <DocumentPreviewButton path={filePath} name={name ?? fileName(filePath)} message={message} />
       <TableFileButton path={filePath} name={name ?? fileName(filePath)} message={message} />
       <button
         type="button"
