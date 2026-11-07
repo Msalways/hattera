@@ -1596,19 +1596,5 @@
   "settings.sendKey.subtitle": "Shift+Enter या {key} चुनें ताकि Enter नई पंक्ति शुरू करे — यह तब काम आता है जब आपकी इनपुट विधि Enter से टेक्स्ट पक्का करती है, जैसे जापानी इनपुट में। {key} हर विकल्प में भेजता है। सिर्फ़ इस डिवाइस पर।",
   "computer.files.homeFolder": "होम फ़ोल्डर",
   "computer.files.changeDefaultFolder": "डिफ़ॉल्ट बदलें",
-  "computer.files.pinnedFolderHint": "इस बातचीत का मौजूदा फ़ोल्डर वही रहेगा। नई बातचीत के लिए डिफ़ॉल्ट फ़ोल्डर बदलें।",
-  "chat.usage.details.title": "Context & usage",
-  "chat.usage.details.subtitle": "Context occupancy, this task's token ledger, and the current account's provider-reported allowance.",
-  "chat.usage.details.openAria": "Open context and usage details",
-  "chat.usage.details.contextOccupancy": "Context occupancy",
-  "chat.usage.details.contextNote": "How much of the current model context window this conversation is occupying now. This is separate from total tokens used across turns.",
-  "chat.usage.details.contextUnavailable": "Context occupancy is not reported for this conversation yet.",
-  "chat.usage.details.noTelemetry": "No usage telemetry is available for this conversation yet.",
-  "chat.usage.details.ledger": "Accumulated task ledger",
-  "chat.usage.details.ledgerNote": "Totals accumulated across settled turns in this task. This is not the same as current context occupancy or provider plan allowance.",
-  "chat.usage.details.noLedger": "No settled turn usage has been recorded for this task yet.",
-  "chat.usage.details.allowance": "Account allowance",
-  "chat.usage.details.allowanceUnavailable": "Provider-reported allowance is not available for the current account or connection.",
-  "chat.usage.details.allowanceLegacy": "Legacy provider window data is available in Settings → Usage.",
-  "chat.usage.details.unknownAccount": "Current account"
+  "computer.files.pinnedFolderHint": "इस बातचीत का मौजूदा फ़ोल्डर वही रहेगा। नई बातचीत के लिए डिफ़ॉल्ट फ़ोल्डर बदलें।"
 }
