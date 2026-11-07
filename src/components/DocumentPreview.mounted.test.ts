@@ -55,7 +55,7 @@ describe('mounted document preview', () => {
   });
   it('isolates ignored-abort responses when switching documents while open', async () => {
     const old = deferred(); network.mockReturnValueOnce(old.promise).mockResolvedValue(new Response('Second document'));
-    await render('first.txt'); await await open(); await vi.waitFor(() => expect(network).toHaveBeenCalledTimes(1));
+    await render('first.txt'); await open(); await vi.waitFor(() => expect(network).toHaveBeenCalledTimes(1));
     const signal = network.mock.calls[0]![1]!.signal!;
     await render('second.txt'); expect(signal.aborted).toBe(true);
     await vi.waitFor(async () => { await settle(); expect(document.querySelector('dialog pre')?.textContent).toBe('Second document'); });
