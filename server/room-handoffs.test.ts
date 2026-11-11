@@ -18,6 +18,28 @@ async function fixture(test: (engine: RoomHandoffs, hooks: RoomHandoffHooks, fil
 const flush = () => new Promise<void>(resolve => setImmediate(resolve));
 
 describe("addressed room request tree", () => {
+  it("persists per-request selections without collapsing distinct routes or legacy requests", () => fixture((engine, hooks, file) => {
+    const source = {botId: "source-opaque", threadId: "source-chat"};
+    const target = {botId: "recipient-opaque", threadId: "recipient-chat"};
+    const a = {instanceId: "account-opaque", model: "model-opaque", effort: "high" as const};
+    const enqueue = (selection?: typeof a) => engine.enqueue(source, "turn", undefined, target, "request", "same message",
+      false, false, "", undefined, undefined, selection);
+    const legacy = enqueue();
+    const first = enqueue(a);
+    expect(enqueue({...a}).duplicate).toBe(true);
+    const second = enqueue({...a, model: "another-opaque-model"});
+    expect(second.duplicate).toBe(false);
+    expect(new Set([legacy.node.id, first.node.id, second.node.id]).size).toBe(3);
+    a.model = "mutated-input";
+    expect(first.node.selection?.model).toBe("model-opaque");
+    expect(Object.isFrozen(first.node.selection)).toBe(true);
+    const reloaded = new RoomHandoffs(file, hooks);
+    expect(reloaded.nodes.get(first.node.id)?.selection).toEqual(first.node.selection);
+    expect(Object.isFrozen(reloaded.nodes.get(first.node.id)?.selection)).toBe(true);
+    expect(reloaded.nodes.get(legacy.node.id)?.selection).toBeUndefined();
+    expect(reloaded.nodes.get(second.node.id)?.selection?.model).toBe("another-opaque-model");
+    expect(JSON.parse(readFileSync(file, "utf8")).find((n: RoomHandoff) => n.id === legacy.node.id)).not.toHaveProperty("selection");
+  }));
   it("keeps where a tree's work started on its root, across a restart, and nowhere else", () => fixture(async (engine, _hooks, file) => {
     const chief = { botId: "chief", threadId: "chief-chat" };
     const lead = { botId: "lead", threadId: "lead-work" };

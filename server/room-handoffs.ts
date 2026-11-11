@@ -3,12 +3,14 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { writeFileAtomic } from "./atomic.ts";
 import { workOriginSchema, type WorkOrigin } from "./peer-provenance.ts";
+import { delegatedSelectionKey, delegatedSelectionSchema, type DelegatedSelection } from "./delegated-selection.ts";
 
 const nodeSchema = z.object({
   id: z.string(), rootId: z.string(), parentId: z.string().optional(),
   groupId: z.string().optional(), threadId: z.string(), botId: z.string(),
   key: z.string(), text: z.string(), createdAt: z.number(),
   requestBatchKey: z.string().optional(),
+  selection: delegatedSelectionSchema.optional(),
   status: z.enum(["source", "queued", "running", "waiting", "resume", "completed", "failed", "cancelled"]),
   result: z.string().default(""), reported: z.boolean().default(false),
   executions: z.number().int().nonnegative().default(0), startedAt: z.number().optional(),
@@ -397,8 +399,10 @@ export class RoomHandoffs {
 
   enqueue(source: RoomAddress, generation: string, parentId: string | undefined,
     target: RoomAddress, key: string, text: string, approvalGranted = false,
-    rework = false, sourceText = "", requestBatchKey?: string, origin?: WorkOrigin): { node: RoomHandoff; duplicate: boolean } {
+    rework = false, sourceText = "", requestBatchKey?: string, origin?: WorkOrigin,
+    requestedSelection?: DelegatedSelection): { node: RoomHandoff; duplicate: boolean } {
     if (this.loadError) throw new Error(this.loadError);
+    const selection = requestedSelection === undefined ? undefined : delegatedSelectionSchema.parse(requestedSelection);
     let parent = parentId ? this.nodes.get(parentId) : this.nodes.get(generation);
     if (parentId && (!parent || parent.status !== "running")) throw new Error("The originating room task is no longer running");
     if (parent && (parent.groupId !== source.groupId || parent.threadId !== source.threadId || parent.botId !== source.botId)) {
@@ -412,10 +416,11 @@ export class RoomHandoffs {
     if (path.some(n => n.botId === target.botId && (!n.groupId || !target.groupId || n.groupId === target.groupId))) {
       throw new Error("Cannot assign work back to an ancestor; results return automatically");
     }
-    // The same text to the same teammate and place under one parent is one
-    // request, so a repeat lands on it. Only rework=true runs a finished or
+    // The same text, explicit selection, teammate and place under one parent
+    // is one request, so a repeat lands on it. Only rework=true runs a finished or
     // failed one again.
-    const existing = this.children(parent.id).findLast(n => n.botId === target.botId && n.groupId === target.groupId && n.text === text);
+    const existing = this.children(parent.id).findLast(n => n.botId === target.botId && n.groupId === target.groupId && n.text === text &&
+      delegatedSelectionKey(n.selection) === delegatedSelectionKey(selection));
     if (existing && !(rework && terminal(existing))) return { node: existing, duplicate: true };
     if (!rework && this.children(parent.id).some(n => n.kind === kind &&
       n.groupId === target.groupId && n.botId === target.botId && n.status === "completed")) {
@@ -449,7 +454,7 @@ export class RoomHandoffs {
     }
     const node: RoomHandoff = { ...target, id: randomUUID(), rootId: parent.rootId, parentId: parent.id,
       key, text, createdAt: this.now(), status: "queued", result: "", reported: false, executions: 0, approvalGranted,
-      kind, restarts: 0, ...(target.groupId && requestBatchKey ? { requestBatchKey } : {}) };
+      kind, restarts: 0, ...(selection ? { selection } : {}), ...(target.groupId && requestBatchKey ? { requestBatchKey } : {}) };
     const problem = this.hooks.validate(node, parent);
     if (problem) throw new Error(problem);
     if (fresh) this.nodes.set(parent.id, parent);
