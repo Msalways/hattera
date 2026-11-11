@@ -232,6 +232,8 @@ export async function runRoomHandoffAgent(argv: string[], planPath: string, prom
     await waitForExit(child, { signal: "SIGTERM", graceMs: 500 });
     appendFileSync(`${planPath}.evidence.jsonl`, JSON.stringify({ botId, turnIndex, threadId: integration.env.OMB_THREAD_ID,
       model: argv.includes("--model") ? arg("--model") : undefined,
+      effort: argv.includes("--effort") ? arg("--effort") : undefined,
+      instanceTag: process.env.FAKE_CLAUDE_ROUTE_ID,
       permissionMode: argv.includes("--permission-mode") ? arg("--permission-mode") : undefined,
       snapshotMode: argv.includes("--system-prompt-snapshot") ? arg("--system-prompt-snapshot") : undefined,
       resumed, system, prompt, evidence, ...(entry ? { planKey: entry.key } : {}), ...(approval ? { approval } : {}), ...(screen ? { screen } : {}), ...launch?.evidence }) + "\n");

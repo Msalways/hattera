@@ -441,7 +441,7 @@ export async function launchVerificationServer(
   /** A stand-in enterprise layer (the folder shape core loads) and the key
    * it should accept, so a recipe can prove entitled behaviour offline. */
   enterprise?: { dir: string; licenseKey: string },
-  room?: { scripted: boolean },
+  room?: { scripted: boolean; prepare?: (dataDir: string) => void },
   /** Optional repository-owned fake providers for multi-engine setup checks. */
   extraProviders: Array<"codex" | "cline" | "opencode" | "qwen" | "grok" | "kimi" | "droid" | "gemini" | "grok-api" | "antigravity"> = [],
   /** Programmatic tests only: an owned loopback Boat provider, never a live account. */
@@ -512,6 +512,9 @@ export async function launchVerificationServer(
     },
   }, null, 2));
 
+  // Programmatic fixture setup only; never exposed through control HTTP/CLI.
+  try { room?.prepare?.(dataDir); }
+  catch (error) { await removeTempDir(dataDir); throw error; }
   const log = openSync(logPath, "a", 0o600);
   const childEnv = verificationServerEnvironment(parentEnv, dataDir, port);
   // Opt-in live Local VM fixture: keep the temporary home and fake engine,
@@ -565,6 +568,8 @@ export async function launchVerificationServer(
     throw error;
   }
 
+  // Custom persisted fixtures own their initial bot roster.
+  if (!room?.prepare) {
   // The first-run seed gives the starter a random friendly name from
   // server/names.ts, and that pool shares names with bots e2e suites plan
   // ("Quill" among them). A name-based assertion then reports the starter as
@@ -598,6 +603,7 @@ export async function launchVerificationServer(
     throw error;
   }
 
+  }
   let closed = false;
   return {
     info: { url, pid: child.pid!, dataDir, logPath },

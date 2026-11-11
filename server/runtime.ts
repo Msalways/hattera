@@ -305,6 +305,7 @@ import { parseDataContext, type DataContext } from "./data-context.ts";
 import { promptWithDataContext } from "../shared/data-context.ts";
 import { admit, DRAIN_COALESCE_MAX_ITEMS } from "./admission.ts";
 import { _loadPending, buildDelegationFailurePrompt, buildDelegationRevivalPrompt, DELEGATION_TTL_MS, DelegationWakeBudget, discardDelegations, drainDelegations, expireStaleDelegations, findDelegationReceipt, pendingDelegationInfo, pendingDelegationSnapshot, pendingThreads, queueDelegation, recordDelegationReceipt, releaseDelegationsWaitingOn, summarizeDelegatedActivity, type DelegationReceipt, type DelegationRunner, type QueueResult } from "./delegations.ts";
+import { validateDelegatedSelection, type DelegatedSelection } from "./delegated-selection.ts";
 import {
   cancelSteeredMessage,
   drainSteeredMessages,
@@ -10360,9 +10361,11 @@ async function startTurn(
     };
   }
   // A thread whose own model can't run runs on its bot's from now on.
-  healThreadModel(botId, threadId);
-  const bot = store.projectBotForTask(botId, threadId);
-  if (!bot) throw Object.assign(new Error("no such task"), { status: 404 });
+  const delegatedSelection = activeDelegatedSelection(botId, threadId, opts?.coordination?.id, Boolean(opts?.cardContinuation));
+  if (!delegatedSelection) healThreadModel(botId, threadId);
+  const taskBot = store.projectBotForTask(botId, threadId);
+  if (!taskBot) throw Object.assign(new Error("no such task"), { status: 404 });
+  const bot = await delegatedExecutionBot(taskBot, delegatedSelection, threadId);
   // Routines and legacy peer delivery already have their own completion
   // owners. Only ordinary chats opt into this scheduler; its child turns
   // carry an exact node id rather than inheriting a routine's lifetime.
@@ -11608,6 +11611,14 @@ async function startTurn(
       // turn or a slash command skips it even when replayed context leads.
       const clock = takesTurnClock(userTurnText) ? turnClockLine(Date.now(), hostTimeZone()) : "";
       sharedExecution?.assertThread(threadId);
+      const dispatchBot = await delegatedExecutionBot(store.projectBotForTask(bot.id, threadId) ?? bot, delegatedSelection, threadId);
+      if (delegatedSelection) {
+        const node = opts?.coordination ? roomHandoffs.nodes.get(opts.coordination.id) : undefined;
+        if (registry.get(instanceId) !== instance || approvalModeFor(dispatchBot) !== approvalModeFor(bot) ||
+          (opts?.coordination && (!node || node.status !== "running" || roomHandoffProblem(node, node.parentId ? roomHandoffs.nodes.get(node.parentId) : undefined)))) {
+          throw new Error("Delegated execution settings or route changed during setup");
+        }
+      }
       const dispatch = await guardTurnDispatch(instance.adapter.sendTurn({
         threadId,
         botId: bot.id,
@@ -11786,7 +11797,7 @@ async function startTurn(
         registry.get(candidate.instanceId)?.enabled &&
         (candidate.instanceId !== instanceId || candidate.model !== model));
       const backup = backups[nextIndex];
-      if (mayRecover && backup && current && (!opts?.cardContinuation || opts.coordination) &&
+      if (!delegatedSelection && mayRecover && backup && current && (!opts?.cardContinuation || opts.coordination) &&
           !directRequestOwners.get(threadId)?.stopped && !hasQueuedSteeredMessages(bot.id, threadId) &&
           JSON.stringify(current.modelSelection) === JSON.stringify(bot.modelSelection) &&
           (backup.instanceId !== instanceId || backup.model !== model) &&
@@ -12673,6 +12684,37 @@ const configuredBotModels = () => {
   }
   return models;
 };
+/** Intent belongs to the addressed request, including its card continuations. */
+function activeDelegatedSelection(botId: string, threadId: string, requestId?: string, continuation = false): DelegatedSelection | undefined {
+  const node = requestId ? roomHandoffs.nodes.get(requestId) : continuation
+    ? [...roomHandoffs.nodes.values()].find(n => n.botId === botId && n.threadId === threadId && n.status === "running") : undefined;
+  return node?.botId === botId && node.threadId === threadId ? node.selection : undefined;
+}
+
+/** Project the request's selection without changing any stored bot/task setting. */
+async function delegatedExecutionBot(bot: BotRecord, selection?: DelegatedSelection, directThreadId?: string,
+  room?: {threadId: string; orchestration?: GroupTurnOrchestration}): Promise<BotRecord> {
+  if (!selection) return bot;
+  await registry.snapshot(selection.instanceId);
+  const current = directThreadId ? store.projectBotForTask(bot.id, directThreadId) : store.bot(bot.id);
+  if (!current) throw new Error("Delegated recipient no longer exists");
+  bot = current;
+  const target = registry.get(selection.instanceId);
+  const engine = threadEngine(selection.instanceId);
+  const checked = validateDelegatedSelection(selection, {
+    authorized: [...configuredBotModels()].flatMap(([instanceId, models]) => [...models].map(model => ({instanceId, model}))),
+    engines: target ? [{instanceId: selection.instanceId,
+      ready: Boolean(registry.lastSnapshot(selection.instanceId) && engine && readyToRun(selectableInstances([engine])[0]!, selectionContext)),
+      models: target.models.options.map(o => o.id), effortLevels: target.adapter.capabilities.effortLevels ?? []}] : [],
+    approvalPending: Boolean(bot.approvalGrant),
+    approvalCompatible: requested => {
+      const mode = room ? roomTurnApprovalMode(bot, room.threadId, room.orchestration) : approvalModeFor(bot);
+      return supportsApprovalMode(requested, mode) && ((mode !== "full" && mode !== "custom") ||
+        registry.cliTarget(requested.instanceId)?.driverKind === registry.cliTarget(bot.modelSelection.instanceId)?.driverKind);
+    },
+  });
+  return {...bot, modelSelection: checked!};
+}
 /** Shared model validation for team-setup cards and propose_model: the
  * selection must resolve, and the destination driver must still support the
  * bot's existing approval setup. */
@@ -13408,7 +13450,9 @@ async function runGroupMemberTurn(
   }
   if (isCancelled?.()) return false;
   const group = store.group(groupId);
-  const bot = store.bot(botId);
+  const profile = store.bot(botId);
+  const selection = activeDelegatedSelection(botId, threadId, orchestration?.roomHandoffId, Boolean(cardContinuation));
+  const bot = profile ? await delegatedExecutionBot(profile, selection, undefined, {threadId, orchestration}) : undefined;
   const ownsThread = group?.dm
     ? group.threadId === threadId
     : Boolean(group && store.groupTaskByThread(group.id, threadId));
@@ -13607,7 +13651,8 @@ async function runGroupMemberTurn(
   // A 1:1 or another room turn may have claimed this bot while connected-app
   // setup was in flight. Re-check immediately before the synchronous claim so
   // one bot can never own two provider processes.
-  const readyBot = store.bot(bot.id);
+  const readyProfile = store.bot(bot.id);
+  const readyBot = readyProfile ? await delegatedExecutionBot(readyProfile, selection, undefined, {threadId, orchestration}) : undefined;
   if (!readyBot) return false;
   toolScopeForTurn(readyBot.id);
   const readyGroup = store.group(group.id);
@@ -14167,7 +14212,16 @@ async function runGroupMemberTurn(
     // was sent with, a Chief's delegated level included (request.opened).
     const turnApprovalMode = roomTurnApprovalMode(readyBot, threadId, orchestration);
     if (!done) releaseTurnLevel = roomTurnLevels.dispatched(threadId, readyBot.id, turnApprovalMode);
-    guardTurnDispatch(instance.adapter.sendTurn({
+    Promise.resolve().then(async () => {
+      const dispatchBot = await delegatedExecutionBot(store.bot(bot.id) ?? bot, selection, undefined, {threadId, orchestration});
+      if (selection) {
+        const node = orchestration?.roomHandoffId ? roomHandoffs.nodes.get(orchestration.roomHandoffId) : undefined;
+        if (registry.get(selection.instanceId) !== instance || roomTurnApprovalMode(dispatchBot, threadId, orchestration) !== turnApprovalMode ||
+          (orchestration?.roomHandoffId && (!node || node.status !== "running" || roomHandoffProblem(node, node.parentId ? roomHandoffs.nodes.get(node.parentId) : undefined)))) {
+          throw new Error("Delegated execution settings or route changed during setup");
+        }
+      }
+      return guardTurnDispatch(instance.adapter.sendTurn({
         threadId,
         botId: readyBot.id,
         text: withTurnClock(turnClockLine(Date.now(), hostTimeZone()), withRecalled(roomRecalled, text)),
@@ -14193,7 +14247,7 @@ async function runGroupMemberTurn(
         // sendTurn completed setup, revoke again and interrupt the real turn.
         await instance.adapter.interruptTurn(threadId).catch(() => {});
       })
-      .then((dispatch) => {
+    }).then((dispatch) => {
         providerTurnId = dispatch.value.turnId;
         bindInternalCapabilityToProviderTurn(threadId, internalGeneration, dispatch.value.turnId);
         orchestration?.onTurnStarted?.(dispatch.value.turnId);
