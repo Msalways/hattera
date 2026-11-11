@@ -266,6 +266,9 @@ const toolDefinitions = (externalRuntime: boolean) => [
       bot_ids: { type: "array", items: { type: "string", description: "A teammate's id exactly as list_bots or your roster prints it ([id: …]). A teammate's unique display name also resolves; a name shared by two reachable teammates is refused." }, minItems: 1, maxItems: 4, uniqueItems: true },
       message: { type: "string", minLength: 1, maxLength: 4000, description: "Question or task for these teammates; later requests in the same conversation can build on earlier ones. Send separate requests when responsibilities differ." },
       rework: { type: "boolean", description: "True only to send concrete work again to someone whose request already finished or failed: a correction, a re-check or a retry." },
+      selection: { type: "object", additionalProperties: false, properties: {
+        instanceId: { type: "string", minLength: 1 }, model: { type: "string", minLength: 1 }, effort: { type: "string", minLength: 1 },
+      }, required: ["instanceId", "model"], description: "Optional task-only route for these recipients. Use an already authorized configured model on a ready engine and an advertised effort; recipient permissions still apply. Omit to use recipient defaults." },
     }, required: ["bot_ids", "message"] },
   },
   {

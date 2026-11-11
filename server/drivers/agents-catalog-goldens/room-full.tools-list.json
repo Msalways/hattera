@@ -139,6 +139,29 @@
           "rework": {
             "type": "boolean",
             "description": "True only to send concrete work again to someone whose request already finished or failed: a correction, a re-check or a retry."
+          },
+          "selection": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "instanceId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "effort": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "instanceId",
+              "model"
+            ],
+            "description": "Optional task-only route for these recipients. Use an already authorized configured model on a ready engine and an advertised effort; recipient permissions still apply. Omit to use recipient defaults."
           }
         },
         "required": [

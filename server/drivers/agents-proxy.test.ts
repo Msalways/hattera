@@ -1052,6 +1052,12 @@ describe("agents-proxy MCP surface", () => {
       depth: 0,
     });
   });
+  it("rejects a legacy delegate selection instead of silently dropping it", async () => {
+    const res = await callTool("delegate_bot", {bot_id:"bot-helper", message:"selected legacy call",
+      selection:{instanceId:"arbitrary-account",model:"opaque/model"}});
+    expect(res.result.isError).toBe(true);
+    expect(res.result.content[0].text).toContain("does not accept selection");
+  });
 
   it("returns queue refusal guidance to the agent as a tool error", async () => {
     delegateResponse = { error: "delegation chains are limited to one hop — do this one yourself" };
@@ -2306,6 +2312,14 @@ describe("coordinate_bots arguments (room turn)", () => {
     expect(lastCoordinateBody).toMatchObject({
       botIds: ["bot-helper"], message: "please review the patch",
     });
+  });
+  it("forwards the task selection without inventing defaults", async () => {
+    const selection = {instanceId: "arbitrary-account", model: "opaque/model", effort: "high"};
+    const res = await roomRpc("tools/call", {name: "coordinate_bots", arguments: {
+      bot_ids: ["bot-helper"], message: "selected task", selection,
+    }});
+    expect(res.result.isError).toBeFalsy();
+    expect(lastCoordinateBody.selection).toEqual(selection);
   });
 
   it("sends cross-bot work one way through the existing thread route", async () => {

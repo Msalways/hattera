@@ -305,7 +305,7 @@ import { parseDataContext, type DataContext } from "./data-context.ts";
 import { promptWithDataContext } from "../shared/data-context.ts";
 import { admit, DRAIN_COALESCE_MAX_ITEMS } from "./admission.ts";
 import { _loadPending, buildDelegationFailurePrompt, buildDelegationRevivalPrompt, DELEGATION_TTL_MS, DelegationWakeBudget, discardDelegations, drainDelegations, expireStaleDelegations, findDelegationReceipt, pendingDelegationInfo, pendingDelegationSnapshot, pendingThreads, queueDelegation, recordDelegationReceipt, releaseDelegationsWaitingOn, summarizeDelegatedActivity, type DelegationReceipt, type DelegationRunner, type QueueResult } from "./delegations.ts";
-import { validateDelegatedSelection, type DelegatedSelection } from "./delegated-selection.ts";
+import { delegatedSelectionSchema, validateDelegatedSelection, type DelegatedSelection } from "./delegated-selection.ts";
 import {
   cancelSteeredMessage,
   drainSteeredMessages,
@@ -12693,7 +12693,7 @@ function activeDelegatedSelection(botId: string, threadId: string, requestId?: s
 
 /** Project the request's selection without changing any stored bot/task setting. */
 async function delegatedExecutionBot(bot: BotRecord, selection?: DelegatedSelection, directThreadId?: string,
-  room?: {threadId: string; orchestration?: GroupTurnOrchestration}): Promise<BotRecord> {
+  room?: {threadId: string; orchestration?: GroupTurnOrchestration}, approvalOverride?: ApprovalMode): Promise<BotRecord> {
   if (!selection) return bot;
   await registry.snapshot(selection.instanceId);
   const current = directThreadId ? store.projectBotForTask(bot.id, directThreadId) : store.bot(bot.id);
@@ -12708,7 +12708,7 @@ async function delegatedExecutionBot(bot: BotRecord, selection?: DelegatedSelect
       models: target.models.options.map(o => o.id), effortLevels: target.adapter.capabilities.effortLevels ?? []}] : [],
     approvalPending: Boolean(bot.approvalGrant),
     approvalCompatible: requested => {
-      const mode = room ? roomTurnApprovalMode(bot, room.threadId, room.orchestration) : approvalModeFor(bot);
+      const mode = approvalOverride ?? (room ? roomTurnApprovalMode(bot, room.threadId, room.orchestration) : approvalModeFor(bot));
       return supportsApprovalMode(requested, mode) && ((mode !== "full" && mode !== "custom") ||
         registry.cliTarget(requested.instanceId)?.driverKind === registry.cliTarget(bot.modelSelection.instanceId)?.driverKind);
     },
@@ -19162,6 +19162,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       }
       if (method === "POST" && path === "/api/internal/delegate-bot") {
         const body = await readInternalBody();
+        if (Object.hasOwn(body, "selection")) return json(res, 400, { error: "delegate-bot does not accept selection; use coordinate-bots for a task-specific route." });
         const toBotRef = String(body.toBotId ?? "");
         const message = String(body.message ?? "").trim();
         const reason = typeof body.reason === "string" && body.reason.trim() ? body.reason.trim() : undefined;
@@ -19275,6 +19276,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             botIds: z.array(z.string().min(1).max(128)).min(1).max(4).refine(ids => new Set(ids).size === ids.length),
             message: z.string().trim().min(1).max(4000),
             rework: z.boolean().default(false),
+            selection: delegatedSelectionSchema.optional(),
           }).safeParse(await readInternalBody());
           if (!parsed.success) return json(res, 400, { error: "Provide 1-4 distinct botIds and a message of 1-4000 characters." });
           const groupId = parsed.data.groupId ?? source?.id;
@@ -19310,6 +19312,21 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
               : roomHandoffProblem(target, address);
             if (eligibility) return json(res, 403, { error: eligibility });
           }
+          const validateSelectionTarget = async (target: typeof targets[number]) => {
+            if (!parsed.data.selection) return;
+            const recipient = store.bot(target.botId);
+            if (!recipient) throw new Error("The recipient no longer exists");
+            const continued = destination ? undefined : store.workThread(target.botId, internalSender.id, address.threadId);
+            const effective = continued ? store.projectBotForTask(target.botId, continued.threadId)! : recipient;
+            const own = destination ? roomTurnApprovalMode(effective, target.threadId) : approvalModeFor(effective);
+            const mode = destination && cloudGuestDriven(target.threadId) ? "ask"
+              : delegatedLevel(internalSender, address.threadId, effective, own) ?? own;
+            await delegatedExecutionBot(effective, parsed.data.selection, continued?.threadId,
+              destination ? {threadId: target.threadId} : undefined, mode);
+            requireActiveInternalCapability();
+          };
+          try { for (const target of targets) await validateSelectionTarget(target); }
+          catch (error) { return json(res, 400, { error: error instanceof Error ? error.message : "Invalid delegated selection" }); }
           let approvalGranted = false;
           if (peerReviewRequired(internalSender, address.threadId)) {
             const verdicts = await Promise.all(targets.map(target =>
@@ -19351,11 +19368,15 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
                 if (!task) throw new Error("The recipient no longer exists");
                 target.threadId = task.threadId;
                 if (!continued) createdThread = task.threadId;
-                applyDelegatedLevel(internalSender, internalCapability.threadId, store.bot(target.botId)!, target.threadId);
               }
+              await validateSelectionTarget(target);
+              requireActiveInternalCapability();
+              const routeProblem = roomHandoffProblem(target, address);
+              if (routeProblem) throw new Error(routeProblem);
+              if (!destination) applyDelegatedLevel(internalSender, internalCapability.threadId, store.bot(target.botId)!, target.threadId);
               const { node, duplicate } = roomHandoffs.enqueue(address, internalCapability.generation, internalCapability.roomHandoffId,
                 target, target.botId, parsed.data.message, approvalGranted, parsed.data.rework, [...store.messagesFor(address.threadId)].reverse().find(m => m.role === "user" && m.kind === "text")?.text ?? "",
-                requestBatchKey, origin);
+                requestBatchKey, origin, parsed.data.selection);
               // A repeat lands on the request already made, possibly in a
               // thread the person archived meanwhile; a thread opened for it
               // is never used.

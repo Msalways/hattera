@@ -492,7 +492,7 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
     }
     const r = await api("/api/internal/coordinate-bots", { method: "POST", body: JSON.stringify({
       groupId: canonical.group_id, botIds: ids, message: canonical.message,
-      rework: canonical.rework,
+      rework: canonical.rework, selection: canonical.selection,
     }) });
     return { text: JSON.stringify(r), ...(r.error ? { isError: true } : {}) };
   }
@@ -628,6 +628,7 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
     return { text: `${r.botName ?? "Bot"} replied:\n${r.text ?? "(no reply)"}${note ? `\n\n${note}` : ""}` };
   }
   if (name === "delegate_bot") {
+    if (args.selection !== undefined) return { text: "delegate_bot does not accept selection; use coordinate_bots for a task-specific route.", isError: true };
     const toBotId = String(args.bot_id ?? "").trim();
     const message = String(args.message ?? "").trim();
     const reason = typeof args.reason === "string" ? args.reason.trim() : "";
