@@ -130,7 +130,7 @@ describe("a driver gaining allowance reporting", () => {
     expect(accounts).toEqual([{ id: "acme", name: "Acme", driver: "acme", environment: { ACME_TOKEN: "tok" } }]);
     const seen: string[] = [];
     const fetch: PlanFetch = async (url, init) => {
-      seen.push(`${url}|${(init?.headers as Record<string, string>).Authorization}`);
+      seen.push(`${url}|${(init?.headers as Record<string, string> | undefined)?.Authorization}`);
       return { ok: true, status: 200, text: async () => JSON.stringify({ hour_used: 25, hour_reset: iso(NOW + 3_600_000), month_used: 60 }) };
     };
     const report = await fetchPlanUsage(accounts, {
