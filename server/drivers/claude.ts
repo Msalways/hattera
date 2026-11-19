@@ -10,6 +10,7 @@
 //     computer through server/harness-mcp-proxy.ts computer) as the one
 //     stdio `computer` server in turn.integrations.localComputer
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { claudeAllowance } from "./claude-allowance.ts";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { createServer as createNetServer } from "node:net";
 import { homedir, tmpdir } from "node:os";
@@ -1233,6 +1234,8 @@ function diagnosticClaudeUserMessage(message: ClaudeUserMessage): ClaudeUserMess
 
 export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
   driverKind: DRIVER_KIND,
+  // Lazy: claude-allowance imports this module, so it cannot be read at load.
+  get allowance() { return claudeAllowance; },
   metadata: { displayName: "Claude", supportsMultipleInstances: true },
   // npm on all three: the one recipe that is genuinely cross-platform. The
   // native installers differ per OS and would need verifying separately.
