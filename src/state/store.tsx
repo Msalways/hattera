@@ -18,6 +18,7 @@ import { DATA_ROUTES, type DataSheet, type DataTable } from "../../shared/data-s
 import type { TurnDigest } from "../../shared/digest";
 import type { ToolScope } from "../../shared/tool-scope";
 import type { ModelVariantOption, RuntimeEvent } from "../../shared/runtime-events";
+import { foldLiveTurn, type LiveTurn } from "@/lib/live-turn";
 import type { MausColor, MausMotion } from "@/lib/mascot";
 import type { BotAvatarCrop } from "../../shared/bot-avatar";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
@@ -976,6 +977,9 @@ export interface AppState {
   instances: InstanceInfo[];
   /** Session discoveries stay with their conversation and never enter persisted settings. */
   modelVariantSessions: Record<string, ModelVariantSession>;
+  /** In-flight reasoning/reply text per thread, folded from streamed deltas.
+   * Display-only and never persisted; the stored message replaces it. */
+  liveTurns: Record<string, LiveTurn>;
   config: ConfigStatus | null;
   /** The Live call the harness is running, including a call that has just
    * ended; null when no call is known. Follows `live.call` SSE frames and
@@ -1328,6 +1332,7 @@ export type Action =
   | { type: "dataView"; view: AppState["dataView"] }
   | { type: "loadDataSheet"; botId: string; onError?: (message: string) => void }
   | { type: "modelVariantRuntime"; event: RuntimeEvent }
+  | { type: "liveTurnRuntime"; event: RuntimeEvent }
   | { type: "setModel"; botId: string; selection: ModelSelection; threadId?: string; updateBotDefault?: boolean; resetApprovalToAsk?: boolean }
   | { type: "interrupt"; botId: string; threadId?: string; onError?: () => void }
   | { type: "connected"; value: boolean }
@@ -1644,6 +1649,8 @@ export function reducer(state: AppState, action: Action): AppState {
         loadingOlder: {},
         transcriptGeneration: {},
         modelVariantSessions: {},
+        // a snapshot is the stored truth; in-flight text restarts from here
+        liveTurns: {},
       };
       return reconcileSnapshotQueues(
         action.botQueuedMessages ? replaceBotQueues(hydrated, action.botQueuedMessages) : hydrated,
@@ -2116,6 +2123,15 @@ export function reducer(state: AppState, action: Action): AppState {
           [action.botId]: { held: action.held, helpReason: action.helpReason },
         },
       };
+    case "liveTurnRuntime": {
+      const previous = state.liveTurns[action.event.threadId];
+      const next = foldLiveTurn(previous, action.event);
+      if (next === previous) return state;
+      if (!next) {
+        return { ...state, liveTurns: Object.fromEntries(Object.entries(state.liveTurns).filter(([threadId]) => threadId !== action.event.threadId)) };
+      }
+      return { ...state, liveTurns: { ...state.liveTurns, [action.event.threadId]: next } };
+    }
     case "modelVariantRuntime": {
       const event = action.event;
       if (!event.turnId) return state;
@@ -2673,6 +2689,7 @@ export function dataSheetFromResponse(body: unknown, botId: string): DataSheet {
 
 export const initialState: AppState = {
   modelVariantSessions: {},
+  liveTurns: {},
   backgroundThreadEvents: {},
   loadingOlder: {},
   transcriptGeneration: {},
@@ -3006,13 +3023,21 @@ export async function loadSnapshotBoundary<Key extends string>(
   return chat.status === "fulfilled";
 }
 
-/** The desktop shows a reply once it is finished (the turn's busy state is
- * what a reader sees while it works), so it keeps no in-flight reply text: a
- * streamed delta changes nothing here. Runtime frames feed only the
- * model-variant fold. */
+/** The model-variant fold's share of the runtime frames. */
 export function runtimeFrameAction(event: RuntimeEvent): Action | null {
   return event.type === "turn.started" || event.type === "session.model-variants" || event.type === "turn.completed"
     ? { type: "modelVariantRuntime", event }
+    : null;
+}
+
+/** The live-turn buffer's share: streamed deltas, the stored reply that
+ * replaces them, and the turn boundaries that reset or close it. */
+export function liveTurnFrameAction(event: RuntimeEvent): Action | null {
+  return event.type === "content.delta" ||
+    event.type === "turn.started" ||
+    event.type === "turn.completed" ||
+    (event.type === "item.completed" && event.itemType === "assistant_text")
+    ? { type: "liveTurnRuntime", event }
     : null;
 }
 
@@ -4247,6 +4272,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         case "runtime": {
           const action = runtimeFrameAction(frame.event);
           if (action) rawDispatch(action);
+          const live = liveTurnFrameAction(frame.event);
+          if (live) rawDispatch(live);
           break;
         }
         case "screen":
