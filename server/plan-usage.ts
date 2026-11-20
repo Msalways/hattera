@@ -14,7 +14,7 @@ import {
   type AllowanceCapability,
   type AllowanceRegistry,
   type CredentialReader,
-  type CredentialSource,
+  type CredentialSource as KitCredentialSource,
   type PlanAccount,
   type PlanCredential,
   type PlanFetch,
@@ -26,10 +26,15 @@ import type { AnyProviderDriver, InstanceConfigMap } from "./contracts.ts";
 import { BUILT_IN_DRIVERS } from "./drivers/builtIn.ts";
 
 export type {
-  AllowanceCapability, AllowanceRegistry, CredentialReader, CredentialSource, PlanAccount, PlanCredential, PlanExtra, PlanFetch,
+  AllowanceCapability, AllowanceRegistry, CredentialReader, PlanAccount, PlanCredential, PlanExtra, PlanFetch,
   PlanModelUsage, PlanProviderRow, PlanResponse, PlanUsageDeps, PlanUsageReport, PlanWindow, PlanWindows,
 } from "./awareness/allowance-kit.ts";
+import type { ClaudeKeychainReader } from "./drivers/claude-allowance.ts";
 export { parseClaudeUsage } from "./drivers/claude-allowance.ts";
+
+/** The credential source plan-usage callers pass: the generic facilities plus the
+ * Claude keychain reader, which lives with the Claude driver, not in awareness. */
+export type CredentialSource = KitCredentialSource & { readClaudeKeychain?: ClaudeKeychainReader };
 export { parseCodexUsage } from "./drivers/codex-allowance.ts";
 export { parseGrokUsage } from "./drivers/acp/grok-allowance.ts";
 

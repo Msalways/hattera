@@ -13,6 +13,8 @@ export const DEFAULT_STALE_AFTER_MS = 10 * 60_000;
 /** Optional facts a catalog row may carry beyond the base contract. Read
  * structurally, so a driver that starts reporting them needs no change here. */
 interface ModelRowFacts {
+  provider?: unknown;
+  reasoning?: unknown;
   contextWindow?: unknown;
   modalities?: unknown;
   cost?: unknown;
@@ -23,6 +25,8 @@ export interface AwarenessInstanceInput {
   instanceId: string;
   driverKind: string;
   displayName: string;
+  /** How the instance is reached, as the registry reports it; absent: unknown. */
+  access?: string | null;
   /** null/absent: never read. */
   snapshot?: ProviderSnapshot | null;
   snapshotObservedAt?: string | null;
@@ -41,16 +45,29 @@ export interface AllowanceWindowView {
   scope: "account" | "model" | "extra";
   /** Set for scope "model". */
   model?: string;
-  remainingPercent: number | null;
-  usedPercent: number | null;
-  resetsAt: string | null;
+  /** Each value is a fact: a window that did not report it says unknown. */
+  remainingPercent: Fact<number>;
+  usedPercent: Fact<number>;
+  resetsAt: Fact<string>;
+}
+
+/** A variant the driver discovered, kept as reported. It says nothing about
+ * what the variant does; reasoning is a separate fact. */
+export interface VariantView {
+  id: string;
+  label: string;
 }
 
 export interface ModelAwareness {
   id: string;
   label: string;
+  /** The upstream provider the catalog names for this model. */
+  provider: Fact<string>;
+  variants: Fact<VariantView[]>;
   contextWindow: Fact<number>;
   modalities: Fact<string[]>;
+  /** Known only when the source states reasoning levels explicitly; variant
+   * ids are never read as reasoning. */
   reasoning: Fact<string[]>;
   cost: Fact<unknown>;
 }
@@ -59,11 +76,14 @@ export interface InstanceAwareness {
   instanceId: string;
   driverKind: string;
   displayName: string;
+  /** How the instance is reached; with driverKind and the models' providers
+   * this carries the Provider → Access → Instance → Model → Variant path. */
+  access: Fact<string>;
   availability: Fact<"available" | "unavailable">;
   authenticated: Fact<boolean>;
   models: ModelAwareness[];
   defaultModel: Fact<string>;
-  allowance: Fact<{ plan: string | null; windows: AllowanceWindowView[] }>;
+  allowance: Fact<{ plan: Fact<string>; windows: AllowanceWindowView[] }>;
 }
 
 export interface AwarenessReport {
@@ -72,6 +92,7 @@ export interface AwarenessReport {
   instances: InstanceAwareness[];
 }
 
+const REGISTRY_SOURCE = "instance-registry";
 const SNAPSHOT_SOURCE = "provider-snapshot";
 const CATALOG_SOURCE = "driver-model-catalog";
 const ALLOWANCE_SOURCE = "allowance-report";
@@ -86,13 +107,17 @@ function stringList(value: unknown): string[] | null {
   return out.length === value.length && out.length > 0 ? out : null;
 }
 
-function variantIds(value: unknown): string[] | null {
+function variantViews(value: unknown): VariantView[] | null {
   if (!Array.isArray(value)) return null;
-  const ids = value.flatMap((entry) => {
-    const id = (entry as { id?: unknown } | null)?.id;
-    return typeof id === "string" && id ? [id] : [];
+  const views = value.flatMap((entry): VariantView[] => {
+    const { id, label } = (entry ?? {}) as { id?: unknown; label?: unknown };
+    return typeof id === "string" && id ? [{ id, label: typeof label === "string" && label ? label : id }] : [];
   });
-  return ids.length ? ids : null;
+  return views.length ? views : null;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
 }
 
 function modelAwareness(
@@ -107,14 +132,19 @@ function modelAwareness(
   return {
     id: option.id,
     label: option.label,
+    provider: fact(nonEmptyString(facts.provider)),
+    variants: fact(variantViews(facts.variants)),
     contextWindow: fact(positiveNumber(facts.contextWindow)),
     modalities: fact(stringList(facts.modalities)),
-    reasoning: fact(variantIds(facts.variants)),
+    reasoning: fact(stringList(facts.reasoning)),
     cost: fact(facts.cost ?? null),
   };
 }
 
+type AllowanceFactMaker = <T>(value: T | null) => Fact<T>;
+
 function windowView(
+  make: AllowanceFactMaker,
   id: string,
   label: string,
   scope: AllowanceWindowView["scope"],
@@ -126,20 +156,20 @@ function windowView(
     label,
     scope,
     ...(model ? { model } : {}),
-    remainingPercent: window.remainingPercent,
-    usedPercent: window.usedPercent,
-    resetsAt: window.resetsAt,
+    remainingPercent: make(window.remainingPercent),
+    usedPercent: make(window.usedPercent),
+    resetsAt: make(window.resetsAt),
   };
 }
 
-function allowanceWindows(row: PlanProviderRow): AllowanceWindowView[] {
+function allowanceWindows(row: PlanProviderRow, make: AllowanceFactMaker): AllowanceWindowView[] {
   const windows: AllowanceWindowView[] = [];
-  if (row.fiveHour.available) windows.push(windowView("five-hour", "5 hours", "account", row.fiveHour));
-  if (row.weekly.available) windows.push(windowView("weekly", "Weekly", "account", row.weekly));
-  for (const extra of row.extra) windows.push(windowView(`extra:${extra.label}`, extra.label, "extra", extra));
+  if (row.fiveHour.available) windows.push(windowView(make, "five-hour", "5 hours", "account", row.fiveHour));
+  if (row.weekly.available) windows.push(windowView(make, "weekly", "Weekly", "account", row.weekly));
+  for (const extra of row.extra) windows.push(windowView(make, `extra:${extra.label}`, extra.label, "extra", extra));
   for (const model of row.models) {
     for (const line of model.windows) {
-      windows.push(windowView(`model:${model.name}:${line.label}`, line.label, "model", line, model.name));
+      windows.push(windowView(make, `model:${model.name}:${line.label}`, line.label, "model", line, model.name));
     }
   }
   return windows;
@@ -155,7 +185,9 @@ function allowanceFact(
   const observedAt = input.allowanceObservedAt ?? null;
   if (!row.ok) return unknown(ALLOWANCE_SOURCE, observedAt, row.error ?? "Allowance could not be read");
   if (!observedAt) return unknown(ALLOWANCE_SOURCE, null, "No observation time");
-  return known({ plan: row.plan, windows: allowanceWindows(row) }, ALLOWANCE_SOURCE, observedAt, now, staleAfterMs);
+  const make: AllowanceFactMaker = (value) =>
+    value === null ? unknown(ALLOWANCE_SOURCE, observedAt) : known(value, ALLOWANCE_SOURCE, observedAt, now, staleAfterMs);
+  return known({ plan: make(row.plan), windows: allowanceWindows(row, make) }, ALLOWANCE_SOURCE, observedAt, now, staleAfterMs);
 }
 
 export function assembleAwareness(input: {
@@ -174,6 +206,9 @@ export function assembleAwareness(input: {
       instanceId: entry.instanceId,
       driverKind: entry.driverKind,
       displayName: entry.displayName,
+      access: entry.access && snapshotAt
+        ? known(entry.access, REGISTRY_SOURCE, snapshotAt, now, staleAfterMs)
+        : unknown(entry.access ? REGISTRY_SOURCE : "none", snapshotAt),
       availability: snapshot && snapshotAt
         ? known(snapshot.state, SNAPSHOT_SOURCE, snapshotAt, now, staleAfterMs)
         : unknown(snapshot ? SNAPSHOT_SOURCE : "none", snapshotAt, snapshot?.reason),

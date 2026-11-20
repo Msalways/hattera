@@ -16,6 +16,8 @@ export interface AwarenessRouteDeps {
     instanceId: string;
     driverKind: string;
     displayName: string;
+    /** How the instance is reached (subscription, api, custom), when the registry says. */
+    access?: string;
     snapshot: ProviderSnapshot;
     models: ModelCatalog;
   }>>;
@@ -40,6 +42,7 @@ export function createAwarenessRoutes(deps: AwarenessRouteDeps): RouteHandler {
       instanceId: instance.instanceId,
       driverKind: instance.driverKind,
       displayName: instance.displayName,
+      access: instance.access ?? null,
       snapshot: instance.snapshot,
       snapshotObservedAt: observedAt,
       models: instance.models,

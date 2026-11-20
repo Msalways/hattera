@@ -70,7 +70,8 @@ describe("awareness assembly", () => {
     expect(row.availability).toEqual({ status: "known", value: "available", source: "provider-snapshot", observedAt: iso(NOW), stale: false });
     expect(row.authenticated).toMatchObject({ status: "known", value: true });
     expect(row.models[0]!.contextWindow).toMatchObject({ status: "known", value: 200_000, source: "driver-model-catalog" });
-    expect(row.models[0]!.reasoning).toMatchObject({ status: "known", value: ["low", "high"] });
+    expect(row.models[0]!.variants).toMatchObject({ status: "known", value: [{ id: "low", label: "Low" }, { id: "high", label: "High" }] });
+    expect(row.models[0]!.reasoning.status).toBe("unknown");
     expect(row.defaultModel).toMatchObject({ status: "known", value: "m1" });
   });
 
@@ -121,6 +122,75 @@ describe("awareness assembly", () => {
   });
 });
 
+describe("fact probe: hierarchy, reasoning and nested allowance facts", () => {
+  const openRow = {
+    id: "opaque-instance", name: "Fixture", driver: "opaque", plan: null, ok: true, error: null,
+    fiveHour: { available: true, remainingPercent: null, usedPercent: null, resetsAt: null },
+    weekly: closedWindow(), extra: [], models: [],
+  };
+  const probe = () => assembleAwareness({
+    now: NOW,
+    instances: [{
+      instanceId: "opaque-instance", driverKind: "opaque-driver", displayName: "Fixture", access: "api",
+      snapshot, snapshotObservedAt: iso(NOW), modelsObservedAt: iso(NOW),
+      models: { default: "m", options: [{ id: "m", label: "M", provider: "opaque-provider", variants: [{ id: "fast", label: "Fast", optionId: "speed", value: "fast" } as never] }] },
+      allowance: openRow, allowanceObservedAt: iso(NOW),
+    }],
+  }).instances[0]!;
+
+  it("keeps access, model provider and explicit variants", () => {
+    const row = probe();
+    expect(row.access).toMatchObject({ status: "known", value: "api" });
+    expect(row.models[0]!.provider).toMatchObject({ status: "known", value: "opaque-provider" });
+    expect(row.models[0]!.variants).toMatchObject({ status: "known", value: [{ id: "fast", label: "Fast" }] });
+    const bare = assembleAwareness({ instances: [instance()], now: NOW }).instances[0]!;
+    expect(bare.access.status).toBe("unknown");
+    expect(bare.models[1]!.provider.status).toBe("unknown");
+    expect(bare.models[1]!.variants.status).toBe("unknown");
+  });
+
+  it("never reads reasoning from a variant id; only an explicit source states it", () => {
+    expect(probe().models[0]!.reasoning.status).toBe("unknown");
+    const stated = assembleAwareness({
+      now: NOW,
+      instances: [instance({ models: { default: "m", options: [{ id: "m", label: "M", reasoning: ["low", "high"] } as never] } })],
+    }).instances[0]!;
+    expect(stated.models[0]!.reasoning).toMatchObject({ status: "known", value: ["low", "high"] });
+  });
+
+  it("null allowance fields are explicit unknowns, not known nulls", () => {
+    const allowance = probe().allowance;
+    expect(allowance.status).toBe("known");
+    if (allowance.status !== "known") return;
+    expect(allowance.value.plan.status).toBe("unknown");
+    const window = allowance.value.windows[0]!;
+    expect([window.remainingPercent.status, window.usedPercent.status, window.resetsAt.status]).toEqual(["unknown", "unknown", "unknown"]);
+  });
+
+  it("the route passes the registry's access through", async () => {
+    let body: any;
+    const handler = createAwarenessRoutes({
+      describe: async () => [{ instanceId: "a", driverKind: "x", displayName: "A", access: "api", snapshot, models: catalog }],
+      allowance: async () => ({ fetchedAt: iso(NOW), providers: [] }),
+      now: () => NOW,
+    });
+    const url = new URL("/api/awareness", "http://localhost");
+    await handler({
+      req: {} as IncomingMessage, res: { setHeader() {} } as unknown as ServerResponse, url, path: url.pathname, method: "GET",
+      auth: { kind: "loopback", scopes: ["admin"] } as never,
+      json: ((_r: unknown, _c: number, payload: unknown) => { body = payload; }) as never,
+      readBody: (async () => ({})) as never,
+    });
+    expect(body.instances[0].access).toMatchObject({ status: "known", value: "api" });
+  });
+
+  it("generic awareness names no provider's credential hook", async () => {
+    const { readFileSync } = await import("node:fs");
+    const kit = readFileSync(new URL("./allowance-kit.ts", import.meta.url), "utf8");
+    expect(kit).not.toMatch(/Keychain/i);
+  });
+});
+
 describe("a driver gaining allowance reporting", () => {
   const registry = allowanceRegistry([acmeDriver, plainDriver]);
   const instances = { acme: { driver: "acmeAgent", environment: { ACME_TOKEN: "tok" } }, plain: { driver: "plainAgent" } };
@@ -148,7 +218,7 @@ describe("a driver gaining allowance reporting", () => {
     }).instances[0]!;
     expect(view.allowance).toMatchObject({ status: "known", source: "allowance-report" });
     const windows = view.allowance.status === "known" ? view.allowance.value.windows : [];
-    expect(windows.map((w) => [w.label, w.scope, w.usedPercent, w.remainingPercent])).toEqual([
+    expect(windows.map((w) => [w.label, w.scope, w.usedPercent.status === "known" && w.usedPercent.value, w.remainingPercent.status === "known" && w.remainingPercent.value])).toEqual([
       ["1 hour", "extra", 25, 75],
       ["30 days", "extra", 60, 40],
     ]);

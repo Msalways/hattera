@@ -173,10 +173,14 @@ export function readDarwinClaudeKeychain(service: string): Promise<string | null
   });
 }
 
+/** macOS login keychain, read-only. Tests inject this so `security` is never spawned. */
+export type ClaudeKeychainReader = (service: string) => string | null | Promise<string | null>;
+export type ClaudeCredentialSource = CredentialSource & { readClaudeKeychain?: ClaudeKeychainReader };
+
 async function readClaudeCredential(
   account: PlanAccount,
   env: NodeJS.ProcessEnv,
-  source: CredentialSource,
+  source: ClaudeCredentialSource,
   now: number,
 ): Promise<PlanCredential> {
   let resolvedDir: string;
@@ -219,6 +223,6 @@ export const claudeAllowance: AllowanceCapability = {
   id: "claude",
   product: "Claude",
   defaultSource: () => (process.platform === "darwin" ? { readClaudeKeychain: readDarwinClaudeKeychain } : {}),
-  readCredential: (account, env, source, now) => readClaudeCredential(account, env, source, now),
+  readCredential: (account, env, source, now) => readClaudeCredential(account, env, source as ClaudeCredentialSource, now),
   fetchUsage: (account, credential, deps) => fetchClaude(account, credential.token ?? "", deps),
 };

@@ -93,8 +93,9 @@ export interface CredentialSource {
   readText: (path: string) => string | null;
   env?: NodeJS.ProcessEnv;
   now?: () => number;
-  /** macOS login keychain, read-only. Tests inject this so `security` is never spawned. */
-  readClaudeKeychain?: (service: string) => string | null | Promise<string | null>;
+  /** Driver-specific facilities (e.g. an OS credential-store reader) a capability's
+   * defaultSource supplies and its own readCredential reads. Typed by the driver. */
+  [facility: string]: unknown;
 }
 
 export const PROVIDER_TIMEOUT_MS = 8_000;
@@ -352,7 +353,7 @@ export interface AllowanceCapability {
   /** Product name shown when an instance has no display name. */
   readonly product: string;
   /** Extra credential-source facilities this driver wants by default (e.g. an
-   * OS keychain reader). Merged into defaultCredentialReader. */
+   * OS credential-store reader). Merged into defaultCredentialReader. */
   defaultSource?(): Partial<CredentialSource>;
   /** Read the sign-in this driver's usage endpoint needs. `env` already has the
    * instance environment merged in. */
