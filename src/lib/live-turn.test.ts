@@ -9,7 +9,8 @@ const base = (threadId = "t1", turnId: string | undefined = "turn-1") => ({
   provider: "any",
   threadId,
   turnId,
-  createdAt: "2026-11-20T00:00:00Z",
+  // each frame is created one second after the previous one, as on a real stream
+  createdAt: new Date(1795132800000 + n * 1000).toISOString(),
 });
 const started = (threadId?: string, turnId?: string): RuntimeEvent => ({ ...base(threadId, turnId), type: "turn.started" });
 const completed = (threadId?: string, turnId?: string): RuntimeEvent => ({ ...base(threadId, turnId), type: "turn.completed", ok: true });
@@ -138,8 +139,12 @@ describe("foldLiveTurn", () => {
     });
 
     it("a late delta for a reply already stored does not resurrect it", () => {
-      const live = run([started(), delta("assistant_text", "done", { itemId: "m1" }), stored("done", { itemId: "m1" }), delta("assistant_text", "done", { itemId: "m1" })]);
+      // created before the stored message, delivered after it
+      const straggler = delta("assistant_text", "done", { itemId: "m1" });
+      const live = run([started(), delta("assistant_text", "do", { itemId: "m1" }), straggler, stored("done", { itemId: "m1" }), straggler]);
       expect(live?.reply).toBe("");
+      const reordered = delta("assistant_text", "ne", { itemId: "m1" });
+      expect(run([started(), delta("assistant_text", "do", { itemId: "m1" }), reordered, stored("done", { itemId: "m1" }), reordered])?.reply).toBe("");
     });
 
     it("a second reply item in the same turn streams after the first is stored", () => {
@@ -160,6 +165,69 @@ describe("foldLiveTurn", () => {
     it("a stored message for another turn leaves this turn's reply alone", () => {
       const live = run([started(undefined, "a"), delta("assistant_text", "mine", { turnId: "a" }), stored("other", { turnId: "z" })]);
       expect(live?.reply).toBe("mine");
+    });
+  });
+
+  describe("replays from beyond any bounded history", () => {
+    it("a duplicate delta after 512+ newer frames is still applied once", () => {
+      const h = delta("assistant_text", "H", { itemId: "m" });
+      let live = run([started(), h]);
+      for (let i = 0; i < 600; i++) live = foldLiveTurn(live, delta("assistant_text", "i", { itemId: "m" }));
+      const before = live!.reply;
+      expect(before).toHaveLength(601);
+      expect(foldLiveTurn(live, h)?.reply).toBe(before);
+      expect(foldLiveTurn(live, h)).toBe(live);
+    });
+
+    it("an old turn.started after 40 newer turns cannot displace the current turn", () => {
+      const old = started(undefined, "old");
+      let live = foldLiveTurn(undefined, old);
+      for (let i = 0; i < 40; i++) live = foldLiveTurn(live, started(undefined, "turn-" + i));
+      live = foldLiveTurn(live, delta("assistant_text", "new", { turnId: "turn-39", itemId: "m" }));
+      const replayed = foldLiveTurn(live, old);
+      expect(replayed).toBe(live);
+      expect(replayed).toMatchObject({ turnId: "turn-39", reply: "new" });
+    });
+
+    it("old-turn deltas and completions after 40 newer turns are ignored too", () => {
+      const oldDelta = delta("assistant_text", "old", { turnId: "old", itemId: "o1" });
+      const oldDone = completed(undefined, "old");
+      let live = run([started(undefined, "old"), oldDelta]);
+      for (let i = 0; i < 40; i++) live = foldLiveTurn(live, started(undefined, "turn-" + i));
+      live = foldLiveTurn(live, delta("assistant_text", "new", { turnId: "turn-39" }));
+      expect(foldLiveTurn(foldLiveTurn(live, oldDelta), oldDone)).toBe(live);
+    });
+
+    it("a replayed completion of an old item after many newer items is a no-op", () => {
+      const first = stored("first", { itemId: "m0" });
+      let live = run([started(), delta("assistant_text", "first", { itemId: "m0" }), first]);
+      for (let i = 1; i <= 40; i++) {
+        live = foldLiveTurn(live, delta("assistant_text", "t" + i, { itemId: "m" + i }));
+        live = foldLiveTurn(live, stored("t" + i, { itemId: "m" + i }));
+      }
+      live = foldLiveTurn(live, delta("assistant_text", "live", { itemId: "m99" }));
+      expect(foldLiveTurn(live, first)).toBe(live);
+    });
+
+    it("memory stays bounded: marks do not grow with the number of frames", () => {
+      let live = run([started()]);
+      for (let i = 0; i < 2000; i++) live = foldLiveTurn(live, delta("reasoning_text", "r"));
+      expect(live!.reasoningMark.ids.length).toBeLessThanOrEqual(64);
+      expect(Object.keys(live!).length).toBeLessThan(20);
+    });
+
+    it("distinct frames in the same millisecond are all applied; their replays are not", () => {
+      const at = "2026-11-20T00:00:00.000Z";
+      const a: RuntimeEvent = { ...delta("assistant_text", "a", { itemId: "m" }), createdAt: at };
+      const b: RuntimeEvent = { ...delta("assistant_text", "b", { itemId: "m" }), createdAt: at };
+      const live = run([{ ...started(), createdAt: "2026-11-19T00:00:00.000Z" }, a, b, a, b]);
+      expect(live?.reply).toBe("ab");
+    });
+
+    it("a frame with an unparseable time cannot displace or extend a turn", () => {
+      const live = run([started(undefined, "a"), delta("assistant_text", "x", { turnId: "a" })])!;
+      expect(foldLiveTurn(live, { ...delta("assistant_text", "y", { turnId: "b" }), createdAt: "garbage" })).toBe(live);
+      expect(foldLiveTurn(live, { ...delta("assistant_text", "y", { turnId: "a" }), createdAt: "garbage" })).toBe(live);
     });
   });
 
