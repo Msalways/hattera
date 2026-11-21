@@ -1,15 +1,13 @@
-// The in-flight turn, drawn from what the engine streams: its reasoning in a
-// quiet block that folds to "Thought for Ns" once the reply starts, then the
-// reply itself as markdown in an assistant bubble. Display only: the stored
+// The in-flight reply, drawn from what the engine streams, as markdown in an
+// assistant bubble. Its reasoning is not drawn here: a thought sits in the
+// stream where the thinking happened (ThoughtBlock). Display only: the stored
 // message replaces it when it lands, and nothing here is persisted.
 //
 // Engine-agnostic. It shows reasoning text only when the engine sent some and
 // never invents any; an engine without a reasoning stream just shows the reply.
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
-import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
-import { closeOpenFence, thoughtSeconds } from "@/lib/live-turn-view";
+import { closeOpenFence } from "@/lib/live-turn-view";
 import type { LiveTurn as LiveTurnState } from "@/lib/live-turn";
 import { ChatMarkdown } from "./ChatMarkdown";
 
@@ -50,44 +48,6 @@ export function useFrameValue<T>(value: T | null): T | null {
   return value === null ? null : shown ?? value;
 }
 
-function ThoughtBlock({ text, streaming, seconds }: { text: string; streaming: boolean; seconds: number | null }) {
-  // Open while the thinking streams and folded once the reply starts. A
-  // person's own toggle wins from then on for this turn.
-  const [manual, setManual] = useState<boolean | null>(null);
-  const open = manual ?? streaming;
-  const label = streaming ? t("chat.live.thinking") : t("chat.live.thoughtFor", { seconds: seconds ?? 1 });
-  const bodyRef = useRef<HTMLParagraphElement>(null);
-  useLayoutEffect(() => {
-    // keep the newest line of a long thought in view inside its own box
-    const body = bodyRef.current;
-    if (body && streaming && open) body.scrollTop = body.scrollHeight;
-  }, [text, streaming, open]);
-  return (
-    <div data-live-thought data-state={streaming ? "streaming" : "done"} className="min-w-0 max-w-[min(42rem,78%)] text-[13px] text-ink-tertiary">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls="live-thought-body"
-        onClick={() => setManual(!open)}
-        className="flex items-center gap-1 rounded-md py-0.5 pe-1 text-ink-tertiary hover:text-ink-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      >
-        <ChevronRight size={13} aria-hidden="true" className={cn("shrink-0 motion-safe:transition-transform", open && "rotate-90")} />
-        <span>{label}</span>
-      </button>
-      <p
-        id="live-thought-body"
-        ref={bodyRef}
-        hidden={!open}
-        // the text is not a live region: per-token announcements are noise
-        aria-live="off"
-        className="mt-1 max-h-40 overflow-y-auto border-s border-hairline/40 ps-3 leading-relaxed whitespace-pre-wrap break-words"
-      >
-        {text}
-      </p>
-    </div>
-  );
-}
-
 export const LiveTurn = memo(function LiveTurn({
   live,
   botName,
@@ -106,21 +66,12 @@ export const LiveTurn = memo(function LiveTurn({
   const reply = shown?.reply ?? "";
   const turnId = shown?.turnId;
 
-  // Real timing: the client clock from the first reasoning text it saw to the
-  // first reply text. Nothing is estimated.
-  // (a mutable holder in state, not a ref: it must not be position-bound)
-  const [clock] = useState<{ turnId: string | undefined; start: number | null; end: number | null }>(() => ({ turnId, start: null, end: null }));
-  if (clock.turnId !== turnId) Object.assign(clock, { turnId, start: null, end: null });
-  if (reasoning && clock.start === null) clock.start = Date.now();
-  if (reply && clock.start !== null && clock.end === null) clock.end = Date.now();
-  const replying = reply !== "";
-  const seconds = clock.start !== null && clock.end !== null ? thoughtSeconds(clock.start, clock.end) : null;
-
   // Announce twice per turn, never per token: when thinking begins and when
   // the thought folds because the reply has started.
   const [said, setSaid] = useState({ text: "", count: 0 });
   const [announced] = useState<{ turnId: string | undefined; start: boolean; done: boolean }>(() => ({ turnId, start: false, done: false }));
   if (announced.turnId !== turnId) Object.assign(announced, { turnId, start: false, done: false });
+  const replying = reply !== "";
   const hasReasoning = reasoning !== "";
   useEffect(() => {
     const memory = announced;
@@ -151,7 +102,6 @@ export const LiveTurn = memo(function LiveTurn({
       {shown.joinedMidStream && (
         <p data-live-joined className="text-[12px] text-ink-tertiary">{t("chat.live.joined")}</p>
       )}
-      {hasReasoning && <ThoughtBlock key={turnId ?? "turn"} text={reasoning} streaming={!replying} seconds={seconds} />}
       {replying && (
         <div
           data-chat-bubble

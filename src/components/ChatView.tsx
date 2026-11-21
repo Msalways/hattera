@@ -1,4 +1,4 @@
-import { Component, createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
+import { Component, createContext, Fragment, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { brand } from "@/lib/brand";
 import { useShowThreads } from "@/lib/thread-preferences";
@@ -66,7 +66,7 @@ import { isCancelledTranscriptRow } from "../../shared/client-cancel";
 import { BotAvatar } from "./Avatar";
 import { TurnPresence } from "./TurnPresence";
 import { LiveTurn, useGrowToEnd } from "./LiveTurn";
-import { visibleLiveTurn } from "@/lib/live-turn";
+import { resolveThoughtAnchor, visibleLiveTurn } from "@/lib/live-turn";
 import { showToolCallsEnabled, skillAuthoringEnabled } from "@/lib/feature-flags";
 import { normalizeState, stateForBot } from "@/lib/mascot";
 import { peerLine, peerRequest, type PeerLine } from "@/lib/peer-message";
@@ -122,7 +122,8 @@ import { StatusActivityRow } from "@/components/StatusActivityRow";
 import { CancelledTurnRow } from "./CancelledTurnRow";
 import { ActivityRun } from "./ActivityRun";
 import { TurnToolsHeader } from "./TurnToolsHeader";
-import { toolCountsByTurn } from "@/lib/tool-rows";
+import { digestsCoveredByHeader, toolCountsByTurn } from "@/lib/tool-rows";
+import { ThoughtSlot } from "./ThoughtBlock";
 import { TurnNarrationRun } from "./TurnNarrationRun";
 import { webhookMessageView } from "@/lib/webhook-message";
 import { splitTranscriptAttachments } from "@/lib/composer-attachments";
@@ -882,6 +883,8 @@ const MessagesList = memo(function MessagesList({
   engine,
   unreadDividerId,
   unreadDividerFading,
+  thoughtAnchors,
+  resolveThoughtAnchorFor,
   onStartEdit,
   onCancelEdit,
   onSubmitEdit,
@@ -906,6 +909,9 @@ const MessagesList = memo(function MessagesList({
   /** The New divider goes above the row holding this message. */
   unreadDividerId: string | null;
   unreadDividerFading: boolean;
+  /** Stored messages a thought sits right after (finished ones and the live one). */
+  thoughtAnchors: ReadonlySet<string>;
+  resolveThoughtAnchorFor: (anchorId: string | undefined, startedAt: number | undefined) => string | null;
   onStartEdit: (id: string) => void;
   onCancelEdit: () => void;
   onSubmitEdit: (id: string, text: string) => void;
@@ -916,7 +922,10 @@ const MessagesList = memo(function MessagesList({
   // Finished tool chips become compact runs; settled assistant narration
   // becomes one reversible turn row while the terminal answer stays visible.
   // The locale refreshes the turn labels when the language changes.
-  const items = useMemo(() => groupTranscript(messages), [messages, locale]);
+  // With tool rows shown the narration stays in stream order beside them; the
+  // "Worked" fold would be a second activity anchor over the same turn.
+  const items = useMemo(() => groupTranscript(messages, !showToolCalls), [messages, locale, showToolCalls]);
+  const coveredDigests = useMemo(() => digestsCoveredByHeader(messages), [messages]);
   const newestMessageId = messages.at(-1)?.id;
   const toolCounts = useMemo(() => toolCountsByTurn(messages), [messages]);
   let newestUserMessageId: string | undefined;
@@ -933,9 +942,22 @@ const MessagesList = memo(function MessagesList({
     dividerPlaced = true;
     return <NewMessagesDivider fading={unreadDividerFading} />;
   };
+  // Thoughts sit in the stream, right after the item holding the message the
+  // thinking began after.
+  const thoughtsAfter = (item: (typeof items)[number], node: ReactNode) => {
+    const ids = item.kind === "message" ? [item.message.id] : item.messages.map((message) => message.id);
+    const here = thoughtAnchors.size ? ids.filter((id) => thoughtAnchors.has(id)) : [];
+    if (!here.length) return node;
+    return (
+      <Fragment key={item.kind === "message" ? item.message.id : item.id}>
+        {node}
+        {here.map((id) => <ThoughtSlot key={`${threadId}:${id}`} threadId={threadId} afterId={id} resolveAnchor={resolveThoughtAnchorFor} />)}
+      </Fragment>
+    );
+  };
   return (
     <>
-      {items.map((item, i) => {
+      {items.map((item, i) => thoughtsAfter(item, ((item: (typeof items)[number], i: number) => {
         const previous = items[i - 1];
         const prev = previous && (previous.kind === "message" ? previous.message : previous.messages.at(-1));
         const first = item.kind === "message" ? item.message : item.messages[0];
@@ -1044,7 +1066,7 @@ const MessagesList = memo(function MessagesList({
             }
             case "digest":
               // the summary of the turn's tool chips: shown under the same setting
-              return showToolCalls ? <DigestChip message={m} /> : null;
+              return showToolCalls && !coveredDigests.has(m.id) ? <DigestChip message={m} /> : null;
             case "compaction":
               return <CompactionChip message={m} />;
             case "screen":
@@ -1085,7 +1107,7 @@ const MessagesList = memo(function MessagesList({
             {row}
           </div>
         );
-      })}
+      })(item, i)))}
     </>
   );
 });
@@ -1246,6 +1268,24 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   // replaces it, and it never enters `messages` (so the memoised list does
   // not re-render per delta).
   const live = visibleLiveTurn(state.liveTurns[bot.threadId ?? ""]);
+  const thoughtRecords = state.thoughts[bot.threadId ?? ""];
+  const liveThought = live?.reasoning ? { anchorId: live.anchorId, startedAt: live.thoughtStartedAt } : undefined;
+  const messageIds = useMemo(() => new Set(messages.map((m) => m.id)), [messages]);
+  const resolveThoughtAnchorFor = useCallback(
+    (anchorId: string | undefined, startedAt: number | undefined) => resolveThoughtAnchor(messages, messageIds, anchorId, startedAt),
+    [messages, messageIds],
+  );
+  const thoughtAnchors = useMemo(() => {
+    const anchors = new Set<string>();
+    for (const thought of thoughtRecords ?? []) {
+      const id = resolveThoughtAnchorFor(thought.anchorId, thought.startedAt);
+      if (id) anchors.add(id);
+    }
+    const liveId = liveThought && resolveThoughtAnchorFor(liveThought.anchorId, liveThought.startedAt);
+    if (liveId) anchors.add(liveId);
+    return anchors;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thoughtRecords, liveThought?.anchorId, liveThought?.startedAt, resolveThoughtAnchorFor]);
   const growToEnd = useGrowToEnd(following, scrollRef);
   const liveReplyShown = useRef(false);
   if (live?.reply) liveReplyShown.current = true;
@@ -1598,6 +1638,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
               engine={state.instances.find((i) => i.instanceId === bot.modelSelection.instanceId)}
               unreadDividerId={unreadDivider.messageId}
               unreadDividerFading={unreadDivider.fading}
+              thoughtAnchors={thoughtAnchors}
+              resolveThoughtAnchorFor={resolveThoughtAnchorFor}
               onStartEdit={startEdit}
               onCancelEdit={cancelEdit}
               onSubmitEdit={submitEdit}
@@ -1623,6 +1665,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
               </div>
             </div>
           )}
+          {live?.reasoning && <ThoughtSlot key={bot.threadId} threadId={bot.threadId} afterId={null} resolveAnchor={resolveThoughtAnchorFor} />}
           <LiveTurn live={live} botName={bot.name} mentionPeers={mentionPeers} onGrow={growToEnd} />
           {/* One neutral anchor per turn: "Working…" until the first real item.
               A running tool row or streamed text is the anchor after that, so

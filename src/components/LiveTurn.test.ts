@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
-// The live turn: reasoning streams in a quiet block and folds to "Thought for
-// Ns" when the reply starts; the reply streams as markdown; one announcement
-// at each end; at most one draw per animation frame.
+// The live turn: the reply streams as markdown; its reasoning is drawn by
+// ThoughtBlock; one announcement at each end; at most one draw per animation frame.
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +21,9 @@ const turn = (over: Partial<LiveTurnState> = {}): LiveTurnState => ({
   streamId: "s",
   lastSeq: 1,
   completedItems: [],
+  anchorId: undefined,
+  thoughtStartedAt: undefined,
+  thoughtEndedAt: undefined,
   ...over,
 });
 
@@ -33,8 +35,6 @@ const show = (live: LiveTurnState | null, extra: Record<string, unknown> = {}) =
 /** Let the one-frame throttle draw the newest value. */
 const frame = () => act(() => void vi.advanceTimersByTime(20));
 const thought = () => host.querySelector<HTMLElement>("[data-live-thought]");
-const toggle = () => host.querySelector<HTMLButtonElement>("[data-live-thought] button");
-const body = () => host.querySelector<HTMLElement>("#live-thought-body");
 const announcer = () => host.querySelector("[data-testid=live-turn-announcer]")!.textContent;
 
 beforeEach(() => {
@@ -51,73 +51,12 @@ afterEach(() => {
 });
 
 describe("live thinking", () => {
-  it("shows streamed reasoning in an open, muted block that is not a live region", () => {
-    show(turn({ reasoning: "Checking the registry shape" }));
-    expect(thought()?.dataset.state).toBe("streaming");
-    expect(toggle()?.textContent).toContain("Thinking…");
-    expect(toggle()?.getAttribute("aria-expanded")).toBe("true");
-    expect(body()?.textContent).toBe("Checking the registry shape");
-    expect(body()?.hidden).toBe(false);
-    expect(body()?.getAttribute("aria-live")).toBe("off");
-    expect(thought()?.className).toContain("text-ink-tertiary");
-  });
-
-  it("collapses to Thought for Ns, from real elapsed time, when the reply starts", () => {
-    show(turn({ reasoning: "step one" }));
-    act(() => void vi.advanceTimersByTime(2400));
-    show(turn({ reasoning: "step one step two" }));
+  it("draws no thought itself: a thought sits in the stream (ThoughtBlock), the reply stays here", () => {
+    show(turn({ reasoning: "Checking the registry shape", reply: "Here is the answer" }));
     frame();
-    act(() => void vi.advanceTimersByTime(600));
-    show(turn({ reasoning: "step one step two", reply: "Here is the answer" }));
-    frame();
-    expect(thought()?.dataset.state).toBe("done");
-    expect(toggle()?.textContent).toContain("Thought for 3s");
-    expect(toggle()?.getAttribute("aria-expanded")).toBe("false");
-    expect(body()?.hidden).toBe(true);
-  });
-
-  it("never reads below 1s", () => {
-    show(turn({ reasoning: "quick" }));
-    show(turn({ reasoning: "quick", reply: "done" }));
-    frame();
-    expect(toggle()?.textContent).toContain("Thought for 1s");
-  });
-
-  it("reopens from the keyboard-reachable button, and the person's choice sticks", () => {
-    show(turn({ reasoning: "hidden detail", reply: "answer" }));
-    frame();
-    const button = toggle()!;
-    expect(button.tagName).toBe("BUTTON");
-    expect(button.getAttribute("aria-controls")).toBe("live-thought-body");
-    act(() => button.click());
-    expect(button.getAttribute("aria-expanded")).toBe("true");
-    expect(body()?.hidden).toBe(false);
-    // more text arrives: their choice is not overridden
-    show(turn({ reasoning: "hidden detail more", reply: "answer" }));
-    frame();
-    expect(toggle()?.getAttribute("aria-expanded")).toBe("true");
-    act(() => toggle()!.click());
-    expect(toggle()?.getAttribute("aria-expanded")).toBe("false");
-  });
-
-  it("a person who folds it while it streams keeps it folded", () => {
-    show(turn({ reasoning: "a" }));
-    act(() => toggle()!.click());
-    show(turn({ reasoning: "ab" }));
-    frame();
-    expect(toggle()?.getAttribute("aria-expanded")).toBe("false");
-  });
-
-  it("starts a fresh clock and a fresh block for the next turn", () => {
-    show(turn({ reasoning: "one", reply: "r" }));
-    frame();
-    act(() => void vi.advanceTimersByTime(5000));
-    show(turn({ turnId: "turn-2", reasoning: "two" }));
-    frame();
-    expect(thought()?.dataset.state).toBe("streaming");
-    show(turn({ turnId: "turn-2", reasoning: "two", reply: "r2" }));
-    frame();
-    expect(toggle()?.textContent).toContain("Thought for 1s");
+    expect(thought()).toBeNull();
+    expect(host.textContent).not.toContain("Checking the registry shape");
+    expect(host.querySelector("[data-live-reply]")?.textContent).toBe("Here is the answer");
   });
 });
 
@@ -242,7 +181,6 @@ describe("motion", () => {
     frame();
     const animated = Array.from(host.querySelectorAll("[class]")).filter((node) => /(^|\s)(transition|animate)-/.test(node.getAttribute("class") ?? ""));
     expect(animated).toEqual([]);
-    expect(host.querySelector("svg")?.getAttribute("class")).toContain("motion-safe:transition-transform");
     expect(host.querySelector("[data-live-reply]")?.textContent).toBe("visible text");
   });
 });

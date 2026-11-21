@@ -153,8 +153,8 @@ export function groupActivityRuns(messages: Message[]): ActivityTranscriptItem[]
   return group(messages, false) as ActivityTranscriptItem[];
 }
 
-export function groupTranscript(messages: Message[]): TranscriptItem[] {
-  return group(messages, true);
+export function groupTranscript(messages: Message[], foldAssistantTurns = true): TranscriptItem[] {
+  return group(messages, foldAssistantTurns);
 }
 
 const MAX_NAMES = 3;

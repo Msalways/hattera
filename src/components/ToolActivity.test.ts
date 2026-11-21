@@ -29,6 +29,10 @@ describe("ToolActivity", () => {
     const render = (tool: Parameters<typeof ToolActivity>[0]["tool"]) => renderToStaticMarkup(createElement(ToolActivity, { tool }));
     expect(render({ name: "Bash", ok: true, durationMs: 2400 })).toContain("· 2s");
     expect(render({ name: "Bash", ok: true })).not.toContain("tool-duration");
+    // under 0.1s and zero are not worth showing: never "0s"
+    expect(render({ name: "Bash", ok: true, durationMs: 0 })).not.toContain("tool-duration");
+    expect(render({ name: "Bash", ok: true, durationMs: 40 })).not.toContain("tool-duration");
+    expect(render({ name: "Bash", ok: true, durationMs: 40 })).not.toContain("0s");
     expect(render({ name: "Bash", durationMs: 900 })).not.toContain("tool-duration");
   });
   it("offers a diff for an edit, or says it is unavailable", () => {

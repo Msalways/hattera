@@ -121,3 +121,35 @@ export function toolCountsByTurn(messages: readonly Message[]): Map<string, numb
   }
   return counts;
 }
+
+/** Digest rows whose turn already shows its tool count in the turn header.
+ * The digest would say the same thing again ("Did N tool calls"), so one
+ * activity anchor stays per turn; a digest with no header above it (an older
+ * conversation with no tool rows) still shows. */
+export function digestsCoveredByHeader(messages: readonly Message[]): Set<string> {
+  const covered = new Set<string>();
+  let counted = false;
+  for (const message of messages) {
+    if (message.role === "user") {
+      counted = false;
+      continue;
+    }
+    if (message.kind === "digest") {
+      if (counted) covered.add(message.id);
+      continue;
+    }
+    if (message.kind !== "activity" || !message.tool || message.comm || message.threadRef || message.dataResult) continue;
+    if (isStatusActivity(message) || failedTurnCause(message.tool.name) !== null) continue;
+    counted = true;
+  }
+  return covered;
+}
+
+/** Under this a call's time is noise ("0s"), so no duration is shown. */
+export const MIN_SHOWN_DURATION_MS = 100;
+
+/** The duration to show for a finished call, or null when it is unmeasured or
+ * too short to mean anything. */
+export function shownDurationMs(durationMs: number | undefined): number | null {
+  return durationMs === undefined || !Number.isFinite(durationMs) || durationMs < MIN_SHOWN_DURATION_MS ? null : durationMs;
+}

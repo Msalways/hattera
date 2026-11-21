@@ -67,8 +67,9 @@
 //                      bounded multi-turn orchestration deterministic.
 //   FAKE_CLAUDE_REPLY_STATE Optional counter file shared by fresh CLI
 //                      processes so scripted replies keep their order.
-//   FAKE_CLAUDE_TOOL_CALLS JSON array of {name, input?, ok?, hold?} or {text}
-//                      (assistant words at that position; hold: the call never
+//   FAKE_CLAUDE_TOOL_CALLS JSON array of {name, input?, ok?, hold?}, {text}, {think} or {waitMs}
+//                      ({think}: reasoning text streamed; {waitMs}: pause the script;
+//                      {text}: assistant words at that position; hold: the call never
 //                      reports a result and the turn stays open): the tool calls
 //                      each turn makes, in order and before its reply text —
 //                      one tool_use (fresh id, that name and input) followed
@@ -215,7 +216,7 @@ const scriptedReplies = (() => {
     return [];
   }
 })();
-type ScriptedToolCall = { name: string; id?: string; input: Record<string, unknown>; ok: boolean; output?: unknown; text?: string; hold?: boolean };
+type ScriptedToolCall = { name: string; id?: string; input: Record<string, unknown>; ok: boolean; output?: unknown; text?: string; think?: string; waitMs?: number; hold?: boolean };
 // null = unset (or unparseable): keep the single default Bash call.
 const scriptedToolCalls: ScriptedToolCall[] | null = (() => {
   const raw = process.env.FAKE_CLAUDE_TOOL_CALLS;
@@ -224,10 +225,12 @@ const scriptedToolCalls: ScriptedToolCall[] | null = (() => {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
     return parsed
-      .filter((call): call is { name?: unknown; text?: unknown; hold?: unknown; id?: unknown; input?: unknown; ok?: unknown; output?: unknown } => typeof call?.name === "string" || typeof call?.text === "string")
+      .filter((call): call is { name?: unknown; text?: unknown; think?: unknown; waitMs?: unknown; hold?: unknown; id?: unknown; input?: unknown; ok?: unknown; output?: unknown } => typeof call?.name === "string" || typeof call?.text === "string" || typeof call?.think === "string" || typeof call?.waitMs === "number")
       .map((call) => ({
         name: typeof call.name === "string" ? call.name : "",
         ...(typeof call.text === "string" ? { text: call.text } : {}),
+        ...(typeof call.think === "string" ? { think: call.think } : {}),
+        ...(typeof call.waitMs === "number" ? { waitMs: call.waitMs } : {}),
         ...(call.hold === true ? { hold: true } : {}),
         ...(typeof call.id === "string" ? { id: call.id } : {}),
         input: call.input && typeof call.input === "object" && !Array.isArray(call.input) ? call.input as Record<string, unknown> : {},
@@ -808,32 +811,9 @@ const playTurn = (prompt: JsonValue, late = false) => {
     if (context.trim()) replyParts = [`${context.trim()}\n\n${replyParts[0] ?? ""}`, ...replyParts.slice(1)];
   }
   const usage = { input_tokens: 10, cache_read_input_tokens: 2, output_tokens: 5 };
-  if (scriptedToolCalls) {
-    // scripted calls come first, each settled before the reply text
-    for (const call of scriptedToolCalls) {
-      // a text entry is assistant words at this position between calls
-      if (call.text !== undefined) { out({ type: "assistant", message: { content: [{ type: "text", text: call.text }], usage } }); continue; }
-      const id = call.id ?? `tu-${process.pid}-${++toolUseCount}`;
-      out({ type: "assistant", message: { content: [{ type: "tool_use", id, name: call.name, input: call.input }], usage } });
-      // hold: the call never reports a result and the turn stays open, so a
-      // fixture can show a running call, then stop the turn
-      if (call.hold) return;
-      out({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, is_error: !call.ok, content: call.output }] } });
-      runHooks("PostToolUse", { tool_name: call.name, tool_input: call.input, tool_response: call.output, tool_use_id: id });
-    }
-    for (const text of replyParts) out({ type: "assistant", message: { content: [{ type: "text", text }], usage } });
-  } else {
-    replyParts.forEach((text, index) => {
-      const content: Array<
-        { type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-      > = [{ type: "text", text }];
-      if (index === replyParts.length - 1) content.push({ type: "tool_use", id: defaultToolId, name: "Bash", input: { command: "echo hi" } });
-      out({ type: "assistant", message: { content, usage } });
-    });
-    out({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: defaultToolId, is_error: false, content: [{ type: "text", text: "hi" }] }] } });
-    runHooks("PostToolUse", { tool_name: "Bash", tool_input: { command: "echo hi" }, tool_response: "hi", tool_use_id: defaultToolId });
-  }
-
+  // Everything after the scripted calls have settled. A {waitMs} entry pauses
+  // the script, so this runs from a timer as well as inline.
+  const afterCalls = () => {
   // total_cost_usd is the process's running total (2.1.282: "read the latest
   // result rather than summing across results"); usage is this turn's own.
   const finish = () => {
@@ -917,6 +897,42 @@ const playTurn = (prompt: JsonValue, late = false) => {
     }
   } else {
     finish();
+  }
+  };
+  if (scriptedToolCalls) {
+    // scripted calls come first, each settled before the reply text
+    const step = (from: number) => {
+      for (let i = from; i < scriptedToolCalls.length; i++) {
+        const call = scriptedToolCalls[i]!;
+        // a think entry streams reasoning text, as a model thinking before it acts
+        if (call.think !== undefined) { out({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "thinking_delta", thinking: call.think } } }); continue; }
+        // a waitMs entry pauses the script, so a thought or a call takes real time
+        if (call.waitMs !== undefined) { setTimeout(() => step(i + 1), call.waitMs); return; }
+        // a text entry is assistant words at this position between calls
+        if (call.text !== undefined) { out({ type: "assistant", message: { content: [{ type: "text", text: call.text }], usage } }); continue; }
+        const id = call.id ?? `tu-${process.pid}-${++toolUseCount}`;
+        out({ type: "assistant", message: { content: [{ type: "tool_use", id, name: call.name, input: call.input }], usage } });
+        // hold: the call never reports a result and the turn stays open, so a
+        // fixture can show a running call, then stop the turn
+        if (call.hold) return;
+        out({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, is_error: !call.ok, content: call.output }] } });
+        runHooks("PostToolUse", { tool_name: call.name, tool_input: call.input, tool_response: call.output, tool_use_id: id });
+      }
+      for (const text of replyParts) out({ type: "assistant", message: { content: [{ type: "text", text }], usage } });
+      afterCalls();
+    };
+    step(0);
+  } else {
+    replyParts.forEach((text, index) => {
+      const content: Array<
+        { type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+      > = [{ type: "text", text }];
+      if (index === replyParts.length - 1) content.push({ type: "tool_use", id: defaultToolId, name: "Bash", input: { command: "echo hi" } });
+      out({ type: "assistant", message: { content, usage } });
+    });
+    out({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: defaultToolId, is_error: false, content: [{ type: "text", text: "hi" }] }] } });
+    runHooks("PostToolUse", { tool_name: "Bash", tool_input: { command: "echo hi" }, tool_response: "hi", tool_use_id: defaultToolId });
+    afterCalls();
   }
 };
 

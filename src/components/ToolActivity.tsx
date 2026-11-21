@@ -4,7 +4,7 @@ import type { Message } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { placeLabelKey, type Place } from "@/lib/place";
-import { toolDiff, toolKind, toolStatus, toolTarget, type ToolRowStatus } from "@/lib/tool-rows";
+import { shownDurationMs, toolDiff, toolKind, toolStatus, toolTarget, type ToolRowStatus } from "@/lib/tool-rows";
 import { formatElapsed } from "@/lib/working-time";
 import { nameIsCommand } from "@/lib/verify-steps";
 import { PlaceIcon } from "./PlaceIcon";
@@ -58,7 +58,8 @@ export function ToolActivity({
   const diff = kind === "edit" ? toolDiff(tool) : null;
   // the result already is the diff: show it once, as the diff, not again as raw text
   const outputIsDiff = diff !== null && !!tool.output && toolDiff({ name: tool.name, output: tool.output }) !== null;
-  const duration = status === "running" || tool.durationMs === undefined ? null : formatElapsed(tool.durationMs);
+  const measured = status === "running" ? null : shownDurationMs(tool.durationMs);
+  const duration = measured === null ? null : formatElapsed(measured);
   return (
     <details onToggle={(event) => setExpanded(event.currentTarget.open)} className="group/tool w-full max-w-full rounded-xl border border-hairline/40 bg-panel text-[13px]" data-testid="tool-activity" data-tool-row data-status={status}>
       <summary

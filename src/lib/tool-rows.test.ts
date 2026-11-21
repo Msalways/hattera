@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Message } from "@/state/store";
-import { segmentToolRun, toolCountsByTurn, toolDiff, toolKind, toolStatus, toolTarget } from "./tool-rows";
+import { digestsCoveredByHeader, segmentToolRun, shownDurationMs, toolCountsByTurn, toolDiff, toolKind, toolStatus, toolTarget } from "./tool-rows";
 
 const tool = (id: string, name: string, ok?: boolean): Message => ({ id, role: "bot", kind: "activity", at: 1, tool: { name, ok } });
 const user = (id: string): Message => ({ id, role: "user", kind: "text", text: "hi", at: 1 });
@@ -39,5 +39,26 @@ describe("tool rows", () => {
   it("counts tools per turn and anchors the count on the first tool", () => {
     const counts = toolCountsByTurn([user("u1"), tool("a", "Read", true), text("t"), tool("b", "Bash", true), user("u2"), text("x"), user("u3"), tool("c", "Bash", true)]);
     expect([...counts]).toEqual([["a", 2], ["c", 1]]);
+  });
+});
+
+describe("one activity anchor per turn", () => {
+  const digest = (id: string): Message => ({ id, role: "bot", kind: "digest", at: 1 } as Message);
+  it("covers a digest chip only when the turn already has a counted tool row", () => {
+    const msgs = [user("u1"), tool("a", "Read"), digest("d1"), user("u2"), digest("d2")];
+    const covered = digestsCoveredByHeader(msgs);
+    expect(covered.has("d1")).toBe(true);
+    expect(covered.has("d2")).toBe(false);
+  });
+});
+
+describe("shownDurationMs", () => {
+  it("hides unmeasured and sub-0.1s durations, never showing 0s", () => {
+    expect(shownDurationMs(undefined)).toBeNull();
+    expect(shownDurationMs(0)).toBeNull();
+    expect(shownDurationMs(99)).toBeNull();
+    expect(shownDurationMs(Number.NaN)).toBeNull();
+    expect(shownDurationMs(100)).toBe(100);
+    expect(shownDurationMs(2500)).toBe(2500);
   });
 });

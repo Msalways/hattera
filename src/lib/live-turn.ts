@@ -53,6 +53,62 @@ export interface LiveTurn {
   lastSeq: number;
   /** Assistant items of this turn already stored as messages (capped). */
   completedItems: string[];
+  /** The last stored message when the reasoning began: the thought sits right
+   * after it, where the thinking happened in the stream. */
+  anchorId: string | undefined;
+  /** Server time (ms) of the first reasoning text; undefined when unmeasured. */
+  thoughtStartedAt: number | undefined;
+  /** Server time (ms) of the first event that was not reasoning, after it. */
+  thoughtEndedAt: number | undefined;
+}
+
+/** One finished thought, kept on the client after its turn ends. Display
+ * state only: the server does not store reasoning, so a reload drops it. */
+export interface ThoughtRecord {
+  turnId: string | undefined;
+  anchorId: string | undefined;
+  /** Server time (ms) the thinking began; places the thought by time when its
+   * anchor message was not loaded (a thread not yet opened). */
+  startedAt: number | undefined;
+  text: string;
+  /** Whole seconds, never below 1; null when the timing was not measured. */
+  seconds: number | null;
+}
+
+/** Thoughts kept per thread; far above any realistic session, bounded. */
+export const THOUGHTS_MAX = 100;
+
+function eventMs(event: RuntimeEvent): number | undefined {
+  const at = Date.parse(event.createdAt);
+  return Number.isFinite(at) ? at : undefined;
+}
+
+/** The thought a turn holds, or null when it streamed no reasoning. `endedAt`
+ * stands in when no later event closed it (the turn ended first). */
+export function thoughtOf(live: LiveTurn, endedAt?: number): ThoughtRecord | null {
+  if (!live.reasoning) return null;
+  const end = live.thoughtEndedAt ?? endedAt;
+  const seconds = live.thoughtStartedAt !== undefined && end !== undefined
+    ? Math.max(1, Math.round((end - live.thoughtStartedAt) / 1000))
+    : null;
+  return { turnId: live.turnId, anchorId: live.anchorId, startedAt: live.thoughtStartedAt, text: live.reasoning, seconds };
+}
+
+/** The stored message a thought sits after: its anchor when that message is in
+ * the transcript, else the last message stored at or before the thinking began
+ * (the anchor can be missing when the thread's messages were not loaded yet).
+ * Null means the end of the transcript. */
+export function resolveThoughtAnchor(
+  messages: ReadonlyArray<{ id: string; at: number }>,
+  ids: ReadonlySet<string>,
+  anchorId: string | undefined,
+  startedAt: number | undefined,
+): string | null {
+  if (anchorId !== undefined && ids.has(anchorId)) return anchorId;
+  if (startedAt === undefined) return null;
+  let found: string | null = null;
+  for (const message of messages) if (message.at <= startedAt) found = message.id;
+  return found;
 }
 
 /** Per stream (reasoning, reply): enough for any realistic turn, bounded so a
@@ -86,6 +142,9 @@ function fresh(turnId: string | undefined, cursor: LiveCursor | undefined, joine
     streamId: cursor?.streamId,
     lastSeq: cursor ? cursor.seq : -1,
     completedItems: [],
+    anchorId: undefined,
+    thoughtStartedAt: undefined,
+    thoughtEndedAt: undefined,
   };
 }
 
@@ -116,15 +175,25 @@ function turnFor(live: LiveTurn | undefined, event: RuntimeEvent, cursor: LiveCu
  * itself when the event changes nothing so callers can skip a re-render.
  * `cursor` is the frame's SSE cursor (see `parseFrameCursor`).
  */
-export function foldLiveTurn(live: LiveTurn | undefined, event: RuntimeEvent, cursor?: LiveCursor): LiveTurn | undefined {
-  const next = foldOrdered(live, event, cursor);
+export function foldLiveTurn(live: LiveTurn | undefined, event: RuntimeEvent, cursor?: LiveCursor, anchorId?: string): LiveTurn | undefined {
+  const replay = !!cursor && !!live && live.streamId === cursor.streamId && cursor.seq <= live.lastSeq;
+  const folded = foldOrdered(live, event, cursor, anchorId);
+  const next = replay ? folded : endThought(folded, event);
   // A frame we could not order was applied: earlier text may be missing or
   // out of order, whatever turn it landed on. The known {streamId, lastSeq}
   // boundary is kept.
   return !cursor && next && next !== live && !next.joinedMidStream ? { ...next, joinedMidStream: true } : next;
 }
 
-function foldOrdered(live: LiveTurn | undefined, event: RuntimeEvent, cursor: LiveCursor | undefined): LiveTurn | undefined {
+/** Thinking ends at the first event after it that is not more reasoning. */
+function endThought(next: LiveTurn | undefined, event: RuntimeEvent): LiveTurn | undefined {
+  if (!next || next.thoughtStartedAt === undefined || next.thoughtEndedAt !== undefined) return next;
+  if (event.type === "turn.started" || (event.type === "content.delta" && event.streamKind === "reasoning_text")) return next;
+  const at = eventMs(event);
+  return at === undefined ? next : { ...next, thoughtEndedAt: at };
+}
+
+function foldOrdered(live: LiveTurn | undefined, event: RuntimeEvent, cursor: LiveCursor | undefined, anchorId?: string): LiveTurn | undefined {
   if (cursor && live) {
     // a different server run restarts `seq`: nothing held is comparable
     if (live.streamId !== undefined && live.streamId !== cursor.streamId) live = undefined;
@@ -145,7 +214,13 @@ function foldOrdered(live: LiveTurn | undefined, event: RuntimeEvent, cursor: Li
       if (event.itemId && turn.completedItems.includes(event.itemId)) return live;
       if (event.streamKind === "reasoning_text") {
         const next = appendCapped(turn.reasoning, event.delta);
-        return stamp({ ...turn, reasoning: next.text, truncated: turn.truncated || next.truncated }, cursor);
+        const began = turn.reasoning === "" && turn.thoughtStartedAt === undefined;
+        return stamp({
+          ...turn,
+          reasoning: next.text,
+          truncated: turn.truncated || next.truncated,
+          ...(began ? { anchorId, thoughtStartedAt: eventMs(event) } : {}),
+        }, cursor);
       }
       // A reply belongs to one item: text for a different item starts over.
       const sameItem = !event.itemId || turn.replyItemId === undefined || turn.replyItemId === event.itemId;

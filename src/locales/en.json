@@ -1436,6 +1436,7 @@
   "chat.jumpToLatest": "Jump to latest",
   "chat.jumpToLatestAria": "Jump to latest messages",
   "chat.live.thinking": "Thinking…",
+  "chat.live.thought": "Thought",
   "chat.live.thoughtFor": "Thought for {seconds}s",
   "chat.live.working": "Working…",
   "chat.live.startAnnounce": "{name} is thinking.",
