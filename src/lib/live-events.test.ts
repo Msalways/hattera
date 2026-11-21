@@ -141,7 +141,7 @@ describe("live events supervisor", () => {
     test.sources[1].message({ kind: "message", value: "current" }, "new:1");
 
     expect(onFrame).toHaveBeenCalledOnce();
-    expect(onFrame).toHaveBeenCalledWith({ kind: "message", value: "current" });
+    expect(onFrame).toHaveBeenCalledWith({ kind: "message", value: "current" }, "new:1");
     stop();
   });
 
