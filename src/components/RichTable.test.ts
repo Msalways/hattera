@@ -26,9 +26,9 @@ describe("rich table rendering", () => {
   it("offers file previews only for message-scoped attachments or authored links", () => {
     const file = { name: "report.csv", path: "/workspace/report.csv", private: true };
     const message = { threadId: "t", messageId: "m" };
-    expect(renderToStaticMarkup(createElement(AttachedFileChip, { file, message }))).toContain("Preview table: report.csv");
-    expect(renderToStaticMarkup(createElement(AttachedFileChip, { file }))).not.toContain("Preview table:");
-    expect(renderToStaticMarkup(createElement(AttachedFileChip, { file: { ...file, private: false }, message }))).not.toContain("Preview table:");
+    expect(renderToStaticMarkup(createElement(AttachedFileChip, { file, message }))).toContain("Open preview of report.csv");
+    expect(renderToStaticMarkup(createElement(AttachedFileChip, { file }))).not.toContain("Open preview of");
+    expect(renderToStaticMarkup(createElement(AttachedFileChip, { file: { ...file, private: false }, message }))).not.toContain("Open preview of");
   });
   it("reads chunked UTF-8 data and rejects too-large responses", async () => {
     const signal = new AbortController().signal;

@@ -20,6 +20,7 @@ import {
   preloadScreens, RemoteAgentSettingsPanel, RemoteDesktopPanel, RoutinesPage, SettingsModal, TeamMapPage, TriggersPanel,
 } from "@/components/lazy-screens";
 import { WorkspaceBackupRecovery } from "@/components/WorkspaceBackupSettings";
+import { FilePreviewSurface } from "@/components/FilePreviewSurface";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { AppNotices } from "@/components/AppNotices";
 import { CloudAddDialog } from "@/components/CloudAddDialog";
@@ -402,6 +403,7 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
       )}
       {!remoteClient && state.inspectorOpen && bot && <InspectorPanel key={bot.threadId} bot={bot} />}
       {!remoteClient && state.activityOpen && bot && <ActivityPanel key={`activity:${bot.id}`} bot={bot} />}
+      <FilePreviewSurface />
       {state.appSettingsOpen && <SettingsModal />}
       {/* Add a Cloud: the buying journey's one dialog, and Show me how's one step. */}
       <CloudAddDialog />

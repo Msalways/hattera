@@ -39,8 +39,7 @@ import { looksLikeThreadRefUrl, parseThreadRefUrl, resolveThreadRefAddress, rema
 import { MarkdownImagePreview, MessageFolderFiles, OutsideWorkspaceFile, saveFailureText, useLocalFileSave, type MessageAttachmentContext } from "./AttachmentPreview";
 import { ThreadLink, ThreadRefsContext, threadLinkFromProps, type ThreadRefsValue } from "./ThreadRefs";
 import { MarkdownTable } from "./MarkdownTable";
-import { TableFileButton } from "./TableFilePreview";
-import { DocumentPreviewButton } from "./DocumentPreview";
+import { openFilePreview } from "@/lib/file-preview-store";
 
 // highlighted code, so revisiting a thread doesn't re-tokenize settled
 // blocks; keys are content hashes. The two-theme HTML is about 20 to 28 times
@@ -691,16 +690,27 @@ function LocalFileLink({ filePath, name, children, message }: { filePath: string
 
   return (
     <span dir="ltr" className="inline-flex flex-wrap items-center gap-x-1.5 [unicode-bidi:isolate]">
-      <DocumentPreviewButton path={filePath} name={name ?? fileName(filePath)} message={message} />
-      <TableFileButton path={filePath} name={name ?? fileName(filePath)} message={message} />
+      {/* The name opens the one preview surface; a folder link has nothing to
+          preview, so its name keeps listing the folder's files. */}
+      {!/[\\/]$/.test(filePath) && (
+        <button
+          type="button"
+          onClick={(event) => openFilePreview({ path: filePath, name: name ?? fileName(filePath), message }, event.currentTarget)}
+          aria-label={t("filePreview.open", { name: name ?? fileName(filePath) })}
+          className="inline-flex min-h-6 items-center break-words text-start text-accent underline decoration-accent/40 hover:decoration-accent focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          {children}
+        </button>
+      )}
       <button
         type="button"
         onClick={() => void save.save()}
         disabled={save.state === "saving"}
         title="Save a copy"
+        aria-label={t("attach.saveAria", { name: name ?? fileName(filePath) })}
         className="inline-flex items-center gap-1 break-words text-start text-accent underline decoration-accent/40 hover:decoration-accent disabled:cursor-wait"
       >
-        {children}
+        {/[\\/]$/.test(filePath) && children}
         {save.state === "saving" ? (
           <LoaderCircle size={12} className="shrink-0 animate-spin" aria-hidden="true" />
         ) : save.state === "saved" ? (

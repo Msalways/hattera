@@ -1,0 +1,149 @@
+// @vitest-environment happy-dom
+// Mounts the real surface against a stubbed fetch. Only fetch and the native
+// dialog methods are substituted; this does not establish browser focus
+// containment, inertness or real 390px geometry (the live run covers those).
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FilePreviewSurface } from "./FilePreviewSurface";
+import { closeFilePreview, openFilePreview, resetFilePreview } from "@/lib/file-preview-store";
+
+let root: Root;
+let host: HTMLDivElement;
+const network = vi.fn<typeof fetch>();
+const grant = (messageId: string) => ({ threadId: "fixture-thread", messageId });
+const settle = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 20)); }); };
+const open = (path: string, messageId = "m1", from?: HTMLElement) => act(() => openFilePreview({ path, name: path.split("/").pop()!, message: grant(messageId) }, from));
+const surface = () => document.querySelector("[data-file-preview]");
+const deferred = () => {
+  let resolve!: (r: Response) => void;
+  const promise = new Promise<Response>((r) => { resolve = r; });
+  return { promise, resolve };
+};
+const refusal = (status: number, code?: string) => new Response(JSON.stringify({ error: "server words", code }), { status });
+
+beforeEach(() => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("fetch", network);
+  network.mockReset();
+  vi.spyOn(HTMLDialogElement.prototype, "showModal").mockImplementation(function (this: HTMLDialogElement) { this.open = true; });
+  vi.spyOn(HTMLDialogElement.prototype, "close").mockImplementation(function (this: HTMLDialogElement) { this.open = false; });
+  host = document.createElement("div"); document.body.append(host); root = createRoot(host);
+  act(() => root.render(createElement(FilePreviewSurface)));
+});
+afterEach(() => { act(() => resetFilePreview()); act(() => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+describe("file preview surface", () => {
+  it("renders nothing until a file is opened, and opening requests the file once with its message grant", async () => {
+    expect(surface()).toBeNull();
+    network.mockResolvedValue(new Response("# Plan\n\nReadable steps.", { headers: { "content-length": "23" } }));
+    await open("/w/plan.md");
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector(".chat-md")?.textContent).toContain("Readable steps."); }, { timeout: 10000 });
+    expect(network).toHaveBeenCalledTimes(1);
+    expect(network.mock.calls[0]![0]).toBe("/api/threads/fixture-thread/messages/m1/file");
+    expect(JSON.parse(network.mock.calls[0]![1]!.body as string)).toEqual({ path: "/w/plan.md" });
+    expect(document.querySelector("a[download]")).toBeNull();
+  });
+
+  it("opens Markdown on Output and switches to Raw source", async () => {
+    network.mockResolvedValue(new Response("# Title\n\nbody"));
+    await open("/w/plan.md");
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("[role=tab][aria-selected=true]")?.textContent).toBe("Output"); }, { timeout: 10000 });
+    const raw = [...surface()!.querySelectorAll("[role=tab]")].find((tab) => tab.textContent === "Raw") as HTMLButtonElement;
+    await act(async () => raw.click());
+    expect(surface()!.querySelector("pre")?.textContent).toBe("# Title\n\nbody");
+    expect(raw.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("shows HTML as literal source, never as markup", async () => {
+    network.mockResolvedValue(new Response("<script>alert(1)</script><b>hi</b>"));
+    await open("/w/page.html");
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("pre")?.textContent).toBe("<script>alert(1)</script><b>hi</b>"); });
+    expect(surface()!.querySelector("script, iframe")).toBeNull();
+    expect(surface()!.textContent).toContain("Showing source for safety.");
+  });
+
+  it("says Preview not available for DOCX with type, size and Download, and never reads the bytes", async () => {
+    network.mockResolvedValue(new Response("PK", { headers: { "content-length": "2048" } }));
+    await open("/w/brief.docx");
+    await vi.waitFor(async () => { await settle(); expect(surface()?.textContent).toContain("Preview not available"); });
+    expect(surface()!.textContent).toContain("DOCX · 2 KB");
+    expect([...surface()!.querySelectorAll("button")].some((b) => b.textContent === "Download")).toBe(true);
+    expect(surface()!.textContent).not.toContain("/w/");
+  });
+
+  it.each([
+    [403, "outside_workspace", "the files this conversation can reach"],
+    [404, undefined, "no longer exists"],
+  ])("a %s answer is a calm state with no Download", async (status, code, text) => {
+    network.mockResolvedValue(refusal(status, code));
+    await open("/Users/secret/hidden.txt");
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("[role=alert]")?.textContent).toContain(text); });
+    const body = surface()!.querySelector("[data-testid=file-preview-body]")!;
+    expect([...body.querySelectorAll("button")].some((b) => b.textContent === "Download")).toBe(false);
+    expect(surface()!.textContent).not.toContain("/Users/secret");
+    expect(surface()!.textContent).not.toContain("server words");
+    expect(surface()!.querySelector("header button[disabled]")).not.toBeNull();
+  });
+
+  it("retries a failed load through a fresh request", async () => {
+    network.mockResolvedValueOnce(refusal(500)).mockResolvedValue(new Response("Recovered"));
+    await open("/w/a.txt");
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("[role=alert]")).not.toBeNull(); });
+    const retry = [...surface()!.querySelectorAll("button")].find((b) => b.textContent === "Retry")!;
+    await act(async () => retry.click());
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("pre")?.textContent).toBe("Recovered"); });
+    expect(network).toHaveBeenCalledTimes(2);
+  });
+
+  it("never shows an earlier file's late answer after switching, even for the same name", async () => {
+    const slow = deferred();
+    network.mockReturnValueOnce(slow.promise).mockResolvedValue(new Response("SECOND"));
+    await open("/w/notes.txt", "m1");
+    await vi.waitFor(() => expect(network).toHaveBeenCalledTimes(1));
+    const first = network.mock.calls[0]![1]!.signal!;
+    await open("/w/notes.txt", "m2");
+    expect(first.aborted).toBe(true);
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("pre")?.textContent).toBe("SECOND"); });
+    slow.resolve(new Response("FIRST SECRET")); await settle();
+    expect(document.body.textContent).not.toContain("FIRST SECRET");
+    // each request carried its own message's grant
+    expect(network.mock.calls[0]![0]).toContain("/messages/m1/file");
+    expect(network.mock.calls[1]![0]).toContain("/messages/m2/file");
+  });
+
+  it("aborts the request on close and returns focus to the control that opened it", async () => {
+    const pending = deferred(); network.mockReturnValue(pending.promise);
+    const trigger = document.createElement("button"); document.body.append(trigger); trigger.focus();
+    await open("/w/a.txt", "m1", trigger);
+    await vi.waitFor(() => expect(network).toHaveBeenCalledTimes(1));
+    const signal = network.mock.calls[0]![1]!.signal!;
+    const close = surface()!.querySelector("button[aria-label='Close preview']") as HTMLButtonElement;
+    await act(async () => close.click());
+    await settle();
+    expect(signal.aborted).toBe(true);
+    expect(surface()).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it("moves focus to the title on open and closes on Escape", async () => {
+    network.mockResolvedValue(new Response("x"));
+    await open("/w/a.txt");
+    await settle();
+    expect(document.activeElement?.tagName).toBe("H2");
+    await act(async () => { surface()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(surface()).toBeNull();
+    act(() => closeFilePreview());
+  });
+
+  it("uses a modal dialog sheet below the desktop breakpoint", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
+    act(() => root.render(createElement(FilePreviewSurface)));
+    network.mockResolvedValue(new Response("x"));
+    await open("/w/a.txt");
+    await settle();
+    expect(surface()?.tagName).toBe("DIALOG");
+    expect((surface() as HTMLDialogElement).open).toBe(true);
+  });
+});

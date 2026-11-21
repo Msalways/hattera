@@ -33,8 +33,7 @@ import {
 } from "@/lib/composer-attachments";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
-import { TableFileButton } from "./TableFilePreview";
-import { DocumentPreviewButton } from "./DocumentPreview";
+import { openFilePreview } from "@/lib/file-preview-store";
 
 export interface PreviewImage {
   src: string;
@@ -248,7 +247,7 @@ export async function requestMessageFile(
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { error?: string; code?: string } | null;
-    throw Object.assign(new Error(body?.error ?? t("attach.downloadFailed")), { code: body?.code });
+    throw Object.assign(new Error(body?.error ?? t("attach.downloadFailed")), { code: body?.code, status: response.status });
   }
   return response;
 }
@@ -960,29 +959,31 @@ export function AttachedFileChip({ file, message, linked = false, compact = fals
       <div className="flex items-center pe-1">
         <button
           type="button"
-          onClick={() => void save.save()}
-          disabled={save.state === "saving"}
-          aria-label={
-            retryable
-              ? t("attach.retrySaveAria", { name: file.name })
-              : t("attach.saveAria", { name: file.name })
-          }
-          className="flex min-h-10 min-w-0 flex-1 items-center gap-2 px-2.5 py-2 text-left transition-colors hover:bg-raised/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 disabled:cursor-wait disabled:hover:bg-transparent"
+          onClick={(event) => openFilePreview({ path: file.path, name: file.name, message }, event.currentTarget)}
+          aria-label={t("filePreview.open", { name: file.name })}
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-2.5 py-2 text-left transition-colors hover:bg-raised/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60"
         >
           <FileText size={14} className="shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate text-ink">{file.name}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => void save.save()}
+          disabled={save.state === "saving"}
+          title={t("attach.download")}
+          aria-label={retryable ? t("attach.retrySaveAria", { name: file.name }) : t("attach.saveAria", { name: file.name })}
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-raised/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-wait"
+        >
           {save.state === "saving" ? (
-            <LoaderCircle size={13} className="shrink-0 animate-spin" />
+            <LoaderCircle size={13} className="animate-spin" aria-hidden="true" />
           ) : save.state === "saved" ? (
-            <Check size={13} className="shrink-0 text-success" />
+            <Check size={13} className="text-success" aria-hidden="true" />
           ) : failed ? (
-            retryable && <RotateCcw size={13} className="shrink-0 text-danger" />
+            retryable && <RotateCcw size={13} className="text-danger" aria-hidden="true" />
           ) : (
-            <Download size={13} className="shrink-0" />
+            <Download size={13} aria-hidden="true" />
           )}
         </button>
-        <DocumentPreviewButton path={file.path} name={file.name} message={message} />
-        <TableFileButton path={file.path} name={file.name} message={message} />
       </div>
       {save.state !== "idle" && (
         <div
@@ -1038,25 +1039,31 @@ function CompactFileChip({ file, message, linked, save, className }: {
       >
         <button
           type="button"
-          onClick={() => void save.save()}
-          disabled={save.state === "saving"}
-          aria-label={retryable ? t("attach.retrySaveAria", { name: file.name }) : t("attach.saveAria", { name: file.name })}
-          className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-full ps-2.5 pe-2 transition-colors hover:bg-ink/[0.06] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait"
+          onClick={(event) => openFilePreview({ path: file.path, name: file.name, message }, event.currentTarget)}
+          aria-label={t("filePreview.open", { name: file.name })}
+          className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-full ps-2.5 pe-1.5 transition-colors hover:bg-ink/[0.06] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <FileText size={14} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
           {name}
+        </button>
+        <button
+          type="button"
+          onClick={() => void save.save()}
+          disabled={save.state === "saving"}
+          title={t("attach.download")}
+          aria-label={retryable ? t("attach.retrySaveAria", { name: file.name }) : t("attach.saveAria", { name: file.name })}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-ink/[0.06] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait"
+        >
           {save.state === "saving" ? (
-            <LoaderCircle size={13} className="shrink-0 animate-spin" aria-hidden="true" />
+            <LoaderCircle size={13} className="animate-spin" aria-hidden="true" />
           ) : save.state === "saved" ? (
-            <Check size={13} className="shrink-0 text-success" aria-hidden="true" />
+            <Check size={13} className="text-success" aria-hidden="true" />
           ) : failed ? (
-            retryable && <RotateCcw size={13} className="shrink-0 text-danger" aria-hidden="true" />
+            retryable && <RotateCcw size={13} className="text-danger" aria-hidden="true" />
           ) : (
-            <Download size={13} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
+            <Download size={13} strokeWidth={1.75} aria-hidden="true" />
           )}
         </button>
-        <DocumentPreviewButton path={file.path} name={file.name} message={message} className="table-action shrink-0" />
-        <TableFileButton path={file.path} name={file.name} message={message} />
       </span>
       {save.state !== "idle" && save.state !== "saved" && (
         <span role={failed ? "alert" : "status"} className={cn("px-2.5 text-[11.5px]", failed ? "text-danger" : "text-ink-secondary")}>
