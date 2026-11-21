@@ -142,8 +142,8 @@ function VideoBody({ file, deps }: { file: PreviewFile; deps: PreviewLoadDeps })
 
 function Body({ file, state, retry, deps, download }: { file: PreviewFile; state: PreviewState; retry: () => void; deps: PreviewLoadDeps; download: ReactNode }) {
   const kind = previewKind(file.name);
-  // Output first whenever there is an output to show
-  const [view, setView] = useState<"output" | "raw">("output");
+  // Output first whenever there is an output to show; HTML has none until DP-2, so it opens on Raw
+  const [view, setView] = useState<"output" | "raw">(kind === "html-source" ? "raw" : "output");
   if (state.status === "idle" || state.status === "loading") {
     return <div role="status" className="flex items-center justify-center gap-2 p-10 text-sm text-ink-secondary"><LoaderCircle size={16} className="animate-spin" aria-hidden="true" />{t("filePreview.loading")}</div>;
   }
@@ -189,10 +189,11 @@ function Body({ file, state, retry, deps, download }: { file: PreviewFile; state
           {notices.join(" ")} <span className="mt-1 block">{download}</span>
         </div>
       )}
-      {kind === "markdown" && <Tabs value={view} onChange={setView} />}
-      {kind === "html-source" && <p className="mb-2 text-[12px] text-ink-secondary">{t("attach.previewSourceNote")}</p>}
-      <div id="file-preview-view" role={kind === "markdown" ? "tabpanel" : undefined} aria-labelledby={kind === "markdown" ? `file-preview-tab-${view}` : undefined}>
-        {kind === "markdown" && view === "output" ? (
+      {(kind === "markdown" || kind === "html-source") && <Tabs value={view} onChange={setView} />}
+      <div id="file-preview-view" role={kind === "markdown" || kind === "html-source" ? "tabpanel" : undefined} aria-labelledby={kind === "markdown" || kind === "html-source" ? `file-preview-tab-${view}` : undefined}>
+        {kind === "html-source" && view === "output" ? (
+          <Notice title={t("filePreview.htmlOutputLater")}>{t("filePreview.htmlOutputLaterDetail")}</Notice>
+        ) : kind === "markdown" && view === "output" ? (
           <Suspense fallback={<div role="status" className="p-4 text-sm text-ink-secondary">{t("filePreview.loading")}</div>}>
             <LazyChatMarkdown text={body.text} portable />
           </Suspense>

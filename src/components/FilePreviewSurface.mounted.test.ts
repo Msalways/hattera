@@ -55,12 +55,18 @@ describe("file preview surface", () => {
     expect(raw.getAttribute("aria-selected")).toBe("true");
   });
 
-  it("shows HTML as literal source, never as markup", async () => {
+  it("opens HTML on Raw as literal source, never as markup, and Output says it is not available yet", async () => {
     network.mockResolvedValue(new Response("<script>alert(1)</script><b>hi</b>"));
     await open("/w/page.html");
-    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("pre")?.textContent).toBe("<script>alert(1)</script><b>hi</b>"); });
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("[role=tab][aria-selected=true]")?.textContent).toBe("Raw"); });
+    expect(surface()!.querySelector("pre")?.textContent).toBe("<script>alert(1)</script><b>hi</b>");
     expect(surface()!.querySelector("script, iframe")).toBeNull();
-    expect(surface()!.textContent).toContain("Showing source for safety.");
+    const output = [...surface()!.querySelectorAll("[role=tab]")].find((tab) => tab.textContent === "Output") as HTMLButtonElement;
+    await act(async () => output.click());
+    expect(surface()!.textContent).toContain("Rendered HTML is not available yet.");
+    expect(surface()!.querySelector("pre")).toBeNull();
+    expect(surface()!.querySelector("script, iframe")).toBeNull();
+    expect(network).toHaveBeenCalledTimes(1);
   });
 
   it("says Preview not available for DOCX with type, size and Download, and never reads the bytes", async () => {

@@ -292,6 +292,8 @@
   "filePreview.view": "Preview view",
   "filePreview.output": "Output",
   "filePreview.raw": "Raw",
+  "filePreview.htmlOutputLater": "Rendered HTML is not available yet.",
+  "filePreview.htmlOutputLaterDetail": "It will arrive in a later update. The Raw tab shows the exact source, and Download keeps a copy.",
   "filePreview.loading": "Loading preview…",
   "filePreview.failed": "Could not load this preview. Check your connection and try again.",
   "filePreview.denied": "This file is outside the files this conversation can reach.",
