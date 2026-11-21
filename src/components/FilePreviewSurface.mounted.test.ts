@@ -6,6 +6,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FilePreviewSurface } from "./FilePreviewSurface";
+import { AttachedFileChips } from "./AttachmentPreview";
 import { closeFilePreview, openFilePreview, resetFilePreview } from "@/lib/file-preview-store";
 
 let root: Root;
@@ -177,5 +178,82 @@ describe("file preview surface", () => {
     await settle();
     expect(surface()?.tagName).toBe("DIALOG");
     expect((surface() as HTMLDialogElement).open).toBe(true);
+  });
+
+  describe("image object URLs", () => {
+    let seq = 0;
+    let created: string[];
+    let revoked: string[];
+    const png = () => new Response(new Blob(["x"], { type: "image/png" }), { headers: { "content-type": "image/png" } });
+    beforeEach(() => {
+      seq = 0; created = []; revoked = [];
+      URL.createObjectURL = vi.fn(() => { const url = `blob:fixture/${++seq}`; created.push(url); return url; }) as typeof URL.createObjectURL;
+      URL.revokeObjectURL = vi.fn((url: string) => { revoked.push(url); }) as typeof URL.revokeObjectURL;
+    });
+    const shown = () => surface()?.querySelector("img")?.getAttribute("src");
+
+    it("revokes the image URL when the preview is closed", async () => {
+      network.mockResolvedValue(png());
+      await open("/w/a.png");
+      await vi.waitFor(async () => { await settle(); expect(shown()).toBe("blob:fixture/1"); });
+      expect(revoked).toEqual([]);
+      await act(async () => (surface()!.querySelector("button[aria-label='Close preview']") as HTMLButtonElement).click());
+      await settle();
+      expect(revoked).toEqual(["blob:fixture/1"]);
+    });
+
+    it("revokes the first image URL when another file replaces it", async () => {
+      network.mockResolvedValueOnce(png()).mockResolvedValueOnce(png());
+      await open("/w/a.png");
+      await vi.waitFor(async () => { await settle(); expect(shown()).toBe("blob:fixture/1"); });
+      await open("/w/b.png", "m2");
+      await vi.waitFor(async () => { await settle(); expect(shown()).toBe("blob:fixture/2"); });
+      expect(revoked).toEqual(["blob:fixture/1"]);
+    });
+
+    it("creates no URL for an image answer that arrives after close, and keeps fresh content after reopen", async () => {
+      const old = deferred();
+      network.mockReturnValueOnce(old.promise).mockResolvedValueOnce(png());
+      await open("/w/a.png");
+      await vi.waitFor(() => expect(network).toHaveBeenCalledTimes(1));
+      await act(async () => (surface()!.querySelector("button[aria-label='Close preview']") as HTMLButtonElement).click());
+      await open("/w/a.png");
+      await vi.waitFor(async () => { await settle(); expect(shown()).toBe("blob:fixture/1"); });
+      old.resolve(png()); await settle();
+      expect(created).toEqual(["blob:fixture/1"]);
+      expect(shown()).toBe("blob:fixture/1");
+      expect(revoked).toEqual([]);
+    });
+  });
+
+  it("keeps the fresh text when the closed request, which ignores abort, answers after reopening the same file", async () => {
+    const old = deferred();
+    network.mockReturnValueOnce(old.promise).mockResolvedValueOnce(new Response("Fresh plan"));
+    await open("/w/plan.txt");
+    await vi.waitFor(() => expect(network).toHaveBeenCalledTimes(1));
+    const signal = network.mock.calls[0]![1]!.signal!;
+    await act(async () => (surface()!.querySelector("button[aria-label='Close preview']") as HTMLButtonElement).click());
+    expect(signal.aborted).toBe(true);
+    expect(surface()).toBeNull();
+    await open("/w/plan.txt");
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("pre")?.textContent).toBe("Fresh plan"); });
+    old.resolve(new Response("STALE SECRET")); await settle();
+    expect(document.body.textContent).not.toContain("STALE SECRET");
+    expect(surface()?.querySelector("pre")?.textContent).toBe("Fresh plan");
+  });
+
+  it("opens from the real attached-file chip with one message-scoped request and no download", async () => {
+    network.mockResolvedValue(new Response("Chip body"));
+    const chips = document.createElement("div"); document.body.append(chips);
+    const chipRoot = createRoot(chips);
+    act(() => chipRoot.render(createElement(AttachedFileChips, { files: [{ path: "/w/notes.txt", name: "notes.txt", private: true }], message: grant("m9") })));
+    const chip = chips.querySelector("button[aria-label='Open notes.txt']") as HTMLButtonElement | null ?? chips.querySelector("button") as HTMLButtonElement;
+    await act(async () => chip.click());
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("pre")?.textContent).toBe("Chip body"); });
+    expect(network).toHaveBeenCalledTimes(1);
+    expect(network.mock.calls[0]![0]).toBe("/api/threads/fixture-thread/messages/m9/file");
+    expect(JSON.parse(network.mock.calls[0]![1]!.body as string)).toEqual({ path: "/w/notes.txt" });
+    expect(document.querySelector("a[download]")).toBeNull();
+    act(() => chipRoot.unmount()); chips.remove();
   });
 });

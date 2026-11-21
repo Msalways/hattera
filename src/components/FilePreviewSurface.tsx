@@ -53,8 +53,19 @@ export function useFilePreviewLoad(file: PreviewFile, nonce: number, deps: Previ
   useEffect(() => {
     const request = ++counter.current.n;
     const controller = new AbortController();
+    // Image URLs belong to the load that made them: revoked when that load is
+    // superseded, closed or unmounted, and at once if one arrives after that.
+    const owned = new Set<string>();
+    const ownedDeps: PreviewLoadDeps = {
+      ...deps,
+      objectUrl: (blob) => {
+        const url = deps.objectUrl(blob);
+        if (controller.signal.aborted) URL.revokeObjectURL(url); else owned.add(url);
+        return url;
+      },
+    };
     dispatch({ type: "open", id, request });
-    loadPreview(file, deps, controller.signal).then(
+    loadPreview(file, ownedDeps, controller.signal).then(
       ({ meta, body }) => dispatch({ type: "settled", id, request, meta, body }),
       (error: unknown) => {
         if (controller.signal.aborted) return;
@@ -63,7 +74,7 @@ export function useFilePreviewLoad(file: PreviewFile, nonce: number, deps: Previ
           : { type: "failed", id, request, failure: "failed" });
       },
     );
-    return () => controller.abort();
+    return () => { controller.abort(); owned.forEach((url) => URL.revokeObjectURL(url)); owned.clear(); };
     // `file` is covered by its identity; `deps` is stable per surface
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, nonce, attempt]);
