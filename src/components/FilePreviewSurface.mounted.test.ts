@@ -69,6 +69,32 @@ describe("file preview surface", () => {
     expect(network).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps Close and Download reachable in the header for a very long file name", async () => {
+    const name = `${"quarterly-launch-planning-notes-".repeat(8)}final.md`;
+    network.mockResolvedValue(new Response("# x"));
+    await act(() => openFilePreview({ path: `/w/${name}`, name, message: grant("m1") }));
+    await vi.waitFor(async () => { await settle(); expect(surface()?.querySelector("[role=tab]")).not.toBeNull(); });
+    const header = surface()!.querySelector("[data-testid=file-preview-header]") as HTMLElement;
+    const close = header.querySelector(`button[aria-label="Close preview"]`) as HTMLButtonElement;
+    const download = header.querySelector(`button[aria-label="Save a copy of ${name}"]`) as HTMLButtonElement;
+    for (const button of [close, download]) {
+      expect(button).not.toBeNull();
+      expect(button.disabled).toBe(false);
+      expect(button.className).toContain("shrink-0");
+      expect(button.className).not.toMatch(/\bhidden\b/);
+    }
+    // the title column is the only part allowed to give way: it truncates and may shrink to zero
+    const title = header.querySelector("h2")!;
+    expect(title.parentElement!.className).toMatch(/\bmin-w-0\b/);
+    expect(title.querySelector(".truncate")).not.toBeNull();
+    expect(header.className).toMatch(/\bmin-w-0\b/);
+    expect(surface()!.className).toContain("overflow-hidden");
+    // buttons keep their accessible names when the labels collapse to icons
+    expect(download.querySelector(".sr-only, [class*='sr-only']")).not.toBeNull();
+    act(() => close.click());
+    expect(surface()).toBeNull();
+  });
+
   it("says Preview not available for DOCX with type, size and Download, and never reads the bytes", async () => {
     network.mockResolvedValue(new Response("PK", { headers: { "content-length": "2048" } }));
     await open("/w/brief.docx");

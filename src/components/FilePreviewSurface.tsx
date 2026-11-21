@@ -81,7 +81,7 @@ function Notice({ role = "status", title, children }: { role?: "status" | "alert
   );
 }
 
-const BUTTON = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-hairline px-3 text-[13px] text-ink hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60";
+const BUTTON = "inline-flex shrink-0 min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-hairline px-3 text-[13px] text-ink hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60";
 
 function Tabs({ value, onChange }: { value: "output" | "raw"; onChange: (value: "output" | "raw") => void }) {
   const order = ["output", "raw"] as const;
@@ -212,18 +212,18 @@ function Header({ file, state, titleRef, titleId, onClose, save }: {
   const size = formatBytes(meta.bytes) ?? t("filePreview.sizeUnknown");
   const allowed = canDownload(state, file);
   return (
-    <header className="flex shrink-0 items-start gap-2 border-b border-hairline/40 px-3 pb-2 pt-[max(0.625rem,env(safe-area-inset-top))] sm:px-4">
-      <div className="min-w-0 flex-1">
+    <header data-testid="file-preview-header" className="flex min-w-0 shrink-0 items-start gap-1.5 border-b border-hairline/40 px-3 pb-2 pt-[max(0.625rem,env(safe-area-inset-top))] sm:px-4">
+      <div className="min-w-0 flex-1 basis-0">
         <h2 id={titleId} ref={titleRef} tabIndex={-1} title={file.name} aria-label={file.name} className="flex min-w-0 text-sm font-medium outline-none focus-visible:underline">
           <span className="min-w-0 truncate" dir="auto">{stem}</span><span className="shrink-0">{tail}</span>
         </h2>
         <p className="text-[12px] text-ink-secondary">{typeLabel(file.name)} · {size}</p>
       </div>
       <button type="button" className={BUTTON} disabled={!allowed || save.state === "saving"} onClick={() => void save.save()} aria-label={t("attach.saveAria", { name: file.name })}>
-        <Download size={14} aria-hidden="true" /><span>{t("attach.download")}</span>
+        <Download size={14} aria-hidden="true" /><span className="max-[1535px]:sr-only">{t("attach.download")}</span>
       </button>
       <button type="button" className={cn(BUTTON, "max-sm:hidden")} disabled aria-disabled="true" title={t("filePreview.newTabUnavailable")} aria-label={`${t("filePreview.newTab")}. ${t("filePreview.newTabUnavailable")}`}>
-        <ExternalLink size={14} aria-hidden="true" /><span>{t("filePreview.newTab")}</span>
+        <ExternalLink size={14} aria-hidden="true" /><span className="max-[1535px]:sr-only">{t("filePreview.newTab")}</span>
       </button>
       <button type="button" className={BUTTON} onClick={onClose} aria-label={t("attach.closePreview")}>
         <X size={16} aria-hidden="true" />
@@ -261,7 +261,7 @@ function Surface({ file, nonce, onClose, modal }: { file: PreviewFile; nonce: nu
       aria-labelledby={titleId}
       data-file-preview
       onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } }}
-      className="flex h-full min-w-0 shrink-0 basis-[min(520px,42vw)] flex-col border-s border-hairline/40 bg-panel text-ink"
+      className="flex h-full min-w-0 shrink-0 basis-[min(520px,42vw)] flex-col overflow-hidden border-s border-hairline/40 bg-panel text-ink"
     >
       {content}
     </aside>
