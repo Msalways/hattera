@@ -678,6 +678,7 @@ import { publishLocalRuntime } from "./local-runtime.ts";
 import { PROFILE_DRIVERS, profileConfig, publicAccountSetup } from "./provider-profiles.ts";
 import { findAntigravityLeftovers, removeAntigravityLeftovers } from "./drivers/antigravity-temp.ts";
 import { createLiveRoutes } from "./routes/live.ts";
+import { createTokenLedgerRoutes } from "./routes/token-ledger.ts";
 import { createUsageRoutes } from "./routes/usage.ts";
 import { withScopeHint } from "./connector-scope-hint.ts";
 import { objectStorageFromEnv } from "./object-storage.ts";
@@ -16972,6 +16973,7 @@ sharedExecution = new CollaborationExecution({ dataDir: DATA_DIR, service: colla
   },
 } });
 ROUTES.push(createCollaborationRoutes(collaboration, collaborationGroups, store, collaborationAllowed, sharedExecution));
+ROUTES.push(createTokenLedgerRoutes({ dataDir: DATA_DIR }));
 ROUTES.push(createUsageRoutes({
   accountName: (id) => instanceConfigs(cfg)[id]?.displayName,
   dataDir: DATA_DIR,
