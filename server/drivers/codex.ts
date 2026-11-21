@@ -1,3 +1,4 @@
+import { codexAllowance } from "./codex-allowance.ts";
 import { codexToolSurfaceArgs } from "./codex-tool-surface.ts";
 // Codex driver — upstream CodexDriver skeleton over agentcal's
 // drivers/codex.js runtime: the official `codex` CLI headless over its
@@ -650,6 +651,7 @@ function mountMcpServer(
 
 export const CodexDriver: ProviderDriver<CodexConfig> = {
   driverKind: DRIVER_KIND,
+  allowance: codexAllowance,
   metadata: { displayName: "Codex", supportsMultipleInstances: true },
   install: {
     command: {

@@ -5,6 +5,7 @@
 // Stream. The shapes and names are kept so the two codebases stay mutually
 // readable.
 
+import type { AllowanceCapability } from "./awareness/allowance-kit.ts";
 import type { ApprovalMode } from "../shared/approval-mode.ts";
 import type { ToolScope } from "../shared/tool-scope.ts";
 import type { EffortLevel } from "../shared/wire.ts";
@@ -600,6 +601,9 @@ export interface ProviderDriver<Config = unknown> {
   decodeConfig(raw: unknown): Config;
   defaultConfig(): Config;
   readonly models: ModelCatalog;
+  /** Optional: report subscription allowance windows. A driver without it is
+   * simply not listed by plan-usage or the awareness view. */
+  readonly allowance?: AllowanceCapability;
   create(input: DriverCreateInput<Config>): Promise<ProviderInstance>;
 }
 

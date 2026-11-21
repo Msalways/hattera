@@ -650,6 +650,7 @@ import {
 } from "./bot-visibility.ts";
 import { describeBrand, loadBrand } from "./brand.ts";
 import { deliverSseFrame } from "./sse-fanout.ts";
+import { createReplayBuffer } from "./sse-replay.ts";
 import {
   PHONE_SECRET_PROTOCOL_VERSION,
   PhoneSecretBridge,
@@ -678,6 +679,9 @@ import { publishLocalRuntime } from "./local-runtime.ts";
 import { PROFILE_DRIVERS, profileConfig, publicAccountSetup } from "./provider-profiles.ts";
 import { findAntigravityLeftovers, removeAntigravityLeftovers } from "./drivers/antigravity-temp.ts";
 import { createLiveRoutes } from "./routes/live.ts";
+import { createAwarenessRoutes } from "./routes/awareness.ts";
+import { loadPlanUsage, planAccountsFromInstances } from "./plan-usage.ts";
+import { createTokenLedgerRoutes } from "./routes/token-ledger.ts";
 import { createUsageRoutes } from "./routes/usage.ts";
 import { withScopeHint } from "./connector-scope-hint.ts";
 import { objectStorageFromEnv } from "./object-storage.ts";
@@ -6191,7 +6195,7 @@ const SSE_HEARTBEAT_MS =
     ? configuredSseHeartbeatMs
     : 15_000;
 let lastSeq = 0;
-const replayBuffer: Array<{ seq: number; kind: string; frame: string | null; clientFrame: string | null; payload: Record<string, unknown> | null }> = [];
+const replayBuffer = createReplayBuffer(REPLAY_MAX);
 
 /** Screen frames are the only kind a client can decline. */
 const wants = (client: SseClient, kind: string) => kind !== "screen" || client.screens;
@@ -6226,8 +6230,8 @@ function broadcast(payload: Record<string, unknown>, options: { adminOnly?: bool
   // Live desktop captures can each be hundreds of kilobytes and become stale
   // as soon as the next one arrives. Keep their sequence slots so resume-gap
   // detection stays honest, but never retain their base64 payloads.
-  replayBuffer.push({ seq, kind, frame: kind === "screen" ? null : frame, clientFrame: kind === "screen" ? null : clientFrame, payload: kind === "screen" ? null : payload });
-  if (replayBuffer.length > REPLAY_MAX) replayBuffer.shift();
+  // Streamed text deltas are not retained at all (see ./sse-replay.ts).
+  replayBuffer.push({ seq, kind, frame: kind === "screen" ? null : frame, clientFrame: kind === "screen" ? null : clientFrame, payload: kind === "screen" ? null : payload }, payload);
   for (const client of Array.from(sseClients)) {
     if (!wants(client, kind)) continue;
     // Admin-only frames (clientFrame null) never reach members, and a member never falls back to the admin frame.
@@ -16972,6 +16976,8 @@ sharedExecution = new CollaborationExecution({ dataDir: DATA_DIR, service: colla
   },
 } });
 ROUTES.push(createCollaborationRoutes(collaboration, collaborationGroups, store, collaborationAllowed, sharedExecution));
+ROUTES.push(createAwarenessRoutes({ describe: () => registry.describe(), allowance: (refresh) => loadPlanUsage({ accounts: planAccountsFromInstances(instanceConfigs(cfg)), refresh }) }));
+ROUTES.push(createTokenLedgerRoutes({ dataDir: DATA_DIR }));
 ROUTES.push(createUsageRoutes({
   accountName: (id) => instanceConfigs(cfg)[id]?.displayName,
   dataDir: DATA_DIR,
@@ -20689,7 +20695,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       const resumed =
         since !== null &&
         since <= lastSeq &&
-        (replayBuffer.length === 0 ? since === lastSeq : replayBuffer[0].seq <= since + 1) &&
+        replayBuffer.canResume(since, lastSeq) &&
         // A member whose cursor predates a bot's audience change gets a fresh
         // snapshot: a replay is judged by today's audience and could neither
         // withdraw what the change hid nor bring back whole what it showed.
@@ -20705,7 +20711,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         })}\n\n`,
       );
       if (resumed) {
-        for (const buffered of replayBuffer) {
+        for (const buffered of replayBuffer.entries) {
           if (buffered.seq <= since || !wants(client, buffered.kind)) continue;
           const frame = client.admin
             ? buffered.frame

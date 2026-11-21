@@ -8,11 +8,12 @@ import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parse as parseYaml } from "yaml";
 
-import type { ModelCatalog } from "../../contracts.ts";
+import type { ModelCatalog, ProviderDriver } from "../../contracts.ts";
 import { harnessHome, splitCliString } from "../../env-path.ts";
 import type { DeviceSignIn } from "../device-auth.ts";
 import { decodeInjectId, hostApiKey, localHost, mergeLocalInject } from "../local-inject.ts";
-import { createAcpDriver, type AcpSupport } from "./core.ts";
+import { grokAllowance } from "./grok-allowance.ts";
+import { createAcpDriver, type AcpConfig, type AcpSupport } from "./core.ts";
 import { allowsTool, canUseMcpServer, narrowsNativeTools, parseToolScope } from "../../../shared/tool-scope.ts";
 
 export const STATIC_GROK_MODELS: ModelCatalog = {
@@ -500,4 +501,4 @@ const support: AcpSupport = {
   buildPromptText: (turn) => (turn.system ? `${turn.system}\n\n${turn.text}` : turn.text),
 };
 
-export const GrokAgentDriver = createAcpDriver(support);
+export const GrokAgentDriver: ProviderDriver<AcpConfig> = { ...createAcpDriver(support), allowance: grokAllowance };
