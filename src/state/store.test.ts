@@ -12,6 +12,8 @@ import {
   currentTaskBot,
   initialState,
   liveCallFromFrame,
+  liveTurnFrameAction,
+  liveTurnFrameActionFor,
   loadSnapshotBoundary,
   openBot,
   openNotificationTarget,
@@ -2446,23 +2448,109 @@ describe("conversation model variant discoveries", () => {
   const discovery = (variants: ModelVariantState = { options: [{ id: "minimal", label: "Minimal" }], currentValue: "minimal" }, threadId = "first", turnId = "turn-1"): RuntimeEvent =>
     ({ ...base(threadId, turnId), type: "session.model-variants", model: selection.model, variants });
 
-  // The desktop shows a reply once it is finished, so a streamed delta has
-  // nothing to update; only the model-variant fold reads runtime frames.
-  it("ignores reply and reasoning deltas but still folds model-variant frames", () => {
-    const apply = (state: AppState, event: RuntimeEvent) => {
-      const action = runtimeFrameAction(event);
-      return action ? reducer(state, action) : state;
-    };
-    let state = apply(start(), { ...base(), type: "turn.started" });
+  // The model-variant fold and the live-turn buffer read different slices of
+  // the same runtime frames: deltas feed only the live turn, and never touch
+  // model-variant state.
+  const applyFrame = (state: AppState, event: RuntimeEvent, cursor?: { streamId: string; seq: number }) => {
+    let next = state;
+    const variants = runtimeFrameAction(event);
+    if (variants) next = reducer(next, variants);
+    const live = liveTurnFrameAction(event, cursor);
+    if (live) next = reducer(next, live);
+    return next;
+  };
+
+  it("routes deltas to the live turn only, and still folds model-variant frames", () => {
+    let state = applyFrame(start(), { ...base(), type: "turn.started" });
     for (const streamKind of ["assistant_text", "reasoning_text"] as const) {
-      const delta: RuntimeEvent = { ...base(), type: "content.delta", streamKind, delta: "partial" };
+      const delta: RuntimeEvent = { ...base(), eventId: `first-${streamKind}`, type: "content.delta", streamKind, delta: "partial" };
       expect(runtimeFrameAction(delta)).toBeNull();
-      expect(apply(state, delta)).toBe(state);
+      expect(liveTurnFrameAction(delta)).not.toBeNull();
+      const before = state.modelVariantSessions;
+      state = applyFrame(state, delta);
+      expect(state.modelVariantSessions).toBe(before);
     }
-    state = apply(state, discovery());
+    expect(state.liveTurns.first).toMatchObject({ reasoning: "partial", reply: "partial" });
+    state = applyFrame(state, discovery());
     expect(state.modelVariantSessions.first.variants?.currentValue).toBe("minimal");
-    state = apply(state, { ...base(), type: "turn.completed", ok: true });
+    state = applyFrame(state, { ...base(), type: "turn.completed", ok: true });
     expect(state.modelVariantSessions.first.acceptingUpdates).toBe(false);
+    expect(state.liveTurns.first.ended).toBe(true);
+  });
+
+  describe("live turn buffer", () => {
+    it("a malformed SSE id reaches the fold as no cursor: applied, flagged, never ordered", () => {
+      for (const id of ["run:", "run:1e2", "run:0x10", "run:-1", "run:1.5", "run", ":5", "run: 7", "run:1 "]) {
+        const event: RuntimeEvent = { ...base("first", "a"), eventId: "m-" + id, type: "content.delta", streamKind: "assistant_text", delta: "x" };
+        const action = liveTurnFrameActionFor(event, id);
+        expect(action, id).toMatchObject({ type: "liveTurnRuntime" });
+        expect((action as { cursor?: unknown }).cursor, id).toBeUndefined();
+        expect(reducer(start(), action!).liveTurns.first, id).toMatchObject({ reply: "x", joinedMidStream: true });
+      }
+      const ok = liveTurnFrameActionFor({ ...base("first", "a"), type: "turn.started" }, "run:12");
+      expect((ok as { cursor?: unknown }).cursor).toEqual({ streamId: "run", seq: 12 });
+    });
+
+    const delta = (threadId: string, turnId: string, streamKind: "assistant_text" | "reasoning_text", text: string): RuntimeEvent =>
+      ({ ...base(threadId, turnId), eventId: `${threadId}-${turnId}-${streamKind}-${text}`, type: "content.delta", streamKind, delta: text });
+
+    it("keeps interleaved threads apart", () => {
+      let state: AppState = start();
+      state = applyFrame(state, { ...base("first", "a"), type: "turn.started" });
+      state = applyFrame(state, { ...base("second", "b"), type: "turn.started" });
+      state = applyFrame(state, delta("first", "a", "assistant_text", "one "));
+      state = applyFrame(state, delta("second", "b", "reasoning_text", "hmm"));
+      state = applyFrame(state, delta("first", "a", "assistant_text", "two"));
+      expect(state.liveTurns.first).toMatchObject({ reply: "one two", reasoning: "" });
+      expect(state.liveTurns.second).toMatchObject({ reply: "", reasoning: "hmm" });
+      state = applyFrame(state, { ...base("first", "a"), type: "turn.completed", ok: true });
+      expect(state.liveTurns.first.ended).toBe(true);
+      expect(state.liveTurns.second.reasoning).toBe("hmm");
+    });
+
+    it("survives switching the open conversation mid-turn", () => {
+      let state = applyFrame(start(), { ...base("first", "a"), type: "turn.started" });
+      state = applyFrame(state, delta("first", "a", "assistant_text", "partial"));
+      state = reducer(state, { type: "select", id: "elsewhere" });
+      state = applyFrame(state, delta("first", "a", "assistant_text", " more"));
+      state = reducer(state, { type: "select", id: owner.id });
+      expect(state.liveTurns.first.reply).toBe("partial more");
+    });
+
+    it("a turn that never streams leaves nothing to show, and the stored reply is harmless", () => {
+      let state = applyFrame(start(), { ...base("first", "a"), type: "turn.started" });
+      state = applyFrame(state, { ...base("first", "a"), type: "item.completed", itemType: "assistant_text", text: "whole reply" });
+      expect(state.liveTurns.first).toMatchObject({ reply: "", reasoning: "" });
+      state = applyFrame(state, { ...base("first", "a"), type: "turn.completed", ok: true });
+      expect(state.liveTurns.first).toMatchObject({ ended: true, reply: "", reasoning: "" });
+    });
+
+    it("clears the streamed reply when the stored message lands", () => {
+      let state = applyFrame(start(), { ...base("first", "a"), type: "turn.started" });
+      state = applyFrame(state, delta("first", "a", "assistant_text", "draft"));
+      state = applyFrame(state, { ...base("first", "a"), type: "item.completed", itemType: "assistant_text", text: "draft" });
+      expect(state.liveTurns.first.reply).toBe("");
+    });
+
+    it("returns the same state for a duplicate delta and for a frame after the turn ended", () => {
+      const at = (seq: number) => ({ streamId: "s", seq });
+      const startedA: RuntimeEvent = { ...base("first", "a"), type: "turn.started" };
+      let state = applyFrame(start(), startedA, at(1));
+      const d = delta("first", "a", "assistant_text", "x");
+      state = applyFrame(state, d, at(2));
+      // a replay keeps its original seq
+      expect(applyFrame(state, d, at(2))).toBe(state);
+      state = applyFrame(state, { ...base("first", "a"), type: "turn.completed", ok: true }, at(3));
+      expect(applyFrame(state, delta("first", "a", "assistant_text", "late"), at(4))).toBe(state);
+      // a replayed turn.started for the finished turn does not reopen it
+      expect(applyFrame(state, startedA, at(1))).toBe(state);
+    });
+
+    it("ignores frames the buffer does not read", () => {
+      const state = start();
+      expect(liveTurnFrameAction({ ...base(), type: "item.completed", itemType: "tool", ok: true })).toBeNull();
+      expect(applyFrame(state, { ...base(), type: "session.exited" })).toBe(state);
+    });
   });
 
   it("keeps capabilities on their thread, separate from catalog and persisted choices", () => {

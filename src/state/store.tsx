@@ -18,6 +18,7 @@ import { DATA_ROUTES, type DataSheet, type DataTable } from "../../shared/data-s
 import type { TurnDigest } from "../../shared/digest";
 import type { ToolScope } from "../../shared/tool-scope";
 import type { ModelVariantOption, RuntimeEvent } from "../../shared/runtime-events";
+import { foldLiveTurn, parseFrameCursor, type LiveCursor, type LiveTurn } from "@/lib/live-turn";
 import type { MausColor, MausMotion } from "@/lib/mascot";
 import type { BotAvatarCrop } from "../../shared/bot-avatar";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
@@ -976,6 +977,9 @@ export interface AppState {
   instances: InstanceInfo[];
   /** Session discoveries stay with their conversation and never enter persisted settings. */
   modelVariantSessions: Record<string, ModelVariantSession>;
+  /** In-flight reasoning/reply text per thread, folded from streamed deltas.
+   * Display-only and never persisted; the stored message replaces it. */
+  liveTurns: Record<string, LiveTurn>;
   config: ConfigStatus | null;
   /** The Live call the harness is running, including a call that has just
    * ended; null when no call is known. Follows `live.call` SSE frames and
@@ -1328,6 +1332,7 @@ export type Action =
   | { type: "dataView"; view: AppState["dataView"] }
   | { type: "loadDataSheet"; botId: string; onError?: (message: string) => void }
   | { type: "modelVariantRuntime"; event: RuntimeEvent }
+  | { type: "liveTurnRuntime"; event: RuntimeEvent; cursor?: LiveCursor }
   | { type: "setModel"; botId: string; selection: ModelSelection; threadId?: string; updateBotDefault?: boolean; resetApprovalToAsk?: boolean }
   | { type: "interrupt"; botId: string; threadId?: string; onError?: () => void }
   | { type: "connected"; value: boolean }
@@ -1644,6 +1649,8 @@ export function reducer(state: AppState, action: Action): AppState {
         loadingOlder: {},
         transcriptGeneration: {},
         modelVariantSessions: {},
+        // a snapshot is the stored truth; in-flight text restarts from here
+        liveTurns: {},
       };
       return reconcileSnapshotQueues(
         action.botQueuedMessages ? replaceBotQueues(hydrated, action.botQueuedMessages) : hydrated,
@@ -2116,6 +2123,15 @@ export function reducer(state: AppState, action: Action): AppState {
           [action.botId]: { held: action.held, helpReason: action.helpReason },
         },
       };
+    case "liveTurnRuntime": {
+      const previous = state.liveTurns[action.event.threadId];
+      const next = foldLiveTurn(previous, action.event, action.cursor);
+      if (next === previous) return state;
+      if (!next) {
+        return { ...state, liveTurns: Object.fromEntries(Object.entries(state.liveTurns).filter(([threadId]) => threadId !== action.event.threadId)) };
+      }
+      return { ...state, liveTurns: { ...state.liveTurns, [action.event.threadId]: next } };
+    }
     case "modelVariantRuntime": {
       const event = action.event;
       if (!event.turnId) return state;
@@ -2673,6 +2689,7 @@ export function dataSheetFromResponse(body: unknown, botId: string): DataSheet {
 
 export const initialState: AppState = {
   modelVariantSessions: {},
+  liveTurns: {},
   backgroundThreadEvents: {},
   loadingOlder: {},
   transcriptGeneration: {},
@@ -3006,13 +3023,25 @@ export async function loadSnapshotBoundary<Key extends string>(
   return chat.status === "fulfilled";
 }
 
-/** The desktop shows a reply once it is finished (the turn's busy state is
- * what a reader sees while it works), so it keeps no in-flight reply text: a
- * streamed delta changes nothing here. Runtime frames feed only the
- * model-variant fold. */
+/** The model-variant fold's share of the runtime frames. */
 export function runtimeFrameAction(event: RuntimeEvent): Action | null {
   return event.type === "turn.started" || event.type === "session.model-variants" || event.type === "turn.completed"
     ? { type: "modelVariantRuntime", event }
+    : null;
+}
+
+/** The live-turn buffer's share: streamed deltas, the stored reply that
+ * replaces them, and the turn boundaries that reset or close it. */
+export function liveTurnFrameActionFor(event: RuntimeEvent, lastEventId: string | undefined): Action | null {
+  return liveTurnFrameAction(event, parseFrameCursor(lastEventId));
+}
+
+export function liveTurnFrameAction(event: RuntimeEvent, cursor?: LiveCursor): Action | null {
+  return event.type === "content.delta" ||
+    event.type === "turn.started" ||
+    event.type === "turn.completed" ||
+    (event.type === "item.completed" && event.itemType === "assistant_text")
+    ? { type: "liveTurnRuntime", event, ...(cursor ? { cursor } : {}) }
     : null;
 }
 
@@ -4090,8 +4119,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let hydrated = false;
     let hydrationPromise: Promise<boolean> | null = null;
     let rehydrateRequested = false;
-    const pendingFrames: ServerFrame[] = [];
-    let handleFrame: (frame: ServerFrame) => void;
+    const pendingFrames: Array<{ frame: ServerFrame; lastEventId?: string }> = [];
+    let handleFrame: (frame: ServerFrame, lastEventId?: string) => void;
     const hydrate = (): Promise<boolean> => {
       if (hydrationPromise) {
         // A second non-resumable hello means this snapshot may have started
@@ -4108,7 +4137,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } while (alive && rehydrateRequested);
         if (!alive || !loaded) return false;
         hydrated = true;
-        for (const frame of pendingFrames.splice(0)) handleFrame(frame);
+        for (const pending of pendingFrames.splice(0)) handleFrame(pending.frame, pending.lastEventId);
         return true;
       })().finally(() => {
         hydrationPromise = null;
@@ -4123,7 +4152,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // The hydrate decision belongs to the hello frame, not to onopen: the
     // server replays what we missed when it can, and re-downloading every
     // transcript on a reconnect it already covered is pure waste.
-    handleFrame = (frame) => {
+    handleFrame = (frame, lastEventId) => {
       if (frame.kind === "config") bumpPeripheralVersion("config", "instances");
       else if (frame.kind === "routine" || frame.kind === "routine.deleted" || frame.kind === "routine.run") {
         bumpPeripheralVersion("routines");
@@ -4247,6 +4276,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         case "runtime": {
           const action = runtimeFrameAction(frame.event);
           if (action) rawDispatch(action);
+          const live = liveTurnFrameActionFor(frame.event, lastEventId);
+          if (live) rawDispatch(live);
           break;
         }
         case "screen":
@@ -4311,12 +4342,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         pendingFrames.splice(0);
         return hydrate();
       },
-      onFrame: (frame) => {
+      onFrame: (frame, lastEventId) => {
         // Open panels read what the store does not keep (live screens, raw
         // runtime events) from this same stream.
         publishLiveFrame(frame as ServerFrame);
-        if (hydrated) handleFrame(frame as ServerFrame);
-        else pendingFrames.push(frame as ServerFrame);
+        if (hydrated) handleFrame(frame as ServerFrame, lastEventId);
+        else pendingFrames.push({ frame: frame as ServerFrame, lastEventId });
       },
     });
     return () => {
