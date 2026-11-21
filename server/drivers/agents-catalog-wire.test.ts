@@ -103,7 +103,7 @@ function profiles(): Record<string, Profile> {
 
 const PROFILES = profiles();
 /** Refused by the server to every bot that is not a Chief of Staff. */
-const CHIEF_ONLY_TOOLS = ["create_bot", "list_team_setup", "propose_team_setup", "propose_bot_deletion", "create_room", "manage_room", "retry_thread"];
+const CHIEF_ONLY_TOOLS = ["create_bot", "list_team_setup", "propose_team_setup", "propose_bot_deletion", "create_room", "manage_room", "retry_thread", "stop_thread", "cancel_request"];
 /** Their for_bot_id, changing another bot, is a Chief's alone. */
 const CHIEF_TARGET_TOOLS = ["propose_profile", "propose_model"];
 const CHIEF_PROFILE_TARGET = " A Chief of Staff may pass for_bot_id (from list_bots) for a requested change to another bot in its section.";
@@ -116,32 +116,32 @@ const FULL = { direct: "direct+skills+shared+voice", room: "room+own-thread+skil
  * by more than 2%, and may not undercut it by more than 2% either: a smaller
  * catalog is the goal, so lock the win in by lowering the number. */
 const BUDGET_BASELINE: Record<string, number> = {
-  "direct": 48094,
-  "direct+voice": 48835,
-  "direct+shared": 49839,
-  "direct+shared+voice": 50580,
-  "direct+skills": 50020,
-  "direct+skills+voice": 50761,
-  "direct+skills+shared": 51765,
-  "direct+skills+shared+voice": 52506,
-  "room": 46523,
-  "room+voice": 47264,
-  "room+shared": 48268,
-  "room+shared+voice": 49009,
-  "room+skills": 48449,
-  "room+skills+voice": 49190,
-  "room+skills+shared": 50194,
-  "room+skills+shared+voice": 50935,
-  "room+own-thread": 47810,
-  "room+own-thread+voice": 48551,
-  "room+own-thread+shared": 49555,
-  "room+own-thread+shared+voice": 50296,
-  "room+own-thread+skills": 49736,
-  "room+own-thread+skills+voice": 50477,
-  "room+own-thread+skills+shared": 51481,
-  "room+own-thread+skills+shared+voice": 52222,
-  "direct+skills+shared+voice+cloud-home": 51580,
-  "room+own-thread+skills+shared+voice+cloud-home": 51296,
+  "direct": 50067,
+  "direct+voice": 50808,
+  "direct+shared": 51812,
+  "direct+shared+voice": 52553,
+  "direct+skills": 52120,
+  "direct+skills+voice": 52861,
+  "direct+skills+shared": 53865,
+  "direct+skills+shared+voice": 54606,
+  "room": 48488,
+  "room+voice": 49229,
+  "room+shared": 50233,
+  "room+shared+voice": 50974,
+  "room+skills": 50541,
+  "room+skills+voice": 51282,
+  "room+skills+shared": 52286,
+  "room+skills+shared+voice": 53027,
+  "room+own-thread": 49775,
+  "room+own-thread+voice": 50516,
+  "room+own-thread+shared": 51520,
+  "room+own-thread+shared+voice": 52261,
+  "room+own-thread+skills": 51828,
+  "room+own-thread+skills+voice": 52569,
+  "room+own-thread+skills+shared": 53573,
+  "room+own-thread+skills+shared+voice": 54314,
+  "direct+skills+shared+voice+cloud-home": 53661,
+  "room+own-thread+skills+shared+voice+cloud-home": 53369,
   "direct+non-chief": 38657,
   "direct+voice+non-chief": 39398,
   "direct+shared+non-chief": 40402,

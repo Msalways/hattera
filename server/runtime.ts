@@ -2998,7 +2998,7 @@ function requestedTaskBot(botId: string, rawThreadId: unknown): BotRecord {
   return task;
 }
 
-async function interruptDirectThread(botId: string, threadId: string, options?: { preserveComputerResume?: boolean }): Promise<void> {
+async function interruptDirectThread(botId: string, threadId: string, options?: { preserveComputerResume?: boolean; reason?: string }): Promise<void> {
   // A parked turn has settled its provider but still owns a future resume.
   // Stop cancels that work too. The parking teardown itself preserves it.
   if (!options?.preserveComputerResume && pendingComputerResumes.delete(threadId)
@@ -3015,7 +3015,7 @@ async function interruptDirectThread(botId: string, threadId: string, options?: 
   // into a stopped chat; assignments that never started are dropped. A
   // teammate already mid-turn keeps its own provider process, finishes, and
   // its result is still recorded here.
-  noteTeammatesLeftRunning(botId, threadId, roomHandoffs.stopAwaitingDirect(threadId));
+  noteTeammatesLeftRunning(botId, threadId, roomHandoffs.stopAwaitingDirect(threadId, options?.reason));
   const owner = botForThread(botId, threadId);
   const generation = directTurnGenerationByThread.get(threadId);
   cancelDirectTurnDispatch(botId, threadId);
@@ -19111,6 +19111,82 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           threadRef: { botId: target.id, threadId, title: task.title },
         });
         return json(res, 200, { started: true, message: `${target.name}'s thread #${task.title} is running again. Its result stays in that thread; you are not woken for it — check later with list_threads or session_search if you need to.` });
+      }
+      // stop_thread: a Chief stops a teammate's thread it opened, the way the
+      // person's Stop does (interruptDirectThread): the run ends, history and
+      // files stay, and the thread says who stopped it and why. The handoff
+      // node settles as cancelled with that same line, so the outcome reaches
+      // the Chief's conversation through the ordinary result path and the
+      // assignment stops being outstanding.
+      if (method === "POST" && path === "/api/internal/stop-thread") {
+        const body = await readInternalBody();
+        const from = internalSender;
+        const fromThreadId = internalCapability.threadId;
+        if (!from.chiefOfStaff || from.hidden) return json(res, 403, { error: "only a Chief of Staff can stop a teammate's thread" });
+        const threadId = typeof body.toThreadId === "string" ? body.toThreadId : "";
+        const reason = typeof body.reason === "string" ? body.reason.replace(/\s+/g, " ").trim().slice(0, 300) : "";
+        if (!threadId || !reason) return json(res, 400, { error: "thread_id and reason are required" });
+        if (threadId === fromThreadId || store.taskByThread(from.id, threadId)) {
+          return json(res, 400, { error: "that is one of your own threads — stop_thread only stops a teammate's thread you opened" });
+        }
+        const target = reachablePeers(store.bots, from).find((bot) => store.taskByThread(bot.id, threadId));
+        const task = target ? store.taskByThread(target.id, threadId) : undefined;
+        if (!target || !task) return json(res, 404, { error: "no such thread — call list_threads for the ones you can see" });
+        if (target.hidden || !canAccessTeam(from, target.section) || !peerAllowed(from, target)) {
+          return json(res, 403, { error: "that bot is not on this Chief's team — call list_bots for the ones you can reach" });
+        }
+        if (task.openedBy?.botId !== from.id) {
+          return json(res, 403, { error: "that thread is not yours to stop — only the Chief that opened it can" });
+        }
+        if (task.closedBy) return json(res, 409, { error: `#${task.title} is closed — there is nothing running to stop` });
+        if (!threadBusy(target.id, threadId) && !roomHandoffs.activeDirect(threadId)) {
+          return json(res, 409, { error: `#${task.title} is idle — there is nothing running to stop` });
+        }
+        requireActiveInternalCapability();
+        const stopped = `Stopped by ${from.name} — ${reason}`;
+        handoffs.stoppedByPerson(threadId);
+        await interruptDirectThread(target.id, threadId, { reason: stopped });
+        store.appendMessage(threadId, {
+          role: "bot",
+          kind: "activity",
+          from: { botId: from.id, name: from.name, color: from.color },
+          tool: { name: stopped, ok: true },
+        });
+        store.appendMessage(fromThreadId, {
+          role: "bot",
+          kind: "activity",
+          tool: { name: `Stopped ${target.name}'s thread #${task.title} — ${reason}`, ok: true },
+          threadRef: { botId: target.id, threadId, title: task.title },
+        });
+        roomHandoffs.tick();
+        return json(res, 200, { stopped: true, threadId, title: task.title, botName: target.name, message: `Stopped ${target.name}'s thread #${task.title}. Its history and files are kept. The outcome ("${stopped}") returns here as that assignment's result.` });
+      }
+      // cancel_request: withdraw a coordinate_bots request this Chief sent from
+      // this conversation that has not started. Only a queued direct request
+      // whose requester is this very conversation; running work is stop_thread.
+      if (method === "POST" && path === "/api/internal/cancel-request") {
+        const body = await readInternalBody();
+        const from = internalSender;
+        const fromThreadId = internalCapability.threadId;
+        if (!from.chiefOfStaff || from.hidden) return json(res, 403, { error: "only a Chief of Staff can withdraw a request" });
+        const requestId = typeof body.requestId === "string" ? body.requestId : "";
+        if (!requestId) return json(res, 400, { error: "request_id is required" });
+        const node = roomHandoffs.nodes.get(requestId);
+        const parent = node?.parentId ? roomHandoffs.nodes.get(node.parentId) : undefined;
+        if (!node || !parent || node.groupId || parent.groupId || parent.botId !== from.id || parent.threadId !== fromThreadId) {
+          return json(res, 404, { error: "no such request from this conversation — use a requestId from your coordinate_bots receipt or outstanding assignments" });
+        }
+        if (["completed", "failed", "cancelled"].includes(node.status)) {
+          return json(res, 409, { error: `that request already ${node.status} — nothing to withdraw` });
+        }
+        if (node.status !== "queued" || node.startedAt !== undefined) {
+          return json(res, 409, { error: "that request has already started — use stop_thread on its thread to stop it" });
+        }
+        requireActiveInternalCapability();
+        const name = store.bot(node.botId)?.name ?? "the teammate";
+        roomHandoffs.cancelTree(node, `Withdrawn by ${from.name} before it started`);
+        roomHandoffs.tick();
+        return json(res, 200, { cancelled: true, requestId, message: `Withdrew your queued request to ${name}; it had not started. It no longer counts as outstanding.` });
       }
       if (method === "POST" && path === "/api/internal/delegate-bot") {
         const body = await readInternalBody();

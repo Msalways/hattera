@@ -619,6 +619,31 @@ const toolDefinitions = (externalRuntime: boolean) => [
     },
   },
   {
+    name: "stop_thread",
+    description:
+      "Chief of Staff only. Stop a running teammate thread you opened, like the person's Stop button: history and files stay, the thread shows \"Stopped by <you> — <reason>\", and the outcome returns here as a result. Refused for threads you did not open, your own, and idle or closed ones. For work not started yet, use cancel_request.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        thread_id: { type: "string", description: "From list_threads or start_thread." },
+        reason: { type: "string", minLength: 1, description: "One sentence; shown in that thread." },
+      },
+      required: ["thread_id", "reason"],
+    },
+  },
+  {
+    name: "cancel_request",
+    description:
+      "Chief of Staff only. Withdraw a coordinate_bots request that has not started (still queued), by the requestId from its receipt or your outstanding assignments. The withdrawal returns here as a result. A request already running is refused: use stop_thread.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: { request_id: { type: "string", minLength: 1, description: "The requestId of the queued request." } },
+      required: ["request_id"],
+    },
+  },
+  {
     name: "memory_log",
     description:
       "Write one line to today's log file, memory/log/YYYY-MM-DD.md, stamped with the time and this conversation: what happened, not what is true. Use it for events worth a trace — a deploy went out, a person decided something, a check failed — that should not shape future sessions. Logs are never loaded into your prompt; the person can read them, and session_search finds them later. A fact that should hold in every session goes to memory_update instead.",
@@ -929,7 +954,7 @@ const VOICE_TOOL_NAMES = new Set(["send_voice_note"]);
 // propose_profile or propose_model. (A routine's for_bot_id is open to any
 // bot that can reach that peer, so it stays.)
 const CHIEF_ONLY_TOOL_NAMES = new Set([
-  "create_bot", "list_team_setup", "propose_team_setup", "propose_bot_deletion", "create_room", "manage_room", "retry_thread",
+  "create_bot", "list_team_setup", "propose_team_setup", "propose_bot_deletion", "create_room", "manage_room", "retry_thread", "stop_thread", "cancel_request",
 ]);
 const CHIEF_TARGET_TOOL_NAMES = new Set(["propose_profile", "propose_model"]);
 // One teamwork path in room turns; keep all unrelated integrations available.
