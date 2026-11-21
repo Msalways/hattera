@@ -71,7 +71,6 @@ import { showToolCallsEnabled, skillAuthoringEnabled } from "@/lib/feature-flags
 import { normalizeState, stateForBot } from "@/lib/mascot";
 import { peerLine, peerRequest, type PeerLine } from "@/lib/peer-message";
 import { showWorkingDots } from "@/lib/turn-tail";
-import { liveActivityPhrases } from "@/lib/live-activity";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { VoiceNoteBubble, type VoiceNoteAttachment } from "./VoiceNoteBubble";
 import { RawMarkdownView, RawToggleAction } from "./RawMarkdownToggle";
@@ -122,6 +121,8 @@ import { groupTranscript, isStatusActivity } from "@/lib/activity-runs";
 import { StatusActivityRow } from "@/components/StatusActivityRow";
 import { CancelledTurnRow } from "./CancelledTurnRow";
 import { ActivityRun } from "./ActivityRun";
+import { TurnToolsHeader } from "./TurnToolsHeader";
+import { toolCountsByTurn } from "@/lib/tool-rows";
 import { TurnNarrationRun } from "./TurnNarrationRun";
 import { webhookMessageView } from "@/lib/webhook-message";
 import { splitTranscriptAttachments } from "@/lib/composer-attachments";
@@ -789,7 +790,7 @@ function PeerLabel({ peer }: { peer: PeerLine }) {
 }
 
 /** A tool run: spinner while live, check/cross once settled. */
-const ActivityChip = memo(function ActivityChip({ message, place = "auto" }: { message: Message; place?: EffectivePlace }) {
+const ActivityChip = memo(function ActivityChip({ message, place = "auto", turnActive = true }: { message: Message; place?: EffectivePlace; turnActive?: boolean }) {
   const { bots, dispatch } = useChatRows();
   const tool = message.tool;
   if (!tool) return null;
@@ -812,7 +813,7 @@ const ActivityChip = memo(function ActivityChip({ message, place = "auto" }: { m
       </div>
     );
   }
-  return <ToolActivity tool={tool} place={toolPlace(tool.name, place)} />;
+  return <ToolActivity tool={tool} place={toolPlace(tool.name, place)} turnActive={turnActive} />;
 });
 
 /** A routine run's receipt. It opens the run's own thread, so it follows
@@ -911,12 +912,13 @@ const MessagesList = memo(function MessagesList({
   onRegenerate: () => void;
   onReply: (message: Message) => void;
 }) {
-  const { botId, threadId, botName, focus, showToolCalls, locale } = useChatRows();
+  const { botId, threadId, botName, focus, showToolCalls, locale, busy } = useChatRows();
   // Finished tool chips become compact runs; settled assistant narration
   // becomes one reversible turn row while the terminal answer stays visible.
   // The locale refreshes the turn labels when the language changes.
   const items = useMemo(() => groupTranscript(messages), [messages, locale]);
   const newestMessageId = messages.at(-1)?.id;
+  const toolCounts = useMemo(() => toolCountsByTurn(messages), [messages]);
   let newestUserMessageId: string | undefined;
   for (let i = messages.length - 1; i >= 0 && !newestUserMessageId; i--) {
     if (messages[i]!.role === "user") newestUserMessageId = messages[i]!.id;
@@ -939,6 +941,7 @@ const MessagesList = memo(function MessagesList({
         const first = item.kind === "message" ? item.message : item.messages[0];
         const newDay = !prev || localDay(prev.at) !== localDay(first.at);
         const divider = dividerAbove(item.kind === "message" ? [item.message] : item.messages);
+        const toolsHeader = showToolCalls && toolCounts.get(first.id) ? <TurnToolsHeader count={toolCounts.get(first.id)!} /> : null;
         if (item.kind === "turn") {
           return (
             <div key={item.id} className="contents">
@@ -973,13 +976,8 @@ const MessagesList = memo(function MessagesList({
             <div key={item.id} className="contents">
               {newDay && <DaySeparator at={first.at} today={today} />}
               {divider}
-              <ActivityRun messages={item.messages} forceOpen={item.messages.some((step) => step.id === focusedId)}>
-                {item.messages.map((step) => (
-                  <div key={step.id} className="contents" data-mid={step.id}>
-                    <ActivityChip message={step} place={place} />
-                  </div>
-                ))}
-              </ActivityRun>
+              {toolsHeader}
+              <ActivityRun messages={item.messages} focusedId={focusedId} renderStep={(step) => <ActivityChip message={step} place={place} turnActive={busy} />} />
             </div>
           );
         }
@@ -1042,7 +1040,7 @@ const MessagesList = memo(function MessagesList({
                 );
               }
               if (!showToolCalls && !m.comm && !m.threadRef && !m.dataResult) return null;
-              return <ActivityChip message={m} place={place} />;
+              return <ActivityChip message={m} place={place} turnActive={busy} />;
             }
             case "digest":
               // the summary of the turn's tool chips: shown under the same setting
@@ -1083,6 +1081,7 @@ const MessagesList = memo(function MessagesList({
           <div key={m.id} className="contents" data-mid={m.id}>
             {newDay && <DaySeparator at={m.at} today={today} />}
             {divider}
+            {toolsHeader}
             {row}
           </div>
         );
@@ -1303,7 +1302,6 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   // is finished, the whole bubble pops in above the mascot.
   const lastMessage = messages.at(-1);
   const toolInFlight = lastMessage?.kind === "activity" && lastMessage.tool?.ok === undefined;
-  const activity = liveActivityPhrases(lastMessage);
   const waiting = Boolean(
     bot.busy &&
       bot.activity !== "waiting-on-you" &&
@@ -1626,26 +1624,14 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
             </div>
           )}
           <LiveTurn live={live} botName={bot.name} mentionPeers={mentionPeers} onGrow={growToEnd} />
+          {/* One neutral anchor per turn: "Working…" until the first real item.
+              A running tool row or streamed text is the anchor after that, so
+              no mascot, rotating phrase or timer sits beside it. */}
           <TurnPresence
-            avatar={
-              // BotAvatar, not a bare MausAvatar: an uploaded profile image
-              // (and a chosen mascot body) must match the sidebar row.
-              <BotAvatar
-                bot={bot}
-                state={toolInFlight ? "working" : "thinking"}
-                size={36}
-                forward={false}
-                lookAround={1}
-                trackPointer={false}
-              />
-            }
-            visible={presenceVisible}
-            phrases={activity.phrases}
-            phase={activity.phase}
+            avatar={null}
+            visible={presenceVisible && !live && !toolInFlight}
             seed={`${bot.id}:${bot.threadId ?? ""}:${busySince ?? ""}`}
-            answering={popping !== null}
-            since={busySince}
-            quietLabel={live ? (live.reasoning ? null : t("chat.live.working")) : undefined}
+            quietLabel={t("chat.live.working")}
           />
         </div>
       </div>
