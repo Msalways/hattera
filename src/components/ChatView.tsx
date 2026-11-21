@@ -65,6 +65,8 @@ import { isProviderSafetyBlock, PROVIDER_SAFETY_GUIDANCE, PROVIDER_SAFETY_HELP_U
 import { isCancelledTranscriptRow } from "../../shared/client-cancel";
 import { BotAvatar } from "./Avatar";
 import { TurnPresence } from "./TurnPresence";
+import { LiveTurn, useGrowToEnd } from "./LiveTurn";
+import { visibleLiveTurn } from "@/lib/live-turn";
 import { showToolCallsEnabled, skillAuthoringEnabled } from "@/lib/feature-flags";
 import { normalizeState, stateForBot } from "@/lib/mascot";
 import { peerLine, peerRequest, type PeerLine } from "@/lib/peer-message";
@@ -1241,6 +1243,14 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
     [messages],
   );
   const unreadDivider = useUnreadDivider({ threadId: bot.threadId, messages, following });
+  // What the engine is streaming right now. Display only: the stored message
+  // replaces it, and it never enters `messages` (so the memoised list does
+  // not re-render per delta).
+  const live = visibleLiveTurn(state.liveTurns[bot.threadId ?? ""]);
+  const growToEnd = useGrowToEnd(following, scrollRef);
+  const liveReplyShown = useRef(false);
+  if (live?.reply) liveReplyShown.current = true;
+  else if (!bot.busy) liveReplyShown.current = false;
 
   // What the rows read besides their own message (see ChatRows).
   const bots = useDrawnBots(state.bots);
@@ -1317,6 +1327,12 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   useLayoutEffect(() => {
     if (lastMessage?.role !== "bot" || lastMessage.kind !== "text" || !wasWaiting.current) return;
     wasWaiting.current = false;
+    // The reply was already on screen as it streamed: the stored message takes
+    // its place as it is, with no pop-in to flash over it.
+    if (liveReplyShown.current) {
+      liveReplyShown.current = false;
+      return;
+    }
     const messageId = lastMessage.id;
     if (poppingTimer.current) clearTimeout(poppingTimer.current);
     setPopping(messageId);
@@ -1609,6 +1625,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
               </div>
             </div>
           )}
+          <LiveTurn live={live} botName={bot.name} mentionPeers={mentionPeers} onGrow={growToEnd} />
           <TurnPresence
             avatar={
               // BotAvatar, not a bare MausAvatar: an uploaded profile image
@@ -1628,6 +1645,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
             seed={`${bot.id}:${bot.threadId ?? ""}:${busySince ?? ""}`}
             answering={popping !== null}
             since={busySince}
+            quietLabel={live ? (live.reasoning ? null : t("chat.live.working")) : undefined}
           />
         </div>
       </div>

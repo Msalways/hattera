@@ -107,3 +107,26 @@ describe("thinking shimmer box", () => {
     expect(rule).toMatch(/margin: -0\.35em -0\.12em/);
   });
 });
+
+describe("TurnPresence while the turn streams its own text", () => {
+  it("hides the rotating phrases when quietLabel is null, keeping the avatar row", () => {
+    render({ phrases: thinking, phase: "think", quietLabel: null });
+    expect(host.querySelector(".thinking-shimmer")).toBeNull();
+    expect(host.querySelector("[data-quiet-label]")).toBeNull();
+    expect(host.querySelector(".turn-presence")).not.toBeNull();
+  });
+
+  it("shows one plain, unanimated label for an engine with no reasoning stream", () => {
+    render({ phrases: thinking, phase: "think", quietLabel: "Working…" });
+    expect(host.querySelector(".thinking-shimmer")).toBeNull();
+    const label = host.querySelector("[data-quiet-label]");
+    expect(label?.textContent).toBe("Working…");
+    act(() => void vi.advanceTimersByTime(30_000));
+    expect(host.querySelector("[data-quiet-label]")?.textContent).toBe("Working…");
+  });
+
+  it("keeps the rotating phrases when nothing is streaming", () => {
+    render({ phrases: thinking, phase: "think" });
+    expect(visibleText()).toEqual(["Thinking"]);
+  });
+});
