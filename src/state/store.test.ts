@@ -2450,11 +2450,11 @@ describe("conversation model variant discoveries", () => {
   // The model-variant fold and the live-turn buffer read different slices of
   // the same runtime frames: deltas feed only the live turn, and never touch
   // model-variant state.
-  const applyFrame = (state: AppState, event: RuntimeEvent) => {
+  const applyFrame = (state: AppState, event: RuntimeEvent, cursor?: { streamId: string; seq: number }) => {
     let next = state;
     const variants = runtimeFrameAction(event);
     if (variants) next = reducer(next, variants);
-    const live = liveTurnFrameAction(event);
+    const live = liveTurnFrameAction(event, cursor);
     if (live) next = reducer(next, live);
     return next;
   };
@@ -2520,14 +2520,17 @@ describe("conversation model variant discoveries", () => {
     });
 
     it("returns the same state for a duplicate delta and for a frame after the turn ended", () => {
-      let state = applyFrame(start(), { ...base("first", "a"), type: "turn.started" });
+      const at = (seq: number) => ({ streamId: "s", seq });
+      const startedA: RuntimeEvent = { ...base("first", "a"), type: "turn.started" };
+      let state = applyFrame(start(), startedA, at(1));
       const d = delta("first", "a", "assistant_text", "x");
-      state = applyFrame(state, d);
-      expect(applyFrame(state, d)).toBe(state);
-      state = applyFrame(state, { ...base("first", "a"), type: "turn.completed", ok: true });
-      expect(applyFrame(state, delta("first", "a", "assistant_text", "late"))).toBe(state);
+      state = applyFrame(state, d, at(2));
+      // a replay keeps its original seq
+      expect(applyFrame(state, d, at(2))).toBe(state);
+      state = applyFrame(state, { ...base("first", "a"), type: "turn.completed", ok: true }, at(3));
+      expect(applyFrame(state, delta("first", "a", "assistant_text", "late"), at(4))).toBe(state);
       // a replayed turn.started for the finished turn does not reopen it
-      expect(applyFrame(state, { ...base("first", "a"), type: "turn.started" })).toBe(state);
+      expect(applyFrame(state, startedA, at(1))).toBe(state);
     });
 
     it("ignores frames the buffer does not read", () => {

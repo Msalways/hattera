@@ -47,7 +47,8 @@ export interface LiveEventsPlatform {
 }
 
 export interface LiveEventsHandlers {
-  onFrame: (frame: LiveFrame) => void;
+  /** `lastEventId` is the frame's SSE cursor (`<streamId>:<seq>`), when it has one. */
+  onFrame: (frame: LiveFrame, lastEventId?: string) => void;
   /** Rebuild the consumer's complete snapshot after the server says its
    * replay gap cannot be filled. The transport commits the new cursor only
    * after this succeeds; false/rejection closes the stream and retries from
@@ -346,7 +347,10 @@ export function openLiveEvents(
 
       // Hello is transport control, not application state. Consumers rebuild
       // through onSnapshotRequired and receive only numbered application data.
-      if (frame.kind !== "hello") handlers.onFrame(frame);
+      if (frame.kind !== "hello") {
+        if (event.lastEventId) handlers.onFrame(frame, event.lastEventId);
+        else handlers.onFrame(frame);
+      }
     };
   };
 
