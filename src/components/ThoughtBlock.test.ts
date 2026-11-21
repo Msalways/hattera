@@ -13,7 +13,7 @@ import { ThoughtSlot } from "./ThoughtBlock";
 
 const live = (over: Partial<LiveTurn> = {}): LiveTurn => ({
   turnId: "t1", reasoning: "", reply: "", replyItemId: undefined, truncated: false, ended: false, joinedMidStream: false,
-  streamId: "s", lastSeq: 1, completedItems: [], anchorId: "m1", thoughtStartedAt: 0, thoughtEndedAt: undefined, ...over,
+  streamId: "s", lastSeq: 1, completedItems: [], anchorId: "m1", thoughtStartedAt: 0, thoughtEndedAt: undefined, thoughtBoundary: false, thoughts: [], ...over,
 });
 const done = (over: Partial<ThoughtRecord> = {}): ThoughtRecord => ({ turnId: "t0", anchorId: "m1", startedAt: undefined, text: "earlier thinking", seconds: 3, ...over });
 
@@ -58,6 +58,17 @@ describe("ThoughtSlot", () => {
     act(() => button().click());
     expect(button().getAttribute("aria-expanded")).toBe("true");
     expect(body().hidden).toBe(false);
+  });
+
+  it("keeps a thought before a tool and the one after it as two blocks at their own anchors", () => {
+    const state = { liveTurns: { th: live({ reasoning: "then", anchorId: "tool1", thoughtStartedAt: 9000, thoughts: [{ anchorId: "m1", startedAt: 0, endedAt: 2000, text: "plan" }] }) } };
+    render(state, "m1", ["m1", "tool1"]);
+    frame();
+    expect([...host.querySelectorAll("p")].map((p) => p.textContent)).toEqual(["plan"]);
+    expect(button().textContent).toContain("Thought for 2s");
+    render(state, "tool1", ["m1", "tool1"]);
+    frame();
+    expect([...host.querySelectorAll("p")].map((p) => p.textContent)).toEqual(["then"]);
   });
 
   it("says plain Thought when the time was not measured", () => {

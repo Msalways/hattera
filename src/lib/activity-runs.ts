@@ -149,6 +149,38 @@ function group(messages: Message[], foldAssistantTurns: boolean): TranscriptItem
   return items;
 }
 
+/**
+ * A thought sits right after the message it was thought after. A run of tool
+ * steps is drawn as one block, so a thought anchored on a step in the middle
+ * of it would land after the whole run: later than where it happened. Split
+ * such a run after each anchored step, so every thought keeps its place in the
+ * stream. Runs with no anchored step inside, and every other item, are
+ * returned as they were.
+ */
+export function splitRunsAtThoughts<Item extends TranscriptItem>(items: Item[], anchors: ReadonlySet<string>): Item[] {
+  const splits = (item: Item) => item.kind === "run" && item.messages.slice(0, -1).some((message) => anchors.has(message.id));
+  if (!anchors.size || !items.some(splits)) return items;
+  const out: Item[] = [];
+  for (const item of items) {
+    if (item.kind !== "run" || !splits(item)) {
+      out.push(item);
+      continue;
+    }
+    let part: Message[] = [];
+    const flush = () => {
+      if (part.length > 1) out.push({ kind: "run", id: `run:${part[0]!.id}`, messages: part } as Item);
+      else for (const message of part) out.push({ kind: "message", message } as Item);
+      part = [];
+    };
+    for (const message of item.messages) {
+      part.push(message);
+      if (anchors.has(message.id)) flush();
+    }
+    flush();
+  }
+  return out;
+}
+
 export function groupActivityRuns(messages: Message[]): ActivityTranscriptItem[] {
   return group(messages, false) as ActivityTranscriptItem[];
 }

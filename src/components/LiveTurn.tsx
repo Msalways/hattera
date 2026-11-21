@@ -16,7 +16,10 @@ type Peers = Parameters<typeof ChatMarkdown>[0]["mentionPeers"];
 /**
  * Follow a value at most once per animation frame. The first value, and a
  * return to nothing, show at once; in between only the newest value of each
- * frame is drawn, so a burst of deltas costs one render.
+ * frame is drawn, so a burst of deltas costs at most one paced update per
+ * frame. The consumer still commits once per change of its own props (a delta
+ * re-renders `LiveTurn`), so the budget is: one cheap component commit per
+ * delta, and one Markdown parse per frame, not one commit per frame.
  */
 export function useFrameValue<T>(value: T | null): T | null {
   const [shown, setShown] = useState<T | null>(value);
@@ -61,7 +64,15 @@ export const LiveTurn = memo(function LiveTurn({
   /** Called after each drawn update, so the caller can keep following the end. */
   onGrow?: () => void;
 }) {
-  const shown = useFrameValue(live);
+  const throttled = useFrameValue(live);
+  // The throttled copy only paces how often a growing reply is re-parsed. It
+  // is trusted for the same turn and the same reply item and for nothing else:
+  // a different turn or thread, or a reply that just completed or went away,
+  // must show the current state in this very render, not the last frame's.
+  const shown =
+    live && throttled && live.reply !== "" && throttled.turnId === live.turnId && throttled.replyItemId === live.replyItemId
+      ? throttled
+      : live;
   const reasoning = shown?.reasoning ?? "";
   const reply = shown?.reply ?? "";
   const turnId = shown?.turnId;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { describeRun, groupActivityRuns, groupTranscript, isRecoveryActivity, statusActivity } from "./activity-runs";
+import { describeRun, groupActivityRuns, groupTranscript, isRecoveryActivity, splitRunsAtThoughts, statusActivity } from "./activity-runs";
 import type { Message } from "@/state/store";
 
 let seq = 0;
@@ -204,5 +204,24 @@ describe("groupTranscript", () => {
       "turn",
       "message",
     ]);
+  });
+});
+
+describe("splitRunsAtThoughts", () => {
+  it("splits a run after a step a thought sits on, so the thought keeps its place", () => {
+    const [a, b, c, d] = [tool("Read"), tool("Read"), tool("Read"), tool("Read")];
+    const items = splitRunsAtThoughts(groupTranscript([a, b, c, d], false), new Set([b.id]));
+    expect(items.map((i) => (i.kind === "run" ? `run:${i.messages.map((m) => m.id).join("+")}` : i.kind === "message" ? i.message.id : i.kind))).toEqual([`run:${a.id}+${b.id}`, `run:${c.id}+${d.id}`]);
+  });
+  it("turns a lone leftover step into a plain message, as grouping does", () => {
+    const [a, b, c] = [tool("Read"), tool("Read"), tool("Read")];
+    const items = splitRunsAtThoughts(groupTranscript([a, b, c], false), new Set([a.id]));
+    expect(items.map((i) => i.kind)).toEqual(["message", "run"]);
+  });
+  it("leaves runs alone when the thought sits on the last step or nowhere", () => {
+    const [a, b] = [tool("Read"), tool("Read")];
+    const items = groupTranscript([a, b], false);
+    expect(splitRunsAtThoughts(items, new Set([b.id]))).toBe(items);
+    expect(splitRunsAtThoughts(items, new Set())).toBe(items);
   });
 });

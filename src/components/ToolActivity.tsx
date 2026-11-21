@@ -1,10 +1,10 @@
-import { Ban, Check, ChevronRight, Loader2, X } from "lucide-react";
+import { Ban, Check, ChevronRight, CircleHelp, Loader2, X } from "lucide-react";
 import { useState } from "react";
 import type { Message } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { placeLabelKey, type Place } from "@/lib/place";
-import { shownDurationMs, toolDiff, toolKind, toolStatus, toolTarget, type ToolRowStatus } from "@/lib/tool-rows";
+import { shownDurationMs, toolDiff, toolKind, toolStatus, toolTarget, type ToolRowStatus, type ToolTurnState } from "@/lib/tool-rows";
 import { formatElapsed } from "@/lib/working-time";
 import { nameIsCommand } from "@/lib/verify-steps";
 import { PlaceIcon } from "./PlaceIcon";
@@ -14,6 +14,7 @@ const STATUS_KEY = {
   done: "toolRow.done",
   failed: "toolRow.failed",
   cancelled: "toolRow.cancelled",
+  incomplete: "toolRow.incomplete",
 } as const satisfies Record<ToolRowStatus, string>;
 
 /** The status as a glyph. Always paired with the status word, so neither
@@ -22,6 +23,7 @@ function StatusGlyph({ status }: { status: ToolRowStatus }) {
   if (status === "running") return <Loader2 size={13} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />;
   if (status === "failed") return <X size={13} aria-hidden="true" />;
   if (status === "cancelled") return <Ban size={13} aria-hidden="true" />;
+  if (status === "incomplete") return <CircleHelp size={13} aria-hidden="true" />;
   return <Check size={13} className="text-success" aria-hidden="true" />;
 }
 
@@ -43,15 +45,18 @@ export function ToolActivity({
   tool,
   place = null,
   turnActive = true,
+  turnState,
 }: {
   tool: NonNullable<Message["tool"]>;
   /** where a screen or page tool ran, so the transcript shows the place of every step */
   place?: Place | null;
-  /** the turn this call belongs to is still going; false turns an unfinished call into Cancelled */
+  /** the turn this call belongs to is still going; false leaves an unfinished call Incomplete, never Cancelled */
   turnActive?: boolean;
+  /** what is known about the owning turn; overrides `turnActive` (Cancelled needs a confirmed stop) */
+  turnState?: ToolTurnState;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const status = toolStatus(tool, turnActive);
+  const status = toolStatus(tool, turnState ?? turnActive);
   const statusText = t(STATUS_KEY[status]);
   const kind = toolKind(tool.name);
   const target = nameIsCommand(tool.name) ? "" : toolTarget(tool);
@@ -70,8 +75,8 @@ export function ToolActivity({
       >
         <ChevronRight size={13} className="shrink-0 group-open/tool:rotate-90 rtl:rotate-180" aria-hidden="true" />
         {place && <PlaceIcon place={place} size={13} className="shrink-0 opacity-70" role="img" aria-label={t(placeLabelKey(place))} data-testid="tool-place" />}
-        <span className="min-w-0 max-w-[30rem] truncate font-mono">{tool.name}</span>
-        {target && <span className="min-w-0 flex-1 truncate font-mono text-ink-tertiary" title={target}>{target}</span>}
+        <span className="min-w-0 max-w-[30rem] font-mono [overflow-wrap:anywhere]">{tool.name}</span>
+        {target && <span className="min-w-0 flex-1 font-mono text-ink-tertiary [overflow-wrap:anywhere]" data-testid="tool-target">{target}</span>}
         <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[12px]" data-testid="tool-status">
           <StatusGlyph status={status} />
           <span>{statusText}</span>
@@ -85,7 +90,7 @@ export function ToolActivity({
         </div>
         <div>
           <div className="mb-1 text-[11px] font-medium">{t("toolDetail.output")}</div>
-          {outputIsDiff && diff ? <DiffPreview lines={diff} /> : tool.output ? <pre dir="ltr" className="max-h-64 overflow-auto rounded-lg bg-inset p-2.5 font-mono text-xs whitespace-pre-wrap break-words text-ink">{tool.output}</pre> : <p className="text-xs">{status === "running" ? t("toolDetail.waiting") : status === "cancelled" ? t("toolRow.noResultCancelled") : t("toolDetail.noOutput")}</p>}
+          {outputIsDiff && diff ? <DiffPreview lines={diff} /> : tool.output ? <pre dir="ltr" className="max-h-64 overflow-auto rounded-lg bg-inset p-2.5 font-mono text-xs whitespace-pre-wrap break-words text-ink">{tool.output}</pre> : <p className="text-xs">{status === "running" ? t("toolDetail.waiting") : status === "cancelled" ? t("toolRow.noResultCancelled") : status === "incomplete" ? t("toolRow.noResultIncomplete") : t("toolDetail.noOutput")}</p>}
         </div>
         {kind === "edit" && !outputIsDiff && (
           <div>

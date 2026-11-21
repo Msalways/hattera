@@ -58,10 +58,52 @@ describe("inline tool rows", () => {
     act(() => root.render(createElement("div", null,
       createElement(ToolActivity, { tool: { name: "Bash", ok: false }, turnActive: false }),
       createElement(ToolActivity, { tool: { name: "Bash" }, turnActive: false }))));
-    expect(rows()).toEqual(["failed", "cancelled"]);
+    expect(rows()).toEqual(["failed", "incomplete"]);
     expect(host.textContent).toContain("Failed");
-    expect(host.textContent).toContain("Cancelled");
+    expect(host.textContent).not.toContain("Cancelled");
     expect(host.textContent).not.toContain("Running");
+    act(() => root.render(createElement(ToolActivity, { tool: { name: "Bash" }, turnState: "cancelled" })));
+    expect(rows()).toEqual(["cancelled"]);
+  });
+
+  it("a duration under a second is hidden, never 0s", () => {
+    act(() => root.render(createElement("div", null,
+      createElement(ToolActivity, { tool: { name: "Bash", ok: true, durationMs: 250 }, turnActive: false }),
+      createElement(ToolActivity, { tool: { name: "Bash", ok: true, durationMs: 2500 }, turnActive: false }))));
+    const shown = [...host.querySelectorAll("[data-testid=tool-duration]")].map((e) => e.textContent);
+    expect(shown).toHaveLength(1);
+    expect(host.textContent).not.toContain("0s");
+  });
+
+  it("wraps a long target instead of truncating it", () => {
+    const long = `src/${"deeply/nested/".repeat(20)}file.ts`;
+    act(() => root.render(createElement(ToolActivity, { tool: { name: "Read", ok: true, summary: long }, turnActive: false })));
+    const target = host.querySelector("[data-testid=tool-target]") as HTMLElement;
+    expect(target.textContent).toBe(long);
+    expect(target.className).not.toContain("truncate");
+    expect(target.className).toContain("overflow-wrap:anywhere");
+  });
+
+  it("keeps keyboard focus when finished Reads regroup into one group", () => {
+    const first = [msg("1", "Read", { summary: "a.ts" })];
+    act(() => root.render(createElement(ActivityRun, { messages: first, renderStep: step })));
+    const summary = host.querySelector("summary") as HTMLElement;
+    act(() => summary.focus());
+    expect(document.activeElement).toBe(summary);
+    act(() => root.render(createElement(ActivityRun, { messages: [...first, msg("2", "Read", { summary: "b.ts" })], renderStep: step })));
+    expect(host.contains(summary)).toBe(false);
+    expect(document.activeElement).toBe(host.querySelector("[data-group-toggle]"));
+  });
+
+  it("does not take focus back from where the reader moved it", () => {
+    const outside = document.createElement("button"); document.body.append(outside);
+    const first = [msg("1", "Read", { summary: "a.ts" })];
+    act(() => root.render(createElement(ActivityRun, { messages: first, renderStep: step })));
+    act(() => (host.querySelector("summary") as HTMLElement).focus());
+    act(() => outside.focus());
+    act(() => root.render(createElement(ActivityRun, { messages: [...first, msg("2", "Read")], renderStep: step })));
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
   });
 
   it("a call stops reading Running once its turn is no longer active, in place", () => {
@@ -69,7 +111,7 @@ describe("inline tool rows", () => {
     act(() => root.render(createElement(ToolActivity, { tool: call, turnActive: true })));
     expect(rows()).toEqual(["running"]);
     act(() => root.render(createElement(ToolActivity, { tool: call, turnActive: false })));
-    expect(rows()).toEqual(["cancelled"]);
+    expect(rows()).toEqual(["incomplete"]);
     expect(host.querySelectorAll("[data-tool-row]").length).toBe(1);
   });
 

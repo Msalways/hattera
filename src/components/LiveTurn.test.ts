@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // The live turn: the reply streams as markdown; its reasoning is drawn by
 // ThoughtBlock; one announcement at each end; at most one draw per animation frame.
-import { act, createElement } from "react";
+import { act, createElement, Profiler } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,6 +24,8 @@ const turn = (over: Partial<LiveTurnState> = {}): LiveTurnState => ({
   anchorId: undefined,
   thoughtStartedAt: undefined,
   thoughtEndedAt: undefined,
+  thoughtBoundary: false,
+  thoughts: [],
   ...over,
 });
 
@@ -161,6 +163,45 @@ describe("frame throttle", () => {
     expect(host.querySelector("[data-live-reply]")?.textContent).toBe("first");
     show(null);
     expect(host.querySelector("[data-live-reply]")).toBeNull();
+  });
+
+  it("shows another turn's reply at once, never the previous turn's last frame", () => {
+    show(turn({ turnId: "turn-A", reply: "thread A reply" }));
+    show(turn({ turnId: "turn-B", reply: "thread B reply" }));
+    expect(host.querySelector("[data-live-reply]")?.textContent).toBe("thread B reply");
+    show(turn({ turnId: "turn-C", reply: "" }));
+    expect(host.querySelector("[data-live-reply]")).toBeNull();
+  });
+
+  it("hides a completed reply item in the same render, without waiting for a frame", () => {
+    show(turn({ replyItemId: "item-1", reply: "answer" }));
+    frame();
+    // item.completed folds the reply to "" while the turn stays live
+    show(turn({ replyItemId: undefined, reply: "", completedItems: ["item-1"] }));
+    expect(host.querySelector("[data-live-reply]")).toBeNull();
+  });
+
+  it("keys by thread in the parent, so a switch remounts: the throttled copy cannot cross threads", () => {
+    show(turn({ reply: "thread A" }), { key: "A" });
+    show(turn({ turnId: "turn-9", reply: "" }), { key: "B" });
+    expect(host.querySelector("[data-live-reply]")).toBeNull();
+  });
+
+  it("commits at most once per props change and parses markdown at most once per frame", () => {
+    const commits: number[] = [];
+    const onRender = () => void commits.push(1);
+    const profiled = (live: LiveTurnState) => createElement(Profiler, { id: "live", onRender }, createElement(LiveTurn, { live, botName: "Builder" }));
+    act(() => root.render(profiled(turn({ reply: "a" }))));
+    commits.length = 0;
+    act(() => {
+      for (const text of ["ab", "abc", "abcd", "abcde"]) root.render(profiled(turn({ reply: text })));
+    });
+    // one batched commit for the burst; the paced copy then lands in a later one
+    expect(commits.length).toBeLessThanOrEqual(1);
+    commits.length = 0;
+    frame();
+    expect(commits.length).toBeLessThanOrEqual(1);
+    expect(host.querySelector("[data-live-reply]")?.textContent).toBe("abcde");
   });
 
   it("asks the caller to follow the end after each drawn update", () => {

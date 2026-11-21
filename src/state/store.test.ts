@@ -1228,7 +1228,7 @@ describe("optimistic sent messages", () => {
 
   it("moves a thought anchored on the optimistic message to the stored one", () => {
     const sent = reducer({ ...initialState, bots: [bot] }, { type: "send", botId: bot.id, threadId: bot.threadId, sendId: "send-thought", text: "go" });
-    const liveTurn = { turnId: "t", reasoning: "hm", reply: "", replyItemId: undefined, truncated: false, ended: false, joinedMidStream: false, streamId: "s", lastSeq: 1, completedItems: [], anchorId: "optimistic-send-thought", thoughtStartedAt: 1, thoughtEndedAt: undefined };
+    const liveTurn = { turnId: "t", reasoning: "hm", reply: "", replyItemId: undefined, truncated: false, ended: false, joinedMidStream: false, streamId: "s", lastSeq: 1, completedItems: [], anchorId: "optimistic-send-thought", thoughtStartedAt: 1, thoughtEndedAt: undefined, thoughtBoundary: false, thoughts: [] };
     const finished = { turnId: "t0", anchorId: "optimistic-send-thought", startedAt: 1, text: "earlier", seconds: 2 };
     const withThoughts = { ...sent, liveTurns: { [bot.threadId!]: liveTurn }, thoughts: { [bot.threadId!]: [finished] } };
     const stored: Message = { id: "server-thought", role: "user", kind: "text", text: "go", at: 2, parentId: root.id, sendId: "send-thought" };

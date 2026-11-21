@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Message } from "@/state/store";
-import { digestsCoveredByHeader, segmentToolRun, shownDurationMs, toolCountsByTurn, toolDiff, toolKind, toolStatus, toolTarget } from "./tool-rows";
+import { digestsCoveredByHeader, segmentToolRun, shownDurationMs, toolCountsByTurn, toolDiff, toolKind, toolStatus, toolTarget, toolTurnStates } from "./tool-rows";
 
 const tool = (id: string, name: string, ok?: boolean): Message => ({ id, role: "bot", kind: "activity", at: 1, tool: { name, ok } });
 const user = (id: string): Message => ({ id, role: "user", kind: "text", text: "hi", at: 1 });
@@ -17,7 +17,10 @@ describe("tool rows", () => {
     expect(toolStatus({ name: "x", ok: true }, true)).toBe("done");
     expect(toolStatus({ name: "x", ok: false }, false)).toBe("failed");
     expect(toolStatus({ name: "x" }, true)).toBe("running");
-    expect(toolStatus({ name: "x" }, false)).toBe("cancelled");
+    // a missing result never proves a cancellation
+    expect(toolStatus({ name: "x" }, false)).toBe("incomplete");
+    expect(toolStatus({ name: "x" }, "unknown")).toBe("incomplete");
+    expect(toolStatus({ name: "x" }, "cancelled")).toBe("cancelled");
   });
   it("names the target from a JSON input, else the first line", () => {
     expect(toolTarget({ name: "Read", input: JSON.stringify({ file_path: "src/a.ts" }, null, 2) })).toBe("src/a.ts");
@@ -53,12 +56,54 @@ describe("one activity anchor per turn", () => {
 });
 
 describe("shownDurationMs", () => {
-  it("hides unmeasured and sub-0.1s durations, never showing 0s", () => {
+  it("hides unmeasured and sub-second durations, so a whole-second label never reads 0s", () => {
     expect(shownDurationMs(undefined)).toBeNull();
     expect(shownDurationMs(0)).toBeNull();
     expect(shownDurationMs(99)).toBeNull();
+    expect(shownDurationMs(250)).toBeNull();
+    expect(shownDurationMs(999)).toBeNull();
     expect(shownDurationMs(Number.NaN)).toBeNull();
-    expect(shownDurationMs(100)).toBe(100);
+    expect(shownDurationMs(1000)).toBe(1000);
     expect(shownDurationMs(2500)).toBe(2500);
+  });
+});
+
+describe("one turn, one header (steered rows)", () => {
+  const steer = (id: string): Message => ({ ...user(id), steered: true });
+  const inTurn = (m: Message, turnId: string): Message => ({ ...m, turnId });
+  it("a steered user row in the middle of a turn does not start a second header", () => {
+    const counts = toolCountsByTurn([user("u1"), tool("a", "Read", true), steer("s1"), tool("b", "Bash", true)]);
+    expect([...counts]).toEqual([["a", 2]]);
+  });
+  it("by turnId: the same turn keeps one header even across a request-looking row", () => {
+    const counts = toolCountsByTurn([user("u1"), inTurn(tool("a", "Read", true), "t1"), user("u2"), inTurn(tool("b", "Bash", true), "t1")]);
+    expect([...counts]).toEqual([["a", 2]]);
+  });
+  it("two real requests are two turns", () => {
+    const counts = toolCountsByTurn([user("u1"), inTurn(tool("a", "Read", true), "t1"), user("u2"), inTurn(tool("b", "Bash", true), "t2")]);
+    expect([...counts]).toEqual([["a", 1], ["b", 1]]);
+  });
+  it("covers the digest of a turn that a steered row split", () => {
+    const digest = { id: "d", role: "bot", kind: "digest", at: 1 } as Message;
+    expect(digestsCoveredByHeader([user("u1"), tool("a", "Read", true), steer("s1"), digest]).has("d")).toBe(true);
+  });
+});
+
+describe("toolTurnStates", () => {
+  const stopped: Message = { id: "stop", role: "bot", kind: "activity", at: 1, tool: { name: "stopped: by you" } };
+  it("only the newest turn can be active, and only while the chat is busy", () => {
+    const msgs = [user("u1"), tool("a", "Bash"), user("u2"), tool("b", "Bash")];
+    expect(toolTurnStates(msgs, true).get("a")).toBe("unknown");
+    expect(toolTurnStates(msgs, true).get("b")).toBe("active");
+    expect(toolTurnStates(msgs, false).get("b")).toBe("unknown");
+  });
+  it("a missing result is cancelled only when a stop row of that turn follows", () => {
+    const msgs = [user("u1"), tool("a", "Bash"), stopped, user("u2"), tool("b", "Bash")];
+    const states = toolTurnStates(msgs, false);
+    expect(states.get("a")).toBe("cancelled");
+    expect(states.get("b")).toBe("unknown");
+  });
+  it("does not list a call that has its result", () => {
+    expect(toolTurnStates([user("u1"), tool("a", "Bash", true)], true).has("a")).toBe(false);
   });
 });

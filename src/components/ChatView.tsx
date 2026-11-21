@@ -117,12 +117,12 @@ import { effectivePlace, toolPlace, type EffectivePlace } from "@/lib/place";
 import { cn } from "@/lib/cn";
 import { activeLocale, t } from "@/lib/i18n";
 import { COMPACT_BUBBLE } from "@/lib/compact-chip";
-import { groupTranscript, isStatusActivity } from "@/lib/activity-runs";
+import { groupTranscript, isStatusActivity, splitRunsAtThoughts } from "@/lib/activity-runs";
 import { StatusActivityRow } from "@/components/StatusActivityRow";
 import { CancelledTurnRow } from "./CancelledTurnRow";
 import { ActivityRun } from "./ActivityRun";
 import { TurnToolsHeader } from "./TurnToolsHeader";
-import { digestsCoveredByHeader, toolCountsByTurn } from "@/lib/tool-rows";
+import { digestsCoveredByHeader, toolCountsByTurn, toolTurnStates, type ToolTurnState } from "@/lib/tool-rows";
 import { ThoughtSlot } from "./ThoughtBlock";
 import { TurnNarrationRun } from "./TurnNarrationRun";
 import { webhookMessageView } from "@/lib/webhook-message";
@@ -791,7 +791,7 @@ function PeerLabel({ peer }: { peer: PeerLine }) {
 }
 
 /** A tool run: spinner while live, check/cross once settled. */
-const ActivityChip = memo(function ActivityChip({ message, place = "auto", turnActive = true }: { message: Message; place?: EffectivePlace; turnActive?: boolean }) {
+const ActivityChip = memo(function ActivityChip({ message, place = "auto", turnState = "active" }: { message: Message; place?: EffectivePlace; turnState?: ToolTurnState }) {
   const { bots, dispatch } = useChatRows();
   const tool = message.tool;
   if (!tool) return null;
@@ -814,7 +814,7 @@ const ActivityChip = memo(function ActivityChip({ message, place = "auto", turnA
       </div>
     );
   }
-  return <ToolActivity tool={tool} place={toolPlace(tool.name, place)} turnActive={turnActive} />;
+  return <ToolActivity tool={tool} place={toolPlace(tool.name, place)} turnState={turnState} />;
 });
 
 /** A routine run's receipt. It opens the run's own thread, so it follows
@@ -924,7 +924,11 @@ const MessagesList = memo(function MessagesList({
   // The locale refreshes the turn labels when the language changes.
   // With tool rows shown the narration stays in stream order beside them; the
   // "Worked" fold would be a second activity anchor over the same turn.
-  const items = useMemo(() => groupTranscript(messages, !showToolCalls), [messages, locale, showToolCalls]);
+  const items = useMemo(
+    () => splitRunsAtThoughts(groupTranscript(messages, !showToolCalls), thoughtAnchors),
+    [messages, locale, showToolCalls, thoughtAnchors],
+  );
+  const toolStates = useMemo(() => toolTurnStates(messages, busy), [messages, busy]);
   const coveredDigests = useMemo(() => digestsCoveredByHeader(messages), [messages]);
   const newestMessageId = messages.at(-1)?.id;
   const toolCounts = useMemo(() => toolCountsByTurn(messages), [messages]);
@@ -999,7 +1003,7 @@ const MessagesList = memo(function MessagesList({
               {newDay && <DaySeparator at={first.at} today={today} />}
               {divider}
               {toolsHeader}
-              <ActivityRun messages={item.messages} focusedId={focusedId} renderStep={(step) => <ActivityChip message={step} place={place} turnActive={busy} />} />
+              <ActivityRun messages={item.messages} focusedId={focusedId} renderStep={(step) => <ActivityChip message={step} place={place} turnState={toolStates.get(step.id) ?? "unknown"} />} />
             </div>
           );
         }
@@ -1062,7 +1066,7 @@ const MessagesList = memo(function MessagesList({
                 );
               }
               if (!showToolCalls && !m.comm && !m.threadRef && !m.dataResult) return null;
-              return <ActivityChip message={m} place={place} turnActive={busy} />;
+              return <ActivityChip message={m} place={place} turnState={toolStates.get(m.id) ?? "unknown"} />;
             }
             case "digest":
               // the summary of the turn's tool chips: shown under the same setting
@@ -1270,6 +1274,9 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const live = visibleLiveTurn(state.liveTurns[bot.threadId ?? ""]);
   const thoughtRecords = state.thoughts[bot.threadId ?? ""];
   const liveThought = live?.reasoning ? { anchorId: live.anchorId, startedAt: live.thoughtStartedAt } : undefined;
+  const liveSegments = live?.thoughts ?? [];
+  // Earlier segments only change when one closes, never per delta.
+  const liveSegmentsKey = liveSegments.map((s) => `${s.anchorId ?? ""}@${s.startedAt ?? ""}`).join("|");
   const messageIds = useMemo(() => new Set(messages.map((m) => m.id)), [messages]);
   const resolveThoughtAnchorFor = useCallback(
     (anchorId: string | undefined, startedAt: number | undefined) => resolveThoughtAnchor(messages, messageIds, anchorId, startedAt),
@@ -1283,9 +1290,13 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
     }
     const liveId = liveThought && resolveThoughtAnchorFor(liveThought.anchorId, liveThought.startedAt);
     if (liveId) anchors.add(liveId);
+    for (const segment of liveSegments) {
+      const id = resolveThoughtAnchorFor(segment.anchorId, segment.startedAt);
+      if (id) anchors.add(id);
+    }
     return anchors;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thoughtRecords, liveThought?.anchorId, liveThought?.startedAt, resolveThoughtAnchorFor]);
+  }, [thoughtRecords, liveThought?.anchorId, liveThought?.startedAt, liveSegmentsKey, resolveThoughtAnchorFor]);
   const growToEnd = useGrowToEnd(following, scrollRef);
   const liveReplyShown = useRef(false);
   if (live?.reply) liveReplyShown.current = true;
@@ -1666,7 +1677,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
             </div>
           )}
           {live?.reasoning && <ThoughtSlot key={bot.threadId} threadId={bot.threadId} afterId={null} resolveAnchor={resolveThoughtAnchorFor} />}
-          <LiveTurn live={live} botName={bot.name} mentionPeers={mentionPeers} onGrow={growToEnd} />
+          <LiveTurn key={bot.threadId} live={live} botName={bot.name} mentionPeers={mentionPeers} onGrow={growToEnd} />
           {/* One neutral anchor per turn: "Working…" until the first real item.
               A running tool row or streamed text is the anchor after that, so
               no mascot, rotating phrase or timer sits beside it. */}

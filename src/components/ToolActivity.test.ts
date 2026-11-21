@@ -19,8 +19,11 @@ describe("ToolActivity", () => {
     const render = (ok: boolean | undefined, turnActive = true) => renderToStaticMarkup(createElement(ToolActivity, { tool: { name: "Read", ok }, turnActive }));
     expect(render(undefined)).toContain("Waiting for the tool to finish");
     expect(render(undefined)).toContain("Running");
-    expect(render(undefined, false)).toContain("Cancelled");
+    // an ended turn alone does not prove a cancellation
+    expect(render(undefined, false)).toContain("No result");
+    expect(render(undefined, false)).not.toContain("Cancelled");
     expect(render(undefined, false)).not.toContain("Running");
+    expect(renderToStaticMarkup(createElement(ToolActivity, { tool: { name: "Read" }, turnState: "cancelled" }))).toContain("Cancelled");
     expect(render(false)).toContain("Failed");
     expect(render(false)).toContain("No output was recorded");
     expect(render(true)).toContain("No output was recorded");

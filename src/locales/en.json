@@ -259,6 +259,8 @@
   "toolRow.done": "Done",
   "toolRow.failed": "Failed",
   "toolRow.cancelled": "Cancelled",
+  "toolRow.incomplete": "No result",
+  "toolRow.noResultIncomplete": "No result was recorded for this call, and nothing says it was cancelled.",
   "toolRow.noResultCancelled": "No result: the turn ended before this call finished.",
   "toolRow.diff": "Changes made by this edit",
   "toolRow.diffUnavailable": "Diff unavailable",

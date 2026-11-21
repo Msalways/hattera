@@ -18,7 +18,7 @@ import { DATA_ROUTES, type DataSheet, type DataTable } from "../../shared/data-s
 import type { TurnDigest } from "../../shared/digest";
 import type { ToolScope } from "../../shared/tool-scope";
 import type { ModelVariantOption, RuntimeEvent } from "../../shared/runtime-events";
-import { foldLiveTurn, parseFrameCursor, THOUGHTS_MAX, thoughtOf, type LiveCursor, type LiveTurn, type ThoughtRecord } from "@/lib/live-turn";
+import { foldLiveTurn, parseFrameCursor, THOUGHTS_MAX, thoughtsOf, type LiveCursor, type LiveTurn, type ThoughtRecord } from "@/lib/live-turn";
 import type { MausColor, MausMotion } from "@/lib/mascot";
 import type { BotAvatarCrop } from "../../shared/bot-avatar";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
@@ -197,6 +197,8 @@ export interface Message {
   tool?: { name: string; ok?: boolean; spoken?: string; setup?: boolean; claudeUpdate?: boolean; place?: PlaceRow; summary?: string; input?: string; output?: string ; itemId?: string; outputPath?: string; fullResult?: boolean; durationMs?: number };
   /** user messages sent into a running turn — the model saw it mid-turn */
   steered?: boolean;
+  /** a peer bot's context folded into a running turn: never a new request */
+  aside?: boolean;
   /** a user message that did not come from typing here: through the
    * server's API, or spoken during a Live call. */
   via?: "api" | "call";
@@ -1590,12 +1592,18 @@ function dismissOnboardingCard(state: AppState, botId: string): AppState {
 function repointThoughtAnchors(state: AppState, threadId: string, from: string, to: string): AppState {
   const live = state.liveTurns[threadId];
   const records = state.thoughts[threadId];
-  const liveHit = live?.anchorId === from;
+  const liveHit = live?.anchorId === from || (live?.thoughts.some((segment) => segment.anchorId === from) ?? false);
   const recordHit = records?.some((thought) => thought.anchorId === from) ?? false;
   if (!liveHit && !recordHit) return state;
   return {
     ...state,
-    liveTurns: liveHit && live ? { ...state.liveTurns, [threadId]: { ...live, anchorId: to } } : state.liveTurns,
+    liveTurns: liveHit && live
+      ? { ...state.liveTurns, [threadId]: {
+        ...live,
+        anchorId: live.anchorId === from ? to : live.anchorId,
+        thoughts: live.thoughts.map((segment) => (segment.anchorId === from ? { ...segment, anchorId: to } : segment)),
+      } }
+      : state.liveTurns,
     thoughts: recordHit && records
       ? { ...state.thoughts, [threadId]: records.map((thought) => (thought.anchorId === from ? { ...thought, anchorId: to } : thought)) }
       : state.thoughts,
@@ -2151,9 +2159,9 @@ export function reducer(state: AppState, action: Action): AppState {
       const next = foldLiveTurn(previous, action.event, action.cursor, anchorId);
       if (next === previous) return state;
       // a finished turn keeps its thought, so it stays where it was and reopenable
-      const finished = action.event.type === "turn.completed" && previous && !previous.ended ? thoughtOf(previous, Date.parse(action.event.createdAt) || undefined) : null;
-      if (finished) {
-        const kept = [...(state.thoughts[threadId] ?? []), finished].slice(-THOUGHTS_MAX);
+      const finished = action.event.type === "turn.completed" && previous && !previous.ended ? thoughtsOf(previous, Date.parse(action.event.createdAt) || undefined) : [];
+      if (finished.length) {
+        const kept = [...(state.thoughts[threadId] ?? []), ...finished].slice(-THOUGHTS_MAX);
         state = { ...state, thoughts: { ...state.thoughts, [threadId]: kept } };
       }
       if (!next) {

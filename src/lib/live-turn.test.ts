@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RuntimeEvent } from "../../shared/runtime-events";
-import { foldLiveTurn, LIVE_TURN_MAX_CHARS, parseFrameCursor, resolveThoughtAnchor, thoughtOf, visibleLiveTurn, type LiveTurn } from "./live-turn";
+import { foldLiveTurn, LIVE_TURN_MAX_CHARS, parseFrameCursor, resolveThoughtAnchor, thoughtOf, thoughtsOf, visibleLiveTurn, type LiveTurn } from "./live-turn";
 
 let n = 0;
 let seq = 0;
@@ -386,6 +386,29 @@ describe("thought timing and anchor", () => {
   it("uses the turn's end when nothing else closed the thought", () => {
     const live = run([at(delta("reasoning_text", "x"), T0)]);
     expect(thoughtOf(live!, Date.parse(T4))?.seconds).toBe(4);
+  });
+});
+
+describe("separate thoughts around a tool", () => {
+  const at = (event: RuntimeEvent, iso: string): RuntimeEvent => ({ ...event, createdAt: iso } as RuntimeEvent);
+  const toolStart = (): RuntimeEvent => tag({ ...base(), type: "item.started", itemType: "tool", itemId: "tool-1" } as RuntimeEvent);
+  const T = (s: number) => `2026-11-20T00:00:0${s}.000Z`;
+  it("reasoning after a tool is a new thought at its own anchor, not merged into the first", () => {
+    const first = foldLiveTurn(undefined, at(delta("reasoning_text", "plan "), T(0)), undefined, "m1");
+    const afterTool = foldLiveTurn(foldLiveTurn(first, at(toolStart(), T(2))), at(delta("reasoning_text", "then "), T(5)), undefined, "tool-1");
+    expect(afterTool?.thoughts).toEqual([{ anchorId: "m1", startedAt: Date.parse(T(0)), endedAt: Date.parse(T(2)), text: "plan " }]);
+    expect(afterTool).toMatchObject({ reasoning: "then ", anchorId: "tool-1", thoughtStartedAt: Date.parse(T(5)), thoughtEndedAt: undefined });
+    expect(thoughtsOf(afterTool!).map((thought) => [thought.text, thought.seconds])).toEqual([["plan ", 2], ["then ", null]]); // the newest is still open, so unmeasured
+  });
+  it("interleaved reasoning with no boundary between stays one thought", () => {
+    const live = run([at(delta("reasoning_text", "a"), T(0)), at(delta("assistant_text", "x"), T(1)), at(delta("reasoning_text", "b"), T(2))]);
+    expect(live?.thoughts).toEqual([]);
+    expect(live?.reasoning).toBe("ab");
+  });
+  it("a turn that ends clears the earlier segments", () => {
+    const first = foldLiveTurn(undefined, at(delta("reasoning_text", "plan"), T(0)), undefined, "m1");
+    const resumed = foldLiveTurn(foldLiveTurn(first, at(toolStart(), T(2))), at(delta("reasoning_text", "more"), T(5)), undefined, "tool-1");
+    expect(run([completed()], resumed)?.thoughts).toEqual([]);
   });
 });
 

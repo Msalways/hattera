@@ -6,7 +6,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { useStore } from "@/state/store";
-import { visibleLiveTurn } from "@/lib/live-turn";
+import { thoughtsOf, visibleLiveTurn } from "@/lib/live-turn";
 import { useFrameValue } from "./LiveTurn";
 
 export function ThoughtBlock({ id, text, streaming, seconds }: { id: string; text: string; streaming: boolean; seconds: number | null }) {
@@ -64,12 +64,23 @@ export function ThoughtSlot({ threadId, afterId, resolveAnchor }: { threadId: st
   const here = (anchor: string | undefined, startedAt: number | undefined) => resolveAnchor(anchor, startedAt) === afterId;
   const done = (state.thoughts[key] ?? []).filter((thought) => here(thought.anchorId, thought.startedAt));
   const streaming = live && here(live.anchorId, live.thoughtStartedAt) ? live : null;
-  if (!done.length && !streaming) return null;
+  // thoughts of this turn that already ended and were followed by a tool or
+  // reply: each stays its own block at its own place, never merged into the
+  // newest one
+  const earlier = liveNow?.reasoning
+    ? thoughtsOf(liveNow).slice(0, liveNow.thoughts.length).filter((thought) => here(thought.anchorId, thought.startedAt))
+    : [];
+  if (!done.length && !earlier.length && !streaming) return null;
   return (
     <>
       {done.map((thought, index) => (
         <div key={`${thought.turnId ?? "turn"}:${index}`} className="flex justify-start">
           <ThoughtBlock id={`${afterId}-${thought.turnId ?? index}`} text={thought.text} streaming={false} seconds={thought.seconds} />
+        </div>
+      ))}
+      {earlier.map((thought) => (
+        <div key={`live-${thought.turnId ?? "turn"}:${thought.startedAt ?? ""}`} className="flex justify-start" data-live-thought-slot>
+          <ThoughtBlock id={`live-${thought.turnId ?? "turn"}-${thought.startedAt ?? ""}`} text={thought.text} streaming={false} seconds={thought.seconds} />
         </div>
       ))}
       {streaming && (
