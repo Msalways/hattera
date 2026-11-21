@@ -2482,7 +2482,7 @@ describe("conversation model variant discoveries", () => {
       ({ ...base(threadId, turnId), eventId: `${threadId}-${turnId}-${streamKind}-${text}`, type: "content.delta", streamKind, delta: text });
 
     it("keeps interleaved threads apart", () => {
-      let state = start();
+      let state: AppState = start();
       state = applyFrame(state, { ...base("first", "a"), type: "turn.started" });
       state = applyFrame(state, { ...base("second", "b"), type: "turn.started" });
       state = applyFrame(state, delta("first", "a", "assistant_text", "one "));

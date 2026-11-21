@@ -78,6 +78,43 @@ describe("foldLiveTurn", () => {
       expect(run([started(), dup, dup])?.reply).toBe("once");
     });
 
+    // Replayed frames keep their original event ids, whatever has arrived since.
+    it("a non-adjacent duplicate delta is applied once (H, i, H replayed → Hi)", () => {
+      const h = delta("assistant_text", "H", { itemId: "m1" });
+      expect(run([started(), h, delta("assistant_text", "i", { itemId: "m1" }), h])?.reply).toBe("Hi");
+    });
+
+    it("a replayed delta of an older turn cannot displace the current turn", () => {
+      const late = delta("assistant_text", "old", { turnId: "a", itemId: "a1" });
+      const live = run([started(undefined, "a"), late, completed(undefined, "a"), started(undefined, "b"), delta("assistant_text", "new", { turnId: "b", itemId: "b1" }), late]);
+      expect(live).toMatchObject({ turnId: "b", reply: "new", ended: false });
+    });
+
+    it("a replayed turn.started of an older turn cannot reset the current turn", () => {
+      const oldStart = started(undefined, "a");
+      const live = run([oldStart, completed(undefined, "a"), started(undefined, "b"), delta("assistant_text", "new", { turnId: "b" }), oldStart]);
+      expect(live).toMatchObject({ turnId: "b", reply: "new" });
+    });
+
+    it("a replayed completion of an older item cannot erase a different item's live reply", () => {
+      const first = stored("first", { itemId: "m1" });
+      const live = run([started(), delta("assistant_text", "first", { itemId: "m1" }), first, delta("assistant_text", "second", { itemId: "m2" }), first]);
+      expect(live?.reply).toBe("second");
+      // even a re-issued completion for m1 (new event id) is idempotent
+      expect(foldLiveTurn(live, stored("first", { itemId: "m1" }))?.reply).toBe("second");
+    });
+
+    it("completing item A does not clear item B's live reply", () => {
+      const live = run([started(), delta("assistant_text", "B text", { itemId: "m2" }), stored("A", { itemId: "m1" })]);
+      expect(live?.reply).toBe("B text");
+    });
+
+    it("a replayed older-turn completion cannot end the current turn", () => {
+      const done = completed(undefined, "a");
+      const live = run([started(undefined, "a"), done, started(undefined, "b"), delta("assistant_text", "new", { turnId: "b" }), done]);
+      expect(live).toMatchObject({ turnId: "b", reply: "new", ended: false });
+    });
+
     it("a replayed turn.started does not wipe the turn in flight", () => {
       const start = started();
       expect(run([start, delta("assistant_text", "kept"), start])?.reply).toBe("kept");
