@@ -13,6 +13,7 @@ import {
   initialState,
   liveCallFromFrame,
   liveTurnFrameAction,
+  liveTurnFrameActionFor,
   loadSnapshotBoundary,
   openBot,
   openNotificationTarget,
@@ -2478,6 +2479,18 @@ describe("conversation model variant discoveries", () => {
   });
 
   describe("live turn buffer", () => {
+    it("a malformed SSE id reaches the fold as no cursor: applied, flagged, never ordered", () => {
+      for (const id of ["run:", "run:1e2", "run:0x10", "run:-1", "run:1.5", "run", ":5", "run: 7", "run:1 "]) {
+        const event: RuntimeEvent = { ...base("first", "a"), eventId: "m-" + id, type: "content.delta", streamKind: "assistant_text", delta: "x" };
+        const action = liveTurnFrameActionFor(event, id);
+        expect(action, id).toMatchObject({ type: "liveTurnRuntime" });
+        expect((action as { cursor?: unknown }).cursor, id).toBeUndefined();
+        expect(reducer(start(), action!).liveTurns.first, id).toMatchObject({ reply: "x", joinedMidStream: true });
+      }
+      const ok = liveTurnFrameActionFor({ ...base("first", "a"), type: "turn.started" }, "run:12");
+      expect((ok as { cursor?: unknown }).cursor).toEqual({ streamId: "run", seq: 12 });
+    });
+
     const delta = (threadId: string, turnId: string, streamKind: "assistant_text" | "reasoning_text", text: string): RuntimeEvent =>
       ({ ...base(threadId, turnId), eventId: `${threadId}-${turnId}-${streamKind}-${text}`, type: "content.delta", streamKind, delta: text });
 

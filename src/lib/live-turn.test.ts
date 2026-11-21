@@ -315,6 +315,18 @@ describe("foldLiveTurn", () => {
       expect(foldLiveTurn(live, ev("delta", "b", { text: "again" }), at("run-2", 2))).toBe(live);
     });
 
+    it("a cursorless frame on an existing turn flags it and keeps the known boundary", () => {
+      let live = foldLiveTurn(undefined, ev("turn.started", "a"), at("run", 1));
+      expect(live?.joinedMidStream).toBe(false);
+      live = foldLiveTurn(live, ev("delta", "a", { text: "x" }));
+      expect(live).toMatchObject({ reply: "x", joinedMidStream: true, streamId: "run", lastSeq: 1 });
+      live = foldLiveTurn(live, ev("delta", "a", { text: "y" }), at("run", 2));
+      expect(live).toMatchObject({ reply: "xy", joinedMidStream: true, lastSeq: 2 });
+      // a frame that changes nothing does not flag a clean turn
+      const clean = foldLiveTurn(undefined, ev("turn.started", "a"), at("run", 1));
+      expect(foldLiveTurn(clean, { ...ev("delta", "a"), delta: "" } as RuntimeEvent)).toBe(clean);
+    });
+
     it("a frame with no cursor is applied but flagged, not ordered by guesswork", () => {
       expect(foldLiveTurn(undefined, ev("delta", "a", { text: "x" }))).toMatchObject({ reply: "x", joinedMidStream: true });
       expect(foldLiveTurn(undefined, ev("turn.started", "a"))?.joinedMidStream).toBe(true);
@@ -322,7 +334,7 @@ describe("foldLiveTurn", () => {
 
     it("parseFrameCursor reads the SSE id, and nothing else", () => {
       expect(parseFrameCursor("abcd1234:57")).toEqual({ streamId: "abcd1234", seq: 57 });
-      for (const bad of [undefined, "", "abcd1234", ":5", "s:x", "s:-1", "s:1.5"]) expect(parseFrameCursor(bad)).toBeUndefined();
+      for (const bad of [undefined, "", "abcd1234", ":5", "s:x", "s:-1", "s:1.5", "run:", "run:1e2", "run:0x10", "run:+1", "run: 1", "run:1 ", "run:9007199254740993"]) expect(parseFrameCursor(bad)).toBeUndefined();
     });
   });
 

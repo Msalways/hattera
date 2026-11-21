@@ -66,8 +66,11 @@ export function parseFrameCursor(lastEventId: string | undefined | null): LiveCu
   if (!lastEventId) return undefined;
   const colon = lastEventId.lastIndexOf(":");
   if (colon <= 0) return undefined;
-  const seq = Number(lastEventId.slice(colon + 1));
-  return Number.isSafeInteger(seq) && seq >= 0 ? { streamId: lastEventId.slice(0, colon), seq } : undefined;
+  const suffix = lastEventId.slice(colon + 1);
+  // decimal digits only: Number() would also take "", "1e2" and "0x10"
+  if (!/^[0-9]+$/.test(suffix)) return undefined;
+  const seq = Number(suffix);
+  return Number.isSafeInteger(seq) ? { streamId: lastEventId.slice(0, colon), seq } : undefined;
 }
 
 function fresh(turnId: string | undefined, cursor: LiveCursor | undefined, joinedMidStream: boolean): LiveTurn {
@@ -114,6 +117,14 @@ function turnFor(live: LiveTurn | undefined, event: RuntimeEvent, cursor: LiveCu
  * `cursor` is the frame's SSE cursor (see `parseFrameCursor`).
  */
 export function foldLiveTurn(live: LiveTurn | undefined, event: RuntimeEvent, cursor?: LiveCursor): LiveTurn | undefined {
+  const next = foldOrdered(live, event, cursor);
+  // A frame we could not order was applied: earlier text may be missing or
+  // out of order, whatever turn it landed on. The known {streamId, lastSeq}
+  // boundary is kept.
+  return !cursor && next && next !== live && !next.joinedMidStream ? { ...next, joinedMidStream: true } : next;
+}
+
+function foldOrdered(live: LiveTurn | undefined, event: RuntimeEvent, cursor: LiveCursor | undefined): LiveTurn | undefined {
   if (cursor && live) {
     // a different server run restarts `seq`: nothing held is comparable
     if (live.streamId !== undefined && live.streamId !== cursor.streamId) live = undefined;

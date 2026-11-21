@@ -3032,6 +3032,10 @@ export function runtimeFrameAction(event: RuntimeEvent): Action | null {
 
 /** The live-turn buffer's share: streamed deltas, the stored reply that
  * replaces them, and the turn boundaries that reset or close it. */
+export function liveTurnFrameActionFor(event: RuntimeEvent, lastEventId: string | undefined): Action | null {
+  return liveTurnFrameAction(event, parseFrameCursor(lastEventId));
+}
+
 export function liveTurnFrameAction(event: RuntimeEvent, cursor?: LiveCursor): Action | null {
   return event.type === "content.delta" ||
     event.type === "turn.started" ||
@@ -4272,7 +4276,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         case "runtime": {
           const action = runtimeFrameAction(frame.event);
           if (action) rawDispatch(action);
-          const live = liveTurnFrameAction(frame.event, parseFrameCursor(lastEventId));
+          const live = liveTurnFrameActionFor(frame.event, lastEventId);
           if (live) rawDispatch(live);
           break;
         }
