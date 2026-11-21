@@ -1,5 +1,5 @@
 // The route table: where new HTTP routes are registered (see README.md).
-// server/index.ts runs it once per request, right after the auth gate and
+// server/runtime.ts (handleRequest) runs it once per request, right after the auth gate and
 // before its own inline routes, so every handler here is already authenticated.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { json, readBody } from "../harness/http.ts";
