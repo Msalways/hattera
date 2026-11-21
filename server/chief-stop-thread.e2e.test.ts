@@ -148,3 +148,41 @@ it("withdraws a queued request, refuses a second withdrawal, and clears the outs
   await expect.poll(async () => (await f.messages(f.lead.activeTaskId)).some((m: any) => m.text === "Unrelated work completed"), { timeout: 30_000 }).toBe(true);
   expect(f.evidence().filter((t: any) => t.botId === f.lead.id)).toHaveLength(1);
 }), 120_000);
+
+it("refuses to stop a sectionless peer's thread even though blank sections compare equal", () => fixture(async f => {
+  await f.api(`/api/bots/${f.chief.id}`, { section: "" }, "PATCH");
+  await f.api(`/api/bots/${f.lead.id}`, { section: "" }, "PATCH");
+  const hold = join(f.session.info.dataDir, "boundary-hold");
+  f.plan[f.lead.id] = { gateFile: hold, reply: "never reached" };
+  f.plan[f.chief.id] = { script: [
+    { key: "assign", match: ["Boundary: assign"], steps: [{ ...assign, arguments: { ...assign.arguments, bot_ids: [f.lead.id] } }], reply: "Assigned" },
+    { key: "stop", match: ["Boundary: stop"], steps: [f.stopStep("filled-later", true)], reply: "Checked" },
+  ] };
+  f.save();
+  await f.say("Boundary: assign");
+  await expect.poll(() => f.childNode()?.status, { timeout: 30_000 }).toBe("running");
+  await expect.poll(() => f.turn("assign"), { timeout: 30_000 }).toBeTruthy();
+  const leadThread = f.childNode().threadId;
+  f.plan[f.chief.id].script.find((e: any) => e.key === "stop").steps[0].arguments.thread_id = leadThread;
+  f.save();
+  await f.say("Boundary: stop");
+  await expect.poll(() => f.turn("stop"), { timeout: 30_000 }).toBeTruthy();
+  const [answer] = f.answers("stop");
+  expect(answer).toMatchObject({ error: true });
+  expect(answer.text).toMatch(/named section/);
+  expect(f.childNode().status).toBe("running");
+  expect((await f.messages(leadThread)).some((m: any) => (m.tool?.name ?? "").startsWith("Stopped by"))).toBe(false);
+}), 120_000);
+
+it("answers 404 not found for a thread of a bot outside the Chief's team", () => fixture(async f => {
+  const outsider = (await f.cli("new-bot", "--name", "Outsider", "--section", "Finance")).bot;
+  f.plan[f.chief.id] = { script: [
+    { key: "outside", match: ["Boundary: outside"], steps: [f.stopStep(outsider.activeTaskId, true)], reply: "Checked" },
+  ] };
+  f.save();
+  await f.say("Boundary: outside");
+  await expect.poll(() => f.turn("outside"), { timeout: 30_000 }).toBeTruthy();
+  const [answer] = f.answers("outside");
+  expect(answer).toMatchObject({ error: true });
+  expect(answer.text).toMatch(/no such thread/);
+}), 60_000);

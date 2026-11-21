@@ -621,7 +621,7 @@ const toolDefinitions = (externalRuntime: boolean) => [
   {
     name: "stop_thread",
     description:
-      "Chief of Staff only. Stop a running teammate thread you opened, like the person's Stop button: history and files stay, the thread shows \"Stopped by <you> — <reason>\", and the outcome returns here as a result. Refused for threads you did not open, your own, and idle or closed ones. For work not started yet, use cancel_request.",
+      "Chief of Staff only. Stop a running teammate thread you opened, like the person's Stop button: history and files stay, the thread shows \"Stopped by <you> — <reason>\", and the outcome returns here as a result. Refused for threads you did not open, your own, idle or closed ones, and bots without a section. A thread of a bot outside your team is reported as not found. For work not started yet, use cancel_request.",
     inputSchema: {
       type: "object",
       additionalProperties: false,

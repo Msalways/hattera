@@ -19135,6 +19135,11 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if (target.hidden || !canAccessTeam(from, target.section) || !peerAllowed(from, target)) {
           return json(res, 403, { error: "that bot is not on this Chief's team — call list_bots for the ones you can reach" });
         }
+        // A section is a hard boundary for this operation: two bots with no
+        // section are not "the same team" (canAccessTeam treats blank as equal).
+        if (!from.section?.trim() || !target.section?.trim()) {
+          return json(res, 403, { error: "stop_thread needs the Chief and the target bot to be in a named section — a bot with no section is outside any team" });
+        }
         if (task.openedBy?.botId !== from.id) {
           return json(res, 403, { error: "that thread is not yours to stop — only the Chief that opened it can" });
         }
