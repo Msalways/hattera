@@ -18,8 +18,10 @@ type Peers = Parameters<typeof ChatMarkdown>[0]["mentionPeers"];
  * return to nothing, show at once; in between only the newest value of each
  * frame is drawn, so a burst of deltas costs at most one paced update per
  * frame. The consumer still commits once per change of its own props (a delta
- * re-renders `LiveTurn`), so the budget is: one cheap component commit per
- * delta, and one Markdown parse per frame, not one commit per frame.
+ * re-renders `LiveTurn`). Measured for a burst of deltas inside one frame: one
+ * cheap props commit per delta and no Markdown parse before the animation
+ * frame; then one paced Markdown pipeline per frame (a normalization parse plus
+ * a render parse) and one paced state commit. It is not one commit per frame.
  */
 export function useFrameValue<T>(value: T | null): T | null {
   const [shown, setShown] = useState<T | null>(value);

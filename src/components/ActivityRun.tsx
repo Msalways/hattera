@@ -17,7 +17,7 @@ export function ReadGroup({ id, messages, forceOpen = false, renderStep }: { id?
     if (forceOpen) setOpen(true);
   }, [forceOpen]);
   return (
-    <div className="flex flex-col gap-1" data-testid="tool-group" data-tool-row data-group-id={id}>
+    <div className="flex flex-col gap-1" data-testid="tool-group" data-tool-row data-group-id={id} data-group-members={messages.map((message) => message.id).join(" ")}>
       <button
         type="button"
         data-group-toggle

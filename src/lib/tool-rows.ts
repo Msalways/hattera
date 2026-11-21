@@ -131,7 +131,10 @@ function startsTurn(message: Message): boolean {
  * message has no `turnId` (older history) it joins the stretch after the last
  * request row, and a steered or aside user row never ends that stretch. When
  * a message names the same `turnId` the stretch was already carrying, it stays
- * in it even if a request row sits between (the row was not a new turn).
+ * in it even if a request row sits between (the row was not a new turn). When
+ * it names a different explicit `turnId` it starts a new turn even with no
+ * request row in between (a continuation produces a second provider turn after
+ * one stored prompt).
  */
 function turnIndexes(messages: readonly Message[]): Array<number | undefined> {
   const turns: Array<number | undefined> = [];
@@ -144,7 +147,8 @@ function turnIndexes(messages: readonly Message[]): Array<number | undefined> {
       turns.push(undefined);
       continue;
     }
-    if (closed && !(message.turnId !== undefined && message.turnId === turnId)) {
+    const newExplicitTurn = message.turnId !== undefined && turnId !== undefined && message.turnId !== turnId;
+    if (newExplicitTurn || (closed && !(message.turnId !== undefined && message.turnId === turnId))) {
       index += 1;
       turnId = undefined;
     }

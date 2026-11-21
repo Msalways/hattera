@@ -187,7 +187,7 @@ describe("frame throttle", () => {
     expect(host.querySelector("[data-live-reply]")).toBeNull();
   });
 
-  it("commits at most once per props change and parses markdown at most once per frame", () => {
+  it("commits once per props change, then paces the Markdown pipeline to one run per frame", () => {
     const commits: number[] = [];
     const onRender = () => void commits.push(1);
     const profiled = (live: LiveTurnState) => createElement(Profiler, { id: "live", onRender }, createElement(LiveTurn, { live, botName: "Builder" }));

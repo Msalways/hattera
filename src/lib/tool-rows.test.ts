@@ -107,3 +107,26 @@ describe("toolTurnStates", () => {
     expect(toolTurnStates([user("u1"), tool("a", "Bash", true)], true).has("a")).toBe(false);
   });
 });
+
+describe("two provider turns after one stored prompt", () => {
+  const row = (id: string, turnId: string) => ({ id, turnId, role: "bot", kind: "activity", at: 1, tool: { name: "Read", itemId: id } }) as Message;
+  it("keeps separate tool anchors when the explicit turnId changes without a new user row", () => {
+    const rows = [
+      { id: "u", role: "user", kind: "text", at: 0, text: "Work" } as Message,
+      row("a", "turn-1"),
+      { id: "reply", role: "bot", kind: "text", at: 2, text: "First turn done", turnId: "turn-1", turnTerminal: true } as Message,
+      row("b", "turn-2"),
+    ];
+    expect([...toolCountsByTurn(rows)]).toEqual([["a", 1], ["b", 1]]);
+  });
+  it("does not revive an unfinished call of an older turn while a newer one runs", () => {
+    const rows = [{ id: "u", role: "user", kind: "text", at: 0, text: "Work" } as Message, row("a", "turn-1"), row("b", "turn-2")];
+    const state = toolTurnStates(rows, true);
+    expect(state.get("a")).toBe("unknown");
+    expect(state.get("b")).toBe("active");
+  });
+  it("still groups legacy rows without turn ids after one request row", () => {
+    const legacy = (id: string) => ({ id, role: "bot", kind: "activity", at: 1, tool: { name: "Read", itemId: id } }) as Message;
+    expect([...toolCountsByTurn([{ id: "u", role: "user", kind: "text", at: 0, text: "x" } as Message, legacy("a"), legacy("b")])]).toEqual([["a", 2]]);
+  });
+});

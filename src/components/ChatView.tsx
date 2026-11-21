@@ -121,6 +121,7 @@ import { groupTranscript, isStatusActivity, splitRunsAtThoughts } from "@/lib/ac
 import { StatusActivityRow } from "@/components/StatusActivityRow";
 import { CancelledTurnRow } from "./CancelledTurnRow";
 import { ActivityRun } from "./ActivityRun";
+import { useFocusAcrossRegroup } from "./useFocusAcrossRegroup";
 import { TurnToolsHeader } from "./TurnToolsHeader";
 import { digestsCoveredByHeader, toolCountsByTurn, toolTurnStates, type ToolTurnState } from "@/lib/tool-rows";
 import { ThoughtSlot } from "./ThoughtBlock";
@@ -1364,6 +1365,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   useEffect(() => () => {
     if (poppingTimer.current) clearTimeout(poppingTimer.current);
   }, []);
+  const focusAcrossRegroup = useFocusAcrossRegroup(transcriptRef);
   useLayoutEffect(() => {
     if (poppingTimer.current) clearTimeout(poppingTimer.current);
     poppingTimer.current = null;
@@ -1616,6 +1618,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
       >
         <div
           ref={transcriptRef}
+          onFocusCapture={focusAcrossRegroup.onFocusCapture}
+          onBlurCapture={focusAcrossRegroup.onBlurCapture}
           className="glass-scroller-content flex w-full flex-col gap-3"
           style={{ paddingBottom: composerDock.pad }}
           role="log"
