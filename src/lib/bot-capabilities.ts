@@ -19,6 +19,8 @@ export interface BotCapabilities {
     /** Why not available (or "ready"), ignoring where the bot works. */
     availableReason: BrowserReason;
     message: string;
+    /** Each switch alone (the reason names only the first one that is off). */
+    switches: { workspaceOn: boolean; botOn: boolean; engineSupports: boolean; engineInstalled: boolean };
   };
   thisPc: {
     /** Computer control (desktop bridge) is set up for this bot. */
@@ -60,4 +62,43 @@ export function useBotCapabilities(botId: string | undefined, threadId: string |
     return () => { active = false; };
   }, [botId, threadId, refreshKey]);
   return value;
+}
+
+/** The Designer's four states for a capability: it is on and usable now
+ * ("available"), set up but not where this conversation works ("configured"),
+ * blocked on something the person can do ("needs-action"), or not answered yet
+ * ("unknown"). Each carries its reason and a next step as locale keys; the
+ * words come from the server's reason, never from config flags. */
+export type CapabilityState = "available" | "configured" | "needs-action" | "unknown";
+export interface BrowserStatus {
+  state: CapabilityState;
+  reason: BrowserReason | "unknown";
+  /** Locale keys (en.json "capability.browser.*"). */
+  titleKey: string;
+  reasonKey: string;
+  /** null when nothing is left to do. */
+  nextKey: string | null;
+}
+
+/** `canInstall`: this server can install the browser engine from the app. */
+export function browserStatus(caps: BotCapabilities | null, canInstall: boolean): BrowserStatus {
+  if (!caps) return { state: "unknown", reason: "unknown", titleKey: "capability.browser.unknown.title", reasonKey: "capability.browser.unknown.reason", nextKey: "capability.browser.unknown.next" };
+  const reason = caps.browser.availableReason;
+  const key = (name: string) => `capability.browser.${name}`;
+  switch (reason) {
+    case "ready":
+      return caps.browser.mounts
+        ? { state: "available", reason, titleKey: key("ready.title"), reasonKey: key("ready.reason"), nextKey: null }
+        : { state: "configured", reason: caps.browser.reason, titleKey: key("configured.title"), reasonKey: key("configured.reason"), nextKey: key("configured.next") };
+    case "not-installed":
+      return { state: "needs-action", reason, titleKey: key("notInstalled.title"), reasonKey: key("notInstalled.reason"), nextKey: canInstall ? key("notInstalled.nextInstall") : key("notInstalled.nextCli") };
+    case "workspace-off":
+      return { state: "needs-action", reason, titleKey: key("workspaceOff.title"), reasonKey: key("workspaceOff.reason"), nextKey: key("workspaceOff.next") };
+    case "bot-off":
+      return { state: "needs-action", reason, titleKey: key("botOff.title"), reasonKey: key("botOff.reason"), nextKey: key("botOff.next") };
+    case "engine-unsupported":
+      return { state: "needs-action", reason, titleKey: key("engineUnsupported.title"), reasonKey: key("engineUnsupported.reason"), nextKey: key("engineUnsupported.next") };
+    default:
+      return { state: "needs-action", reason, titleKey: key("workspaceOff.title"), reasonKey: key("workspaceOff.reason"), nextKey: key("workspaceOff.next") };
+  }
 }

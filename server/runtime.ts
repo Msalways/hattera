@@ -7743,6 +7743,10 @@ function botCapabilities(bot: BotRecord, threadId?: string) {
     browser: {
       mounts: browser.mounts, reason: browser.reason,
       available: switchReason === "ready", availableReason: switchReason,
+      // Every switch on its own: the reason above names only the first one
+      // that is off, which hides the rest from a surface that must say which
+      // ones the person can still change.
+      switches,
       message: browserReasonText(switchReason === "ready" ? browser.reason : switchReason, bot.name),
     },
     thisPc: { control: { ready: controlReady }, shell: { available: shellHere } },

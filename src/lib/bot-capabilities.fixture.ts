@@ -13,7 +13,8 @@ export function seedCapabilitiesFor(
       : overrides.engineSupports === false ? "engine-unsupported"
         : config?.browserEngine?.kind !== "engine" ? "not-installed" : "ready";
   const value: BotCapabilities = {
-    browser: { mounts: reason === "ready", reason, available: reason === "ready", availableReason: reason, message: reason },
+    browser: { mounts: reason === "ready", reason, available: reason === "ready", availableReason: reason, message: reason,
+      switches: { workspaceOn: config?.features?.browser === true, botOn: bot.browser !== false, engineSupports: overrides.engineSupports !== false, engineInstalled: config?.browserEngine?.kind === "engine" } },
     thisPc: { control: { ready: overrides.control === true }, shell: { available: overrides.shell === true } },
   };
   seedBotCapabilities(bot.id, bot.threadId, value);

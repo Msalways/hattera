@@ -35,7 +35,7 @@ export function usePlaceViews(bot: Bot): Record<Place, { view: PlaceView; reacha
     reason: localComputerDisabledReason({ capabilities, providerSupportsLocal }) ?? t("computer.unavailableLocal"),
   };
   const entry = (place: Place) => {
-    const view = placeViewFor(placeFacts({ bot, place, seat, config: state.config, instances: state.instances, local, ...(botCaps ? { browserOn: botCaps.browser.available } : {}) }));
+    const view = placeViewFor(placeFacts({ bot, place, seat, config: state.config, instances: state.instances, local, browserOn: botCaps?.browser.available === true, browserMissing: botCaps?.browser.availableReason === "not-installed" }));
     const policy = (place === "cloud" ? allowed[backend] : place === "vm" ? allowed.localVm : place === "local" ? allowed.thisComputer : true)
       && placeOffered(place, state.config);
     return { view, policy, reachable: policy && !placeBlocked(view) };

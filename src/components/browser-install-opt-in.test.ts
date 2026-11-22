@@ -51,7 +51,7 @@ const switchTag = (markup: string, label: string) => {
   return match![0];
 };
 const settings = () => renderToStaticMarkup(createElement(SettingsModal));
-const access = () => renderToStaticMarkup(createElement(BotAccess, { bot }));
+const access = () => { seedCapabilitiesFor(bot, fixture.config, { engineSupports: fixture.browserMcp }); return renderToStaticMarkup(createElement(BotAccess, { bot })); };
 const panel = (browser: boolean) => { seedCapabilitiesFor({ ...bot, browser }, fixture.config); return renderToStaticMarkup(createElement(ComputerPanel, { bot: { ...bot, browser } })); };
 
 beforeEach(() => {
@@ -82,6 +82,10 @@ describe("browser installation opt-in", () => {
     expect(markup.match(/<button[^>]*>Browser<\/button>/)).toBeNull();
     expect(panel(false)).not.toContain("Install the browser engine");
     expect(panel(true)).toContain("Install the browser engine");
+    // The tile says what is true: not installed, with the next step, never "off".
+    const tile = panel(true);
+    expect(tile).toContain("Browser engine not installed");
+    expect(tile).not.toContain("The browser is off");
     expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 

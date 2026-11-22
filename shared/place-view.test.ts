@@ -126,6 +126,8 @@ describe("placeState", () => {
     expect(placeState(facts({ place: "off" })).state).toBe("off");
     expect(placeState(facts({ place: "browser" })).state).toBe("browser");
     expect(placeState(facts({ place: "browser", browserOn: false })).state).toBe("browser-off");
+    // switched on but no engine yet: not installed, never "off"
+    expect(placeState(facts({ place: "browser", browserOn: false, browserMissing: true })).state).toBe("browser-missing");
     expect(placeState(facts({ place: "browser", engine: { name: "X", computer: true, browser: false, signedIn: true } })).state).toBe("browser-cannot");
     expect(placeState(facts({ place: "local", local: { ready: false, reason: "Not yet." } }))).toEqual({
       state: "local-unavailable", params: { bot: "Scout", reason: "Not yet." },

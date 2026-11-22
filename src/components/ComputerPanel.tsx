@@ -34,7 +34,7 @@ import {
   Smartphone,
   X,
 } from "lucide-react";
-import { useBotCapabilities } from "@/lib/bot-capabilities";
+import { browserStatus, useBotCapabilities } from "@/lib/bot-capabilities";
 import { api, ApiError, currentTaskBot, useStore, type Bot, type ConfigStatus } from "@/state/store";
 import { setAdvancedMode, useAdvancedMode } from "@/lib/interface-mode";
 import { ComputerFilesPane } from "./ComputerFilesPane";
@@ -1239,6 +1239,12 @@ export function ComputerPanel({
   // switch as Settings → Computers → Built-in browser, plus this bot's own
   // browser switch, turned on together.
   const browserCanTurnOn = browserAvailableHere || browserInstallable;
+  // Configured / available / needs you / unknown, each with its reason and next step.
+  const browserSt = browserStatus(botCaps, browserInstallable);
+  // An engine this server cannot install: its own reason (an unsupported platform, say) is the useful words.
+  const browserStatusText = botCaps && !botCaps.browser.switches.engineInstalled && !browserCanTurnOn
+    ? browserUnavailableReason(state.config)
+    : `${t(browserSt.reasonKey as LocaleKey)}${browserSt.nextKey ? ` ${t(browserSt.nextKey as LocaleKey)}` : ""}`;
   const [browserTurningOn, setBrowserTurningOn] = useState(false);
   const turnOnBrowser = async () => {
     if (browserTurningOn) return;
@@ -1271,7 +1277,7 @@ export function ComputerPanel({
       <Globe size={15} className="shrink-0 text-ink-secondary" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-medium text-ink">{t("computer.browserSwitch.title", { name: bot.name })}</div>
-        {!browserSwitchedOn && botCaps && <div data-testid="browser-switch-reason" className="text-[11.5px] text-ink-secondary">{botCaps.browser.availableReason === "not-installed" && !browserCanTurnOn ? browserUnavailableReason(state.config) : botCaps.browser.message}</div>}
+        {!browserSwitchedOn && botCaps && <div data-testid="browser-switch-reason" className="text-[11.5px] text-ink-secondary">{browserStatusText}</div>}
       </div>
       <Switch
         checked={browserSwitchedOn}
@@ -1302,7 +1308,8 @@ export function ComputerPanel({
       bot, place, seat: placeSeat, config: state.config, instances: state.instances,
       // This PC is ready when this app can pick it, or the server says the bot's engine can run commands here or computer control is set up (a shell that ran here used to read "Not ready").
       local: { ready: localSelectable || botCaps?.thisPc.shell.available === true || botCaps?.thisPc.control.ready === true, reason: localDisabledReason ?? t("computer.unavailableLocal") },
-      ...(botCaps ? { browserOn: botCaps.browser.available } : {}),
+      browserOn: botCaps?.browser.available === true,
+      browserMissing: botCaps?.browser.availableReason === "not-installed",
       ...(place === "cloud" ? { computer: cloudComputer } : {}),
       ...(place === "auto" && currentTeamComputer ? { teamComputer: currentTeamComputer.name } : {}),
     }),
@@ -1544,9 +1551,11 @@ export function ComputerPanel({
           {browserSwitchRow}
           <div className="mt-2 flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-8 text-center">
             <Globe size={22} className="text-ink-secondary" aria-hidden="true" />
-            <div className="text-[14px] font-medium text-ink">{t("computer.browserOff.title")}</div>
-            <p className="text-[12px] leading-5 text-ink-secondary">
-              {browserCanTurnOn ? t("computer.browserOff.body", { name: bot.name }) : browserUnavailableReason(state.config)}
+            <div className="text-[14px] font-medium text-ink" data-testid="browser-state-title">{t(browserSt.titleKey as LocaleKey)}</div>
+            <p className="text-[12px] leading-5 text-ink-secondary" data-testid="browser-state-body">
+              {browserSt.reason === "bot-off" || browserSt.reason === "workspace-off"
+                ? (browserCanTurnOn ? t("computer.browserOff.body", { name: bot.name }) : browserStatusText)
+                : browserStatusText}
             </p>
             {errorText && (
               <div role="alert" className="w-full rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">

@@ -8,7 +8,7 @@ import type { CloudAccountState } from "../../electron/cloud-account.mjs";
 import { activeLocale, t } from "@/lib/i18n";
 import { cloudPlanView } from "@/lib/cloud-plan";
 import { engineSignedOut } from "@/lib/failed-turn";
-import { browserAvailable, builtInBrowserEnabled, type FeatureFlagConfig } from "@/lib/feature-flags";
+import type { FeatureFlagConfig } from "@/lib/feature-flags";
 import { writeComputerPanelView } from "@/lib/computer-panel-view";
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
@@ -58,9 +58,11 @@ export function placeFacts(input: {
   local?: PlaceFacts["local"];
   computer?: PlaceFacts["computer"];
   teamComputer?: string;
-  /** The server's answer (src/lib/bot-capabilities.ts). Without it the old
-   * config-flag reading is used, for surfaces that have not loaded it. */
-  browserOn?: boolean;
+  /** The server's answer (src/lib/bot-capabilities.ts), never a config flag.
+   * False until that answer arrives. */
+  browserOn: boolean;
+  /** The server said "not-installed": on, but no engine yet. */
+  browserMissing?: boolean;
 }): PlaceFacts {
   const { bot, config, seat } = input;
   const instance = input.instances.find((candidate) => candidate.instanceId === bot.modelSelection.instanceId);
@@ -73,7 +75,8 @@ export function placeFacts(input: {
     backend: bot.cloudBackend === "vps" ? "vps" : "box",
     engine: engineFacts(instance, bot.modelSelection.model),
     toolsAllowComputer: canUseMcpServer(bot.toolScope, "computer"),
-    browserOn: input.browserOn ?? (builtInBrowserEnabled(config) && browserAvailable(config)),
+    browserOn: input.browserOn,
+    ...(input.browserMissing ? { browserMissing: true } : {}),
     role: seat.role,
     mode: seat.mode,
     ...(input.local ? { local: input.local } : {}),
@@ -97,7 +100,7 @@ export function placeRowViewFor(row: PlaceRow, seat: PlaceSeat, worksOnLabel?: s
 
 /** Whether a place can't be picked at all: no setting here makes it work. */
 export function placeBlocked(view: PlaceView): boolean {
-  return view.state === "cc-cannot" || view.state === "cc-on-my-cloud" || view.state === "browser-off" || view.state === "browser-cannot"
+  return view.state === "cc-cannot" || view.state === "cc-on-my-cloud" || view.state === "browser-off" || view.state === "browser-missing" || view.state === "browser-cannot"
     || view.state === "vm-cannot" || view.state === "local-unavailable";
 }
 
