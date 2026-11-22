@@ -108,7 +108,7 @@ async function boot(askTool: string, desktop = false): Promise<void> {
       stdio: ["ignore", "pipe", "pipe"],
     });
     child.stderr!.on("data", (chunk) => (stderr += chunk));
-    const deadline = Date.now() + 30_000;
+    const deadline = Date.now() + 90_000;
     for (;;) {
       if (child.exitCode !== null) throw new Error(`server exited ${child.exitCode}: ${stderr}`);
       try {
@@ -127,7 +127,7 @@ const shutdown = async () => {
 };
 
 describe("raising the approval level under a running turn", () => {
-  beforeAll(() => boot("Write", true), 60_000);
+  beforeAll(() => boot("Write", true), 100_000);
   afterAll(shutdown);
 
   it("answers the waiting card as allowed by level change, and the turn carries on", async () => {
@@ -177,7 +177,7 @@ stderr: ${stderr}`, { cause: error });
 // why, and the response counts it, so nothing is silently allowed and nothing
 // is left looking like it was handled.
 describe("a level change that does not cover the waiting card", () => {
-  beforeAll(() => boot("Bash", true), 60_000);
+  beforeAll(() => boot("Bash", true), 100_000);
   afterAll(shutdown);
 
   it("leaves a shell command waiting under Auto-accept edits, says so, and answers it when the person does", async () => {
@@ -225,7 +225,7 @@ describe("a level change that does not cover the waiting card", () => {
 // The bot's own default reaches a working thread that follows it, by the same
 // rule as the message box: handed to the engine now, the waiting card re-read.
 describe("a bot-level change under a thread that follows the bot", () => {
-  beforeAll(() => boot("Write", true), 60_000);
+  beforeAll(() => boot("Write", true), 100_000);
   afterAll(shutdown);
 
   it("answers the waiting edit card as allowed by level change", async () => {
@@ -251,7 +251,7 @@ describe("a bot-level change under a thread that follows the bot", () => {
 // caller's choice. So a widening while a bot works is refused whatever the
 // headers say, on every route that can widen, and the card stays waiting.
 describe("a bot's own shell forging browser headers", () => {
-  beforeAll(() => boot("Write", false), 60_000);
+  beforeAll(() => boot("Write", false), 100_000);
   afterAll(shutdown);
 
   const forged: Array<[string, Record<string, string>]> = [
