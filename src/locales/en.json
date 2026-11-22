@@ -3876,6 +3876,8 @@
   "place.view.vps.line": "Uses your own server, connected over SSH.",
   "place.view.browser.short": "Web pages only",
   "place.view.browser.line": "Works in the built-in browser only: web pages, no desktop apps.",
+  "place.view.browserChecking.short": "Checking…",
+  "place.view.browserChecking.line": "Checking whether the built-in browser is available.",
   "place.view.browserOff.short": "Browser is off",
   "place.view.browserOff.line": "The built-in browser is switched off.",
   "place.view.browserMissing.short": "Not installed",

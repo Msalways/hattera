@@ -71,6 +71,18 @@ export function browserEngineInstalled(caps: BotCapabilities | null): boolean | 
   return caps ? caps.browser.switches.engineInstalled : null;
 }
 
+/** The browser facts every place view takes, from the one answer. While the
+ * answer is still being asked (null) the browser is "checking", not off: every
+ * surface that builds a place view spreads this, so none of them can read a
+ * missing answer as "off". */
+export function browserFacts(caps: BotCapabilities | null): { browserOn: boolean; browserMissing: boolean; browserChecking: boolean } {
+  return {
+    browserOn: caps?.browser.available === true,
+    browserMissing: caps?.browser.availableReason === "not-installed",
+    browserChecking: caps === null,
+  };
+}
+
 /** The Designer's four states for a capability: it is on and usable now
  * ("available"), set up but not where this conversation works ("configured"),
  * blocked on something the person can do ("needs-action"), or not answered yet

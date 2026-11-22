@@ -34,7 +34,7 @@ import {
   Smartphone,
   X,
 } from "lucide-react";
-import { browserEngineInstalled, browserStatus, useBotCapabilities } from "@/lib/bot-capabilities";
+import { browserEngineInstalled, browserFacts, browserStatus, useBotCapabilities } from "@/lib/bot-capabilities";
 import { api, ApiError, currentTaskBot, useStore, type Bot, type ConfigStatus } from "@/state/store";
 import { setAdvancedMode, useAdvancedMode } from "@/lib/interface-mode";
 import { ComputerFilesPane } from "./ComputerFilesPane";
@@ -1307,8 +1307,7 @@ export function ComputerPanel({
       bot, place, seat: placeSeat, config: state.config, instances: state.instances,
       // This PC is ready when this app can pick it, or the server says the bot's engine can run commands here or computer control is set up (a shell that ran here used to read "Not ready").
       local: { ready: localSelectable || botCaps?.thisPc.shell.available === true || botCaps?.thisPc.control.ready === true, reason: localDisabledReason ?? t("computer.unavailableLocal") },
-      browserOn: botCaps?.browser.available === true,
-      browserMissing: botCaps?.browser.availableReason === "not-installed",
+      ...browserFacts(botCaps),
       ...(place === "cloud" ? { computer: cloudComputer } : {}),
       ...(place === "auto" && currentTeamComputer ? { teamComputer: currentTeamComputer.name } : {}),
     }),

@@ -5,7 +5,7 @@
 // list, webhooks list, and always-allowed list (the first read-only view of
 // standing grants) are new.
 import { useEffect, useState } from "react";
-import { browserStatus, useBotCapabilities } from "@/lib/bot-capabilities";
+import { browserFacts, browserStatus, useBotCapabilities } from "@/lib/bot-capabilities";
 import { ChevronDown, ChevronRight, FolderOpen, Plus } from "lucide-react";
 
 import { api, useStore, type Bot } from "@/state/store";
@@ -536,8 +536,7 @@ export function AccessSection({
   const placeSeat = usePlaceSeat(state.config, capabilities.host?.platform ?? "other");
   const worksOn = placeViewFor(placeFacts({
     bot, place: bot.computer ?? "auto", seat: placeSeat, config: state.config, instances: state.instances,
-    browserOn: botCaps?.browser.available === true,
-    browserMissing: botCaps?.browser.availableReason === "not-installed",
+    ...browserFacts(botCaps),
   }));
   const [inventory, setInventory] = useState<ConnectorInventory | null>(null);
 
@@ -685,6 +684,7 @@ export function AccessSection({
           aria-label="Give this bot a built-in browser"
           disabled={
             bot.computer === "off" ||
+            botCaps === null ||
             (!browserOn && browserBlocked)
           }
           onClick={() => patch({ browser: bot.browser === false })}

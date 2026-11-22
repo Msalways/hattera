@@ -205,3 +205,10 @@ describe("cloudRefusal reads the Admin's refusals", () => {
     expect(included("something new").state).toBe("cc-no-start");
   });
 });
+
+describe("RC-2: browser state before the server answers", () => {
+  it("reads checking, not off, while the answer is pending, and never blocks the place", () => {
+    expect(placeState(facts({ place: "browser", browserOn: false, browserChecking: true })).state).toBe("browser-checking");
+    expect(placeState(facts({ place: "browser", browserOn: false })).state).toBe("browser-off");
+  });
+});
