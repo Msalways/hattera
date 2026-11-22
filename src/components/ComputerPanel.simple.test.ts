@@ -1,4 +1,5 @@
 import { Children, createElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import { seedCapabilitiesFor } from "@/lib/bot-capabilities.fixture";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -142,6 +143,7 @@ function makeBot(patch: Partial<Bot> = {}): Bot {
 }
 
 function render(forBot: Bot, props: { onOpenVmWorkspace?: (botId: string) => void } = {}) {
+  seedCapabilitiesFor(forBot, fixture.config);
   fixture.values.length = Math.min(fixture.values.length, fixture.own);
   let tree: ReactNode = null;
   function Capture() {

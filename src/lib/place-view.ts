@@ -58,6 +58,9 @@ export function placeFacts(input: {
   local?: PlaceFacts["local"];
   computer?: PlaceFacts["computer"];
   teamComputer?: string;
+  /** The server's answer (src/lib/bot-capabilities.ts). Without it the old
+   * config-flag reading is used, for surfaces that have not loaded it. */
+  browserOn?: boolean;
 }): PlaceFacts {
   const { bot, config, seat } = input;
   const instance = input.instances.find((candidate) => candidate.instanceId === bot.modelSelection.instanceId);
@@ -70,7 +73,7 @@ export function placeFacts(input: {
     backend: bot.cloudBackend === "vps" ? "vps" : "box",
     engine: engineFacts(instance, bot.modelSelection.model),
     toolsAllowComputer: canUseMcpServer(bot.toolScope, "computer"),
-    browserOn: builtInBrowserEnabled(config) && browserAvailable(config),
+    browserOn: input.browserOn ?? (builtInBrowserEnabled(config) && browserAvailable(config)),
     role: seat.role,
     mode: seat.mode,
     ...(input.local ? { local: input.local } : {}),

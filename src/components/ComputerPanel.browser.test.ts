@@ -4,6 +4,7 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 import type { Bot } from "@/state/store";
 import { browserAvailable, type FeatureFlagConfig } from "@/lib/feature-flags";
 import { t } from "@/lib/i18n";
+import { seedCapabilitiesFor } from "@/lib/bot-capabilities.fixture";
 
 const fixture = vi.hoisted(() => {
   vi.stubGlobal("window", {});
@@ -28,6 +29,7 @@ afterAll(() => vi.unstubAllGlobals());
 const bot = { id: "browser-fixture", name: "Browser fixture", modelSelection: { instanceId: "fixture" } } as Bot;
 const render = (config: FeatureFlagConfig & { cloudHome?: boolean }, browser?: boolean) => {
   fixture.config = config;
+  seedCapabilitiesFor({ ...bot, browser }, config);
   return renderToStaticMarkup(createElement(ComputerPanel, { bot: { ...bot, browser } }));
 };
 

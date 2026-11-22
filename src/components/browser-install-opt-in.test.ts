@@ -34,6 +34,7 @@ vi.mock("@/state/store", async (importOriginal) => {
   };
 });
 
+import { seedCapabilitiesFor } from "@/lib/bot-capabilities.fixture";
 import { SettingsModal } from "./SettingsModal";
 import { ComputerPanel } from "./ComputerPanel";
 import { AccessSection } from "./bot-settings/AccessSection";
@@ -51,7 +52,7 @@ const switchTag = (markup: string, label: string) => {
 };
 const settings = () => renderToStaticMarkup(createElement(SettingsModal));
 const access = () => renderToStaticMarkup(createElement(BotAccess, { bot }));
-const panel = (browser: boolean) => renderToStaticMarkup(createElement(ComputerPanel, { bot: { ...bot, browser } }));
+const panel = (browser: boolean) => { seedCapabilitiesFor({ ...bot, browser }, fixture.config); return renderToStaticMarkup(createElement(ComputerPanel, { bot: { ...bot, browser } })); };
 
 beforeEach(() => {
   fixture.config = { features: { browser: false }, browserEngine: { kind: "unavailable", installable: true } };

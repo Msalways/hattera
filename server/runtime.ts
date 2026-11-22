@@ -570,6 +570,7 @@ import { startAutoVmClaim, type AutoVmClaimSlot, type AutoVmClaimTable } from ".
 import { CONTROL_ACT_WITHIN_MS, CONTROL_BUSY, CONTROL_HANDED_BACK, CONTROL_WAIT_MS, CONTROL_WAITED, controlRefusal, type ControlState } from "./control-client.ts";
 import { computerFreeAfterText, computerParkedText, computerPersonAwayText, computerStoppedWaitingText, computerWaitingText, type ComputerHolder } from "./computer-wait.ts";
 import { modelContextWindow } from "./model-context-window.ts";
+import { browserCapability, browserReasonText, browserSwitchReason, type BrowserSwitches } from "./turn-capabilities.ts";
 import { browserIsThePlace, cloudPlaceRefusal, computerSkippedNote, computerToolsRefusal, parseSurface, PlaceUnavailableError, placeUnavailable, resolveSurface, surfaceLabel, surfaceOfComputerKind, surfacePrompt, type ComputerWant, type PlaceSource, type Surface } from "./surface.ts";
 import { cloudRefusal, type PlaceRow } from "../shared/place-view.ts";
 import {
@@ -3217,6 +3218,19 @@ async function forgetTemporaryBrowser(botId: string): Promise<void> {
   if (closed) await browserRuntime.close(session);
   else console.warn(`temporary browser ${session}: could not close its session; run agent-browser --session ${session} close on this server`);
 }
+/** The facts every browser decision reads: the one place they are gathered. */
+function browserSwitchesFor(bot: Pick<BotRecord, "browser">, caps: { browserMcp?: boolean } | undefined): BrowserSwitches {
+  return {
+    workspaceOn: builtInBrowserEnabled(cfg),
+    botOn: bot.browser !== false,
+    engineSupports: caps?.browserMcp === true,
+    engineInstalled: browserEngineStatus().kind === "ready",
+  };
+}
+/** The surface plan's browserOn: the switches, the engine and the install. */
+function browserOnFor(bot: Pick<BotRecord, "browser">, caps: { browserMcp?: boolean } | undefined): boolean {
+  return browserSwitchReason(browserSwitchesFor(bot, caps)) === "ready";
+}
 async function browserIntegration(botId: string, profile: string | undefined, turn?: { threadId: string; generation: string }) {
   const status = browserEngineStatus();
   if (status.kind !== "ready") {
@@ -4173,7 +4187,7 @@ function previewSystemPrompt(bot: BotRecord) {
   // browser in one place while the preview said it had none.
   const previewPlan = resolveSurface({
     destination: previewComputer,
-    browserOn: caps?.browserMcp === true && builtInBrowserEnabled(cfg) && bot.browser !== false,
+    browserOn: browserOnFor(bot, caps),
   });
   const privateWorkspace = instance && supportsWorkspaceFiles(instance.driverKind);
   const built = buildSystemPrompt(persona, bot.soul ?? "", [
@@ -7700,7 +7714,7 @@ function turnSurfacePlan(bot: BotRecord, runOn?: RoutineRunOn, threadId?: string
   return resolveSurface({
     destination: forcedBoat ? "cloud" : bot.computer,
     pinnedSurface: forcedBoat || !threadId ? null : store.taskByThread(bot.id, threadId)?.surface,
-    browserOn: builtInBrowserEnabled(cfg) && bot.browser !== false && instance?.adapter.capabilities.browserMcp === true,
+    browserOn: browserOnFor(bot, instance?.adapter.capabilities),
   });
 }
 
@@ -7709,6 +7723,30 @@ function turnProvider(bot: BotRecord, runOn?: RoutineRunOn, threadId?: string): 
   const wants = turnSurfacePlan(bot, runOn, threadId).computer;
   if (wants !== undefined && wants !== "cloud") return null;
   return bot.cloudBackend === "vps" ? "vps" : wants === "cloud" ? "box" : null;
+}
+
+/** What this bot's turns really get, from the same rule the mount, select_computer
+ * and room turns read (turn-capabilities.ts). The Computer panel shows this
+ * answer; it does not work the browser or This PC out again. */
+function botCapabilities(bot: BotRecord, threadId?: string) {
+  const instance = registry.get(bot.modelSelection.instanceId);
+  const caps = instance?.adapter.capabilities;
+  const plan = turnSurfacePlan(bot, undefined, threadId);
+  const switches = browserSwitchesFor(bot, caps);
+  const browser = browserCapability(switches, plan);
+  const switchReason = browserSwitchReason(switches);
+  const controlReady = !CLOUD_HOME && shouldMountLocalComputer({ requested: "local", hostPlatform: process.platform,
+    providerSupportsLocal: caps?.localComputerMcp === true }) && Boolean(readCuaConnection());
+  const shellHere = !CLOUD_HOME && bot.computer !== "off" && bot.computer !== "cloud" && bot.computer !== "vm"
+    && Boolean(registry.cliTarget(bot.modelSelection.instanceId));
+  return {
+    browser: {
+      mounts: browser.mounts, reason: browser.reason,
+      available: switchReason === "ready", availableReason: switchReason,
+      message: browserReasonText(switchReason === "ready" ? browser.reason : switchReason, bot.name),
+    },
+    thisPc: { control: { ready: controlReady }, shell: { available: shellHere } },
+  };
 }
 
 /** Preview requests carry the selected conversation, not whichever thread
@@ -7794,8 +7832,10 @@ async function selectableComputers(bot: BotRecord) {
         ready = shouldMountLocalComputer({ requested: "local", hostPlatform: process.platform,
           providerSupportsLocal: caps?.localComputerMcp === true }) && Boolean(readCuaConnection());
       } else if (surface === "browser") {
-        ready = caps?.browserMcp === true && builtInBrowserEnabled(cfg) && bot.browser !== false && browserEngineStatus().kind === "ready";
-        reason = "The built-in browser is disabled, not installed, or unsupported by this model.";
+        // The mount's own rule, asked for an explicit Browser place.
+        const browser = browserCapability(browserSwitchesFor(bot, caps), resolveSurface({ destination: "browser", browserOn: browserOnFor(bot, caps) }));
+        ready = browser.mounts;
+        reason = browserReasonText(browser.reason, bot.name);
       }
     } catch (error) { reason = error instanceof Error ? error.message : String(error); }
     // Not offered at all when the organisation disallows it.
@@ -11471,14 +11511,7 @@ async function startTurn(
       // computer; then the built-in browser stays unmounted and web work
       // happens in that computer's own browser, where the person can see it.
       const mountedComputer = surfaceOfComputerKind(computerKind);
-      if (
-        liveBot &&
-        plan.browser &&
-        !(plan.computer === undefined && mountedComputer) &&
-        builtInBrowserEnabled(cfg) &&
-        liveBot.browser !== false &&
-        instance.adapter.capabilities.browserMcp === true
-      ) {
+      if (liveBot && browserCapability(browserSwitchesFor(liveBot, instance.adapter.capabilities), plan, mountedComputer).mounts) {
         const selectedProfile = liveBot.browserProfile;
         browser = await browserIntegration(bot.id, selectedProfile, { threadId, generation: dispatchClaimId });
         if (browser) integrations.browser = browser.integration;
@@ -13744,10 +13777,7 @@ async function runGroupMemberTurn(
   const roomTeamComputer = inheritedTeamComputer(readyBot);
   const roomPlan = resolveSurface({
     destination: roomTeamComputer ? "cloud" : readyBot.computer,
-    browserOn:
-      builtInBrowserEnabled(cfg) &&
-      readyBot.browser !== false &&
-      instance.adapter.capabilities.browserMcp === true,
+    browserOn: browserOnFor(readyBot, instance.adapter.capabilities),
   });
   // A place the organisation disallows, or a Cloud home never offers, is
   // refused before anything is provisioned or started, exactly as a bot
@@ -13769,7 +13799,7 @@ async function runGroupMemberTurn(
   }
   // One place per room turn as well: a team computer reached on Auto means
   // no separate built-in browser.
-  if (roomPlan.browser && !(roomPlan.computer === undefined && roomTeamComputer)) {
+  if (browserCapability(browserSwitchesFor(readyBot, instance.adapter.capabilities), roomPlan, roomTeamComputer ? "cloud" : null).mounts) {
     const selectedProfile = readyBot.browserProfile;
     const browser = await browserIntegration(readyBot.id, selectedProfile, { threadId, generation: internalGeneration });
     if (browser) integrations.browser = browser.integration;
@@ -18442,11 +18472,14 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const configured = configuredBotModels();
         const instances = selectableInstances(await registry.describe()).flatMap((instance) => {
           if (!readyToRun(instance, selectionContext)) return [];
+          // Every ready engine is listed, chosen model or not: an engine nobody selected yet is still a
+          // real option to point the Chief at. Models stay gated: only chosen ones are offered, and
+          // validateModelProposal still refuses any the owner has not configured.
           const selected = configured.get(instance.instanceId);
-          if (!selected) return [];
+          if (!selected) return [{ ...instance, models: { ...instance.models, default: "", options: [] }, modelsChosen: false }];
           const options = instance.models.options.filter((model) => selected.has(model.id));
           const defaultModel = selected.has(instance.models.default) ? instance.models.default : options[0]?.id;
-          return defaultModel ? [{ ...instance, models: { ...instance.models, default: defaultModel, options } }] : [];
+          return [{ ...instance, models: { ...instance.models, default: defaultModel ?? "", options }, modelsChosen: Boolean(defaultModel) }];
         });
         requireActiveInternalCapability();
         chief = store.bot(internalCapability.botId)!;
@@ -18456,8 +18489,8 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           bots: store.bots.filter((bot) => !bot.hidden && canAccessTeam(chief, bot.section) && (bot.id === chief.id || peerAllowed(chief, bot)))
             .map((bot) => ({ id: bot.id, name: bot.name, title: bot.title, section: bot.section ?? "", modelSelection: bot.modelSelection, chiefOfStaff: Boolean(bot.chiefOfStaff) })),
           instances: instances.map((instance) => ({ instanceId: instance.instanceId, driverKind: instance.driverKind, displayName: instance.displayName,
-            state: instance.snapshot.state, ready: readyToRun(instance, selectionContext), models: instance.models, effortLevels: instance.capabilities?.effortLevels ?? [] })),
-          scope: "Only models chosen in app settings or on a bot, and ready to run, are listed. Bot model defaults apply to groups and new threads; existing threads retain their models. Full Access applies requested team setup immediately; other modes return a review card. Existing unauthorized teams remain outside this Chief's scope.",
+            state: instance.snapshot.state, ready: readyToRun(instance, selectionContext), modelsChosen: instance.modelsChosen, models: instance.models, effortLevels: instance.capabilities?.effortLevels ?? [] })),
+          scope: "Every ready engine is listed. Only models chosen in app settings or on a bot are offered; an engine with modelsChosen false has none chosen yet, so its models cannot be requested until the owner chooses one. Bot model defaults apply to groups and new threads; existing threads retain their models. Full Access applies requested team setup immediately; other modes return a review card. Existing unauthorized teams remain outside this Chief's scope.",
         });
       }
       if (method === "POST" && path === "/api/internal/team-setup-requests") {
@@ -24781,6 +24814,13 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       });
     }
 
+    m = path.match(/^\/api\/bots\/([\w-]+)\/capabilities$/);
+    if (m && method === "GET") {
+      const bot = computerPreviewBot(m[1], url);
+      if (!bot) return json(res, 404, { error: "no such bot" });
+      res.setHeader("cache-control", "private, no-store");
+      return json(res, 200, botCapabilities(bot, url.searchParams.get("threadId") ?? undefined));
+    }
     m = path.match(/^\/api\/bots\/([\w-]+)\/local-computer$/);
     if (m && method === "GET") {
       const bot = computerPreviewBot(m[1], url);

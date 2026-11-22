@@ -34,6 +34,7 @@ import {
   Smartphone,
   X,
 } from "lucide-react";
+import { useBotCapabilities } from "@/lib/bot-capabilities";
 import { api, ApiError, currentTaskBot, useStore, type Bot, type ConfigStatus } from "@/state/store";
 import { setAdvancedMode, useAdvancedMode } from "@/lib/interface-mode";
 import { ComputerFilesPane } from "./ComputerFilesPane";
@@ -387,8 +388,12 @@ export function ComputerPanel({
   // Keep installation reachable before the engine is ready. Actual browser
   // operations below still require browserAvailableHere.
   const browserAvailableHere = browserAvailable(state.config);
-  const browserEnabled = builtInBrowserEnabled(state.config) && bot.browser !== false
-    && (browserAvailableHere || state.config?.browserEngine?.installable === true);
+  // The server decides what this bot's turns get; this panel only shows it.
+  const botCaps = useBotCapabilities(profileBot.id, profileBot.threadId,
+    [profileBot.browser, profileBot.computer, profileBot.modelSelection.instanceId, state.config?.features?.browser, state.config?.browserEngine?.kind, state.config?.browserEngine?.installing].join("|"));
+  const browserSwitchedOn = botCaps?.browser.available === true;
+  const browserInstallable = state.config?.browserEngine?.installable === true;
+  const browserEnabled = browserSwitchedOn || (botCaps?.browser.availableReason === "not-installed" && browserInstallable);
   // bumped when a Boat API key is saved inline, to re-run the spin-up flow
   const [retry, setRetry] = useState(0);
   // Auto is a server decision (including an existing Local VM). Do not guess
@@ -1233,7 +1238,7 @@ export function ComputerPanel({
   // Simple mode's Browser tab when the browser is off: the same installation
   // switch as Settings → Computers → Built-in browser, plus this bot's own
   // browser switch, turned on together.
-  const browserCanTurnOn = browserAvailableHere || state.config?.browserEngine?.installable === true;
+  const browserCanTurnOn = browserAvailableHere || browserInstallable;
   const [browserTurningOn, setBrowserTurningOn] = useState(false);
   const turnOnBrowser = async () => {
     if (browserTurningOn) return;
@@ -1266,13 +1271,13 @@ export function ComputerPanel({
       <Globe size={15} className="shrink-0 text-ink-secondary" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-medium text-ink">{t("computer.browserSwitch.title", { name: bot.name })}</div>
-        {!browserCanTurnOn && <div className="text-[11.5px] text-ink-secondary">{browserUnavailableReason(state.config)}</div>}
+        {!browserSwitchedOn && botCaps && <div data-testid="browser-switch-reason" className="text-[11.5px] text-ink-secondary">{botCaps.browser.availableReason === "not-installed" && !browserCanTurnOn ? browserUnavailableReason(state.config) : botCaps.browser.message}</div>}
       </div>
       <Switch
-        checked={browserEnabled}
-        disabled={browserTurningOn || (!browserEnabled && !browserCanTurnOn)}
+        checked={browserSwitchedOn}
+        disabled={browserTurningOn || (!browserSwitchedOn && !browserCanTurnOn)}
         aria-label={t("computer.browserSwitch.title", { name: bot.name })}
-        onClick={() => (browserEnabled ? turnOffBrowser() : void turnOnBrowser())}
+        onClick={() => (browserSwitchedOn ? turnOffBrowser() : void turnOnBrowser())}
       />
     </div>
   );
@@ -1295,7 +1300,9 @@ export function ComputerPanel({
   const viewOf = (place: PlaceFacts["place"], refusal?: PlaceFacts["refusal"]): PlaceView => placeViewFor({
     ...placeFacts({
       bot, place, seat: placeSeat, config: state.config, instances: state.instances,
-      local: { ready: localSelectable, reason: localDisabledReason ?? t("computer.unavailableLocal") },
+      // This PC is ready when this app can pick it, or the server says the bot's engine can run commands here or computer control is set up (a shell that ran here used to read "Not ready").
+      local: { ready: localSelectable || botCaps?.thisPc.shell.available === true || botCaps?.thisPc.control.ready === true, reason: localDisabledReason ?? t("computer.unavailableLocal") },
+      ...(botCaps ? { browserOn: botCaps.browser.available } : {}),
       ...(place === "cloud" ? { computer: cloudComputer } : {}),
       ...(place === "auto" && currentTeamComputer ? { teamComputer: currentTeamComputer.name } : {}),
     }),
