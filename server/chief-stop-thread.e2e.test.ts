@@ -1,11 +1,15 @@
 // A Chief of Staff can stop a teammate's running thread it opened, and
 // withdraw a request that has not started — through the real injected agents
 // MCP proxy (scripted fixture turns), against a real isolated server.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn, type ChildProcess } from "node:child_process";
+import { closeSync, existsSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../scripts/control-hattera.ts";
+import { launchVerificationServer, runControlOmb, verificationServerArgs, verificationServerEnvironment } from "../scripts/control-hattera.ts";
 import { request } from "../scripts/mcp-server.ts";
+import { waitForExit } from "./testing/cleanup.ts";
+
+const CAPABILITY_KEY = "chief-stop-thread-e2e-capability";
 
 const SETTLED = "Your downstream room requests have settled.";
 const OUTSTANDING = "Assignments you already sent are still outstanding";
@@ -186,3 +190,69 @@ it("answers 404 not found for a thread of a bot outside the Chief's team", () =>
   expect(answer).toMatchObject({ error: true });
   expect(answer.text).toMatch(/no such thread/);
 }), 60_000);
+
+/** The stop route itself, called with a Chief's turn capability so the HTTP
+ * status is observable (the agents proxy flattens it into tool text). The
+ * fixture server is restarted on its own data with the test capability key. */
+async function directRoute(test: (f: any) => Promise<void>) {
+  const fixture = await launchVerificationServer({ ...process.env });
+  const { url, dataDir, logPath } = fixture.info;
+  let server: ChildProcess | undefined;
+  try {
+    await waitForExit(fixture.child, { signal: "SIGTERM" });
+    const childEnv = { ...verificationServerEnvironment({}, dataDir, Number(new URL(url).port)), OMB_TEST_INTERNAL_CAPABILITY_KEY: CAPABILITY_KEY };
+    const log = openSync(logPath, "a", 0o600);
+    server = spawn(process.execPath, verificationServerArgs(childEnv), { cwd: join(import.meta.dirname, ".."), env: childEnv, stdio: ["ignore", log, log] });
+    closeSync(log);
+    await expect.poll(async () => { try { return (await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1_000) })).ok; } catch { return false; } }, { timeout: 30_000 }).toBe(true);
+    const cli = (...args: string[]) => runControlOmb(args, { env: { OPENMAUSBOT_URL: url } }) as Promise<any>;
+    const api = (path: string, body?: unknown, method = "POST") => request(path, body === undefined ? {} : { method, body: JSON.stringify(body) }, url) as Promise<any>;
+    const chief = (await cli("new-bot", "--name", "Clive", "--section", "Leadership")).bot;
+    const lead = (await cli("new-bot", "--name", "Engineering lead", "--section", "Engineering")).bot;
+    await api(`/api/bots/${chief.id}`, { chiefOfStaff: true, managedSections: ["Engineering"], acknowledgePeerScope: true }, "PATCH");
+    const stop = async (threadId: string, reason = "The user asked to pause this") => {
+      const minted = await fetch(`${url}/api/testing/internal-capability`, {
+        method: "POST", headers: { "content-type": "application/json", "x-openmausbot-test-capability": CAPABILITY_KEY },
+        body: JSON.stringify({ botId: chief.id, threadId: chief.activeTaskId }),
+      });
+      expect(minted.status).toBe(201);
+      const { token } = await minted.json() as { token: string };
+      const res = await fetch(`${url}/api/internal/stop-thread`, {
+        method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ fromBotId: chief.id, fromThreadId: chief.activeTaskId, toThreadId: threadId, reason }),
+      });
+      return { status: res.status, error: String(((await res.json()) as any).error ?? "") };
+    };
+    await test({ cli, api, chief, lead, stop });
+  } finally {
+    if (server) await waitForExit(server, { signal: "SIGTERM" });
+    await fixture.close();
+  }
+}
+
+it("answers 404 for a thread of an out-of-team bot and for a hidden peer, by status code", () => directRoute(async f => {
+  const outsider = (await f.cli("new-bot", "--name", "Outsider", "--section", "Finance")).bot;
+  expect(await f.stop(outsider.activeTaskId)).toMatchObject({ status: 404, error: expect.stringMatching(/no such thread/) });
+  // In the Chief's managed section but hidden: indistinguishable from a thread that does not exist.
+  const secret = (await f.cli("new-bot", "--name", "Secret engineer", "--section", "Engineering")).bot;
+  await f.api(`/api/bots/${secret.id}`, { hidden: true }, "PATCH");
+  expect(await f.stop(secret.activeTaskId)).toMatchObject({ status: 404, error: expect.stringMatching(/no such thread/) });
+  expect(await f.stop("no-such-thread")).toMatchObject({ status: 404 });
+}), 90_000);
+
+it("answers 403 when the Chief and the target are both sectionless, by status code", () => directRoute(async f => {
+  await f.api(`/api/bots/${f.chief.id}`, { section: "" }, "PATCH");
+  await f.api(`/api/bots/${f.lead.id}`, { section: "" }, "PATCH");
+  expect(await f.stop(f.lead.activeTaskId)).toMatchObject({ status: 403, error: expect.stringMatching(/named section/) });
+}), 90_000);
+
+// A same-section peer's thread that no handoff, delegation or openedBy record
+// ties to the Chief (the shape of a thread the person opened, or one that
+// predates those records) is refused: stop_thread only stops threads this
+// Chief opened. It is seeded as the peer's own starter thread; no
+// start_thread call is involved.
+it("refuses, with 403, to stop a same-section peer's legacy thread that has no handoff or opener record", () => directRoute(async f => {
+  expect(await f.stop(f.lead.activeTaskId)).toMatchObject({ status: 403, error: expect.stringMatching(/not yours to stop/) });
+  const history = (await f.api(`/api/threads/${f.lead.activeTaskId}/messages`)).messages as any[];
+  expect(history.some(m => String(m.tool?.name ?? "").startsWith("Stopped by"))).toBe(false);
+}), 90_000);
