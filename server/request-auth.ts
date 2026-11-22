@@ -203,6 +203,28 @@ export function ipcPeer(req: IncomingMessage): boolean {
   return Boolean(socket) && socket.remoteAddress === undefined && socket.remoteFamily === undefined;
 }
 
+/** Can this request prove the person made it? Used before a request widens
+ * what a working bot may do without asking (a higher approval level, a longer
+ * always-allow list) or answers waiting cards through such a change.
+ *
+ * Two credentials count, and only these, because a bot's shell can read
+ * neither: a real session (a browser's cookie or a paired device's bearer,
+ * which the bot's process never holds), and the desktop app's owner
+ * capability (handed to the server over Electron's private parent port, and
+ * already required by resolveRequestAuth for every public mutation before a
+ * loopback request becomes an auth at all, so a desktop-managed loopback auth
+ * has presented it).
+ *
+ * A bare loopback request proves nothing. Its Origin, Referer, Host and
+ * Sec-Fetch headers are all chosen by the caller, so a bot's shell can send
+ * the same ones the web page does. They are deliberately not inputs here. */
+export function provesPerson(auth: RequestAuth, desktopManaged: boolean): boolean {
+  return auth.kind === "session" || (auth.kind === "loopback" && desktopManaged);
+}
+
+export const WIDEN_NEEDS_PERSON =
+  "Widening what a working bot may do without asking needs a signed-in session or the desktop app. Stop the bot first, or sign in (pair this browser) to change it live.";
+
 /** Origin absent (non-browser) or equal to this request's own origin. */
 export function isSameOrigin(req: IncomingMessage): boolean {
   const origin = headerValue(req.headers.origin);

@@ -446,8 +446,9 @@ describe("peer allow-list", () => {
     // any caller can send — including the bot it constrains, from its own
     // shell, mid-turn. What a tool call does not have is a browser origin or
     // a paired session; what it always has is a running turn. So an
-    // originless, session-less loopback PATCH may loosen a bot only while
-    // every bot is idle. The served UI sends its origin and is unaffected.
+    // session-less loopback PATCH may loosen a bot only while every bot is
+    // idle, whatever Origin it sends. A signed-in session or the desktop
+    // capability is what proves the person.
     await hideSeededBot();
     const held = await createBot("Held", "stuck");
     const bound = await createBot("Ivy", "plain");
@@ -489,9 +490,9 @@ describe("peer allow-list", () => {
       // tightening still needs nothing, and so does an unrelated field
       expect((await api("PATCH", `/api/bots/${bound.id}`, { peers: [] })).status).toBe(200);
       expect((await api("PATCH", `/api/bots/${bound.id}`, { name: "Ivy renamed" })).status).toBe(200);
-      // the served UI is a browser: its origin is what tells it apart
-      expect((await browser(`/api/bots/${bound.id}`, { peers: [peer.id], acknowledgePeerScope: true })).status).toBe(200);
-      expect((await browser(`/api/bots/${bound.id}`, { section: "Finance" })).status).toBe(200);
+      // a browser Origin is the caller's to send, so a shell that sends one is refused too
+      expect((await browser(`/api/bots/${bound.id}`, { peers: [peer.id], acknowledgePeerScope: true })).status).toBe(409);
+      expect((await browser(`/api/bots/${bound.id}`, { section: "Finance" })).status).toBe(409);
 
       // and once nothing is running, a script may loosen again (and is logged)
       expect((await api("POST", `/api/bots/${held.id}/interrupt`, {})).status).toBe(200);

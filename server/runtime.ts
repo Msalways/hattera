@@ -236,7 +236,7 @@ import { clearObservedMetrics } from "./account-metrics.ts";
 import { GroupUsageReader } from "./group-thread-usage.ts";
 import { ledgerCost } from "./model-prices.ts";
 import type { PriceList } from "./prices.ts";
-import type { RequestAuth } from "./request-auth.ts";
+import { WIDEN_NEEDS_PERSON, provesPerson, type RequestAuth } from "./request-auth.ts";
 import { checkProviderKey, PROVIDER_KEY_KINDS, providerBaseUrl, type ProviderKeyKind } from "./provider-key-check.ts";
 import { forgetKey, noteKeyAccepted, noteKeyRejected, onKeyRejectionChange } from "./key-rejections.ts";
 import { assertWithinBudget, noteSpend, spendAlertText, spendState, takeSpendAlert } from "./spend.ts";
@@ -853,6 +853,12 @@ if (githubIdentity) await githubIdentity.ready;
 const HOSTED_WORKSPACE = hostedWorkspaceConfigured();
 let workspaceAccess: WorkspaceAccess | null = null;
 const DESKTOP_MANAGED = process.env.OMB_DESKTOP_PARENT === "1";
+const APPROVAL_RANK = { ask: 0, edits: 1, auto: 2, full: 3, custom: 4 } as const;
+/** A request that widens what a working bot may do unasked must prove the
+ * person made it (see provesPerson). While any bot works, a bot's shell is a
+ * possible caller, so an unproven widening is refused whatever headers it sent. */
+const widenRefused = (auth: RequestAuth): boolean =>
+  !provesPerson(auth, DESKTOP_MANAGED) && store.bots.some((bot) => bot.busy);
 const SHARED_WORKSPACE_FULL_ACCESS = sharedWorkspaceFullAccessConfigured();
 const sharedWorkspaceFullAccessEnabled = () => SHARED_WORKSPACE_FULL_ACCESS && Boolean(workspaceAccess) && entitled("admin");
 // Who a loopback request without a session is (server/request-auth.ts
@@ -23018,9 +23024,11 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         });
       }
       // A bot never widens its own default while it works.
-      if (botLevelChanges && auth.kind === "loopback" && !DESKTOP_MANAGED && !req.headers.origin &&
-        (requestedApprovalMode === "auto" || requestedApprovalMode === "edits") && currentApprovalMode === "ask") {
-        return json(res, 409, { error: "Change approval mode from the app or a paired device while bots are working." });
+      const botWidensList = Array.isArray(body.alwaysAllow) &&
+        body.alwaysAllow.some((key: unknown) => typeof key === "string" && !(existingBot?.alwaysAllow ?? []).includes(key));
+      if (((approvalChangeRequested && APPROVAL_RANK[requestedApprovalMode] > APPROVAL_RANK[currentApprovalMode]) || botWidensList) &&
+        widenRefused(auth)) {
+        return json(res, 409, { error: WIDEN_NEEDS_PERSON });
       }
       if (body.approvalMode !== undefined || body.autoApprove !== undefined) {
         patch.approvalMode = requestedApprovalMode;
@@ -23199,8 +23207,8 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         loosened.push("mcpServers");
       }
       if (Object.hasOwn(body, "toolScope") && toolScopeWidens(existingBot?.toolScope, patch.toolScope)) loosened.push("toolScope");
-      const browserOrigin = typeof req.headers.origin === "string" && req.headers.origin.trim() !== "";
-      if (loosened.length && auth.kind === "loopback" && !DESKTOP_MANAGED && !browserOrigin) {
+      // Origin is the caller's to choose, so it proves nothing: only a session or the desktop capability does.
+      if (loosened.length && !provesPerson(auth, DESKTOP_MANAGED) && auth.kind === "loopback") {
         if (store.bots.some((candidate) => candidate.busy)) {
           return json(res, 409, {
             error: "A bot is working right now, so this change has to come from the desktop app or a paired device. Try again once every bot is idle.",
@@ -23238,7 +23246,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if (auth.kind === "session" && !sessions.isLive(auth.session.id)) {
           return json(res, 401, { error: "unauthorized: this session has expired or was revoked" });
         }
-        if (toolScopeWidens(freshBrowserBot?.toolScope, patch.toolScope) && auth.kind === "loopback" && !DESKTOP_MANAGED && !browserOrigin && store.bots.some((candidate) => candidate.busy)) {
+        if (toolScopeWidens(freshBrowserBot?.toolScope, patch.toolScope) && auth.kind === "loopback" && !provesPerson(auth, DESKTOP_MANAGED) && store.bots.some((candidate) => candidate.busy)) {
           return json(res, 409, { error: "A bot is working right now, so this change has to come from the desktop app or a paired device. Try again once every bot is idle." });
         }
         if (freshBrowserBot && JSON.stringify(freshBrowserBot.toolScope) !== JSON.stringify(patch.toolScope)
@@ -23254,7 +23262,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         }
         if (Array.isArray(freshBrowserBot?.mcpServers) &&
             (requestedMcpServers === undefined || requestedMcpServers.some((name) => !freshBrowserBot.mcpServers!.includes(name))) &&
-            auth.kind === "loopback" && !DESKTOP_MANAGED && !browserOrigin && store.bots.some((candidate) => candidate.busy)) {
+            auth.kind === "loopback" && !provesPerson(auth, DESKTOP_MANAGED) && store.bots.some((candidate) => candidate.busy)) {
           return json(res, 409, { error: "A bot is working right now, so this change has to come from the desktop app or a paired device. Try again once every bot is idle." });
         }
         if (freshBrowserBot &&
@@ -24551,8 +24559,8 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const widensMode = approvalRank[nextMode] > approvalRank[approvalModeFor(current)];
         const nextAllow = profile.alwaysAllow ?? [];
         const widensAllow = nextAllow.some((key) => !(current.alwaysAllow ?? []).includes(key));
-        if ((widensMode || widensAllow) && auth.kind === "loopback" && !DESKTOP_MANAGED && !req.headers.origin && store.bots.some((bot) => bot.busy)) {
-          return json(res, 409, { error: "Change approval mode from the app or a paired device while bots are working." });
+        if ((widensMode || widensAllow) && widenRefused(auth)) {
+          return json(res, 409, { error: WIDEN_NEEDS_PERSON });
         }
         const levelBefore = approvalModeFor(current);
         const task = store.refreshTaskPermissions(profile.id, m[2]);
@@ -24622,13 +24630,14 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         }
         if (current.approvalGrant) return json(res, 409, { error: "the bot's approval mode is still being confirmed" });
         // A bot never raises its own level. Its shell is a loopback caller
-        // with no browser origin, and only the person (the app, a paired
-        // device) may widen what runs without asking while a bot works.
+        // that can send any header a browser does, so only a proven person
+        // (a signed-in session, the desktop app) may widen what runs without
+        // asking while a bot works.
         // Lowering is always safe and stays open to anyone who can reach it.
         const levelRank = { ask: 0, edits: 1, auto: 2, full: 3, custom: 4 } as const;
-        if (levelRank[mode] > levelRank[approvalModeFor(current)] && auth.kind === "loopback" && !DESKTOP_MANAGED && !req.headers.origin &&
-          (threadBusy(current.id, current.threadId) || store.bots.some((bot) => bot.busy))) {
-          return json(res, 409, { error: "Change approval mode from the app or a paired device while bots are working." });
+        if (levelRank[mode] > levelRank[approvalModeFor(current)] &&
+          (widenRefused(auth) || (!provesPerson(auth, DESKTOP_MANAGED) && threadBusy(current.id, current.threadId)))) {
+          return json(res, 409, { error: WIDEN_NEEDS_PERSON });
         }
         if (mode === "auto" && current.computer === "local" && approvalModeFor(current) !== "auto" && body.acknowledgeLocalAuto !== true) {
           return json(res, 400, { error: "Auto mode on this computer requires confirming the warning first (acknowledgeLocalAuto)" });
