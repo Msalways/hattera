@@ -64,6 +64,13 @@ export function useBotCapabilities(botId: string | undefined, threadId: string |
   return value;
 }
 
+/** Is the browser engine installed here, from the server's answer: true or
+ * false once it arrived, null while it is still being asked ("checking", not
+ * a guess from config). */
+export function browserEngineInstalled(caps: BotCapabilities | null): boolean | null {
+  return caps ? caps.browser.switches.engineInstalled : null;
+}
+
 /** The Designer's four states for a capability: it is on and usable now
  * ("available"), set up but not where this conversation works ("configured"),
  * blocked on something the person can do ("needs-action"), or not answered yet

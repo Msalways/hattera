@@ -34,7 +34,7 @@ import {
   Smartphone,
   X,
 } from "lucide-react";
-import { browserStatus, useBotCapabilities } from "@/lib/bot-capabilities";
+import { browserEngineInstalled, browserStatus, useBotCapabilities } from "@/lib/bot-capabilities";
 import { api, ApiError, currentTaskBot, useStore, type Bot, type ConfigStatus } from "@/state/store";
 import { setAdvancedMode, useAdvancedMode } from "@/lib/interface-mode";
 import { ComputerFilesPane } from "./ComputerFilesPane";
@@ -56,7 +56,7 @@ import { BrowserPanel } from "./BrowserPanel";
 // The Data tab's code (and, behind it, vega-embed) loads the
 // first time the tab opens, never with the app.
 const DataPanel = lazy(() => import("./data/DataPanel").then((module) => ({ default: module.DataPanel })));
-import { browserAvailable, browserUnavailableReason, builtInBrowserEnabled } from "@/lib/feature-flags";
+import { browserUnavailableReason, builtInBrowserEnabled } from "@/lib/feature-flags";
 import { transitionComputerControlLease, type ComputerControlAction } from "@/lib/computer-control";
 import { LocalScreenPreview } from "./LocalScreenPreview";
 import { LinuxLocalControl } from "./LinuxLocalControl";
@@ -385,9 +385,6 @@ export function ComputerPanel({
     : storedPanelView === "routines" || storedPanelView === "android" ? "computer" : storedPanelView;
   const androidStatus = useAndroidUsbDevices();
   const androidConnected = androidStatus.devices.length > 0;
-  // Keep installation reachable before the engine is ready. Actual browser
-  // operations below still require browserAvailableHere.
-  const browserAvailableHere = browserAvailable(state.config);
   // The server decides what this bot's turns get; this panel only shows it.
   const botCaps = useBotCapabilities(profileBot.id, profileBot.threadId,
     [profileBot.browser, profileBot.computer, profileBot.modelSelection.instanceId, state.config?.features?.browser, state.config?.browserEngine?.kind, state.config?.browserEngine?.installing].join("|"));
@@ -1238,7 +1235,9 @@ export function ComputerPanel({
   // Simple mode's Browser tab when the browser is off: the same installation
   // switch as Settings → Computers → Built-in browser, plus this bot's own
   // browser switch, turned on together.
-  const browserCanTurnOn = browserAvailableHere || browserInstallable;
+  // The engine fact is the server's answer (null while it is being asked), not config.
+  const browserChecking = botCaps === null;
+  const browserCanTurnOn = browserEngineInstalled(botCaps) === true || browserInstallable;
   // Configured / available / needs you / unknown, each with its reason and next step.
   const browserSt = browserStatus(botCaps, browserInstallable);
   // An engine this server cannot install: its own reason (an unsupported platform, say) is the useful words.
@@ -1277,11 +1276,11 @@ export function ComputerPanel({
       <Globe size={15} className="shrink-0 text-ink-secondary" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-medium text-ink">{t("computer.browserSwitch.title", { name: bot.name })}</div>
-        {!browserSwitchedOn && botCaps && <div data-testid="browser-switch-reason" className="text-[11.5px] text-ink-secondary">{browserStatusText}</div>}
+        {!browserSwitchedOn && <div data-testid="browser-switch-reason" className="text-[11.5px] text-ink-secondary">{browserChecking ? t(browserSt.titleKey as LocaleKey) : browserStatusText}</div>}
       </div>
       <Switch
         checked={browserSwitchedOn}
-        disabled={browserTurningOn || (!browserSwitchedOn && !browserCanTurnOn)}
+        disabled={browserTurningOn || browserChecking || (!browserSwitchedOn && !browserCanTurnOn)}
         aria-label={t("computer.browserSwitch.title", { name: bot.name })}
         onClick={() => (browserSwitchedOn ? turnOffBrowser() : void turnOnBrowser())}
       />

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Archive, CircleUser, Coins, FlaskConical, KeyRound, Monitor, Palette, ScrollText, Search, Sparkles, TabletSmartphone, Terminal, User, Users, X, Building2, Zap, BookOpen } from "lucide-react";
 import { api, useStore, type AppSettingsSection, type ConfigStatus } from "@/state/store";
 import { analyticsEnabled, setAnalyticsEnabled } from "@/lib/analytics";
+import { browserEngineInstalled, useBotCapabilities } from "@/lib/bot-capabilities";
 import { browserAvailable, browserUnavailableReason, builtInBrowserEnabled, routinesInConversationEnabled, showToolCallsEnabled, skillAuthoringEnabled, skillsLibraryEnabled } from "@/lib/feature-flags";
 import { localeChoices, type LocaleKey } from "@/locales";
 import { t } from "@/lib/i18n";
@@ -698,9 +699,16 @@ function ExperimentalFeaturesRow() {
 function BuiltInBrowserRow() {
   const { state, dispatch } = useStore();
   const browser = builtInBrowserEnabled(state.config);
-  const desktopBrowser = browserAvailable(state.config);
+  // The engine fact is the server's answer for the bot in view, null while it
+  // is being asked. With no bot to ask about, the app config is all there is.
+  const referenceBot = state.bots.find((b) => b.id === state.selectedId) ?? state.bots[0];
+  const caps = useBotCapabilities(referenceBot?.id, referenceBot?.threadId,
+    [referenceBot?.browser, state.config?.features?.browser, state.config?.browserEngine?.kind, state.config?.browserEngine?.installing].join("|"));
+  const engineInstalled = referenceBot ? browserEngineInstalled(caps) : browserAvailable(state.config);
+  const checking = engineInstalled === null;
+  const desktopBrowser = engineInstalled === true;
   const browserInstallable = state.config?.browserEngine?.installable === true;
-  const browserBlockedOnWindows = window.ogb?.platform === "win32" && !desktopBrowser && !browserInstallable;
+  const browserBlockedOnWindows = window.ogb?.platform === "win32" && engineInstalled === false && !browserInstallable;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -724,7 +732,9 @@ function BuiltInBrowserRow() {
   return (
     <SettingRow
     title={t("settings.experimental.browserAria")}
-    subtitle={desktopBrowser
+    subtitle={checking
+        ? t("capability.browser.unknown.title")
+        : desktopBrowser
         ? browser
         ? t("settings.experimental.browserOn")
         : t("settings.experimental.browserOff")
@@ -736,7 +746,7 @@ function BuiltInBrowserRow() {
       <Switch
           checked={browser}
           aria-label={t("settings.experimental.browserAria")}
-          disabled={saving || (!browser && !desktopBrowser && !browserInstallable)}
+          disabled={saving || (!browser && (checking || (!desktopBrowser && !browserInstallable)))}
           onClick={() => void toggle(!browser)}
           className="disabled:cursor-wait disabled:opacity-50"
       />

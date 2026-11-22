@@ -45,6 +45,13 @@ export function browserSwitchReason(s: BrowserSwitches): BrowserReason {
   return "ready";
 }
 
+/** A previewed place counts as "a computer was reached" only when it is one;
+ * the browser and Off are not. Readiness reads this from the same preview the
+ * Computer panel shows, the mount from the computer the dispatch reached. */
+export function reachedComputer(place: Surface | "off" | null | undefined): Surface | null {
+  return place === undefined || place === null || place === "off" || place === "browser" ? null : place;
+}
+
 /** The one decision. `plan` is the turn's resolved surface plan;
  * `mountedComputer` is the computer an Auto turn actually reached, if any. */
 export function browserCapability(s: BrowserSwitches, plan: Pick<SurfacePlan, "computer" | "browser">, mountedComputer?: Surface | null): BrowserCapability {

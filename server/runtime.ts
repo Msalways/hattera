@@ -570,7 +570,7 @@ import { startAutoVmClaim, type AutoVmClaimSlot, type AutoVmClaimTable } from ".
 import { CONTROL_ACT_WITHIN_MS, CONTROL_BUSY, CONTROL_HANDED_BACK, CONTROL_WAIT_MS, CONTROL_WAITED, controlRefusal, type ControlState } from "./control-client.ts";
 import { computerFreeAfterText, computerParkedText, computerPersonAwayText, computerStoppedWaitingText, computerWaitingText, type ComputerHolder } from "./computer-wait.ts";
 import { modelContextWindow } from "./model-context-window.ts";
-import { browserCapability, browserReasonText, browserSwitchReason, type BrowserSwitches } from "./turn-capabilities.ts";
+import { browserCapability, browserReasonText, reachedComputer, browserSwitchReason, type BrowserSwitches } from "./turn-capabilities.ts";
 import { browserIsThePlace, cloudPlaceRefusal, computerSkippedNote, computerToolsRefusal, parseSurface, PlaceUnavailableError, placeUnavailable, resolveSurface, surfaceLabel, surfaceOfComputerKind, surfacePrompt, type ComputerWant, type PlaceSource, type Surface } from "./surface.ts";
 import { cloudRefusal, type PlaceRow } from "../shared/place-view.ts";
 import {
@@ -7728,12 +7728,15 @@ function turnProvider(bot: BotRecord, runOn?: RoutineRunOn, threadId?: string): 
 /** What this bot's turns really get, from the same rule the mount, select_computer
  * and room turns read (turn-capabilities.ts). The Computer panel shows this
  * answer; it does not work the browser or This PC out again. */
-function botCapabilities(bot: BotRecord, threadId?: string) {
+async function botCapabilities(bot: BotRecord, threadId?: string) {
   const instance = registry.get(bot.modelSelection.instanceId);
   const caps = instance?.adapter.capabilities;
   const plan = turnSurfacePlan(bot, undefined, threadId);
   const switches = browserSwitchesFor(bot, caps);
-  const browser = browserCapability(switches, plan);
+  // The computer a turn would reach, from the same read the Computer panel
+  // uses, so readiness and the mount (startTurn passes the computer it
+  // reached) cannot disagree on Auto.
+  const browser = browserCapability(switches, plan, reachedComputer(await computerPreviewSurface(bot, threadId)));
   const switchReason = browserSwitchReason(switches);
   const controlReady = !CLOUD_HOME && shouldMountLocalComputer({ requested: "local", hostPlatform: process.platform,
     providerSupportsLocal: caps?.localComputerMcp === true }) && Boolean(readCuaConnection());
@@ -24823,7 +24826,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       const bot = computerPreviewBot(m[1], url);
       if (!bot) return json(res, 404, { error: "no such bot" });
       res.setHeader("cache-control", "private, no-store");
-      return json(res, 200, botCapabilities(bot, url.searchParams.get("threadId") ?? undefined));
+      return json(res, 200, await botCapabilities(bot, url.searchParams.get("threadId") ?? undefined));
     }
     m = path.match(/^\/api\/bots\/([\w-]+)\/local-computer$/);
     if (m && method === "GET") {

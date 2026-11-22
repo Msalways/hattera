@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { resolveSurface } from "./surface.ts";
-import { browserCapability, browserReasonText, browserSwitchReason, type BrowserSwitches } from "./turn-capabilities.ts";
+import { browserCapability, browserReasonText, reachedComputer, browserSwitchReason, type BrowserSwitches } from "./turn-capabilities.ts";
 
 const ready: BrowserSwitches = { workspaceOn: true, botOn: true, engineSupports: true, engineInstalled: true };
-const autoPlan = (browserOn: boolean) => resolveSurface({ browserOn });
+const autoPlan = (browserOn: boolean) => resolveSurface({ destination: undefined, browserOn });
 
 describe("browserCapability: one rule for the mount, readiness, room turns and the panel", () => {
   it("mounts on Auto when nothing else was reached", () => {
@@ -35,6 +35,25 @@ describe("browserCapability: one rule for the mount, readiness, room turns and t
   it("every reason has words", () => {
     for (const reason of ["ready", "workspace-off", "bot-off", "engine-unsupported", "not-installed", "destination-off", "computer-chosen"] as const) {
       expect(browserReasonText(reason, "Sunny").length).toBeGreaterThan(10);
+    }
+  });
+});
+
+describe("readiness and the mount agree on Auto when a computer was reached", () => {
+  // botCapabilities feeds reachedComputer(preview) and startTurn feeds the
+  // surface of the computer it reached: the same place must give the same answer.
+  it("reads a reached computer as chosen, so the panel says the same as the mount", () => {
+    for (const place of ["local", "vm", "cloud"] as const) {
+      const readiness = browserCapability(ready, autoPlan(true), reachedComputer(place));
+      const mount = browserCapability(ready, autoPlan(true), place);
+      expect(readiness).toEqual(mount);
+      expect(readiness).toEqual({ mounts: false, reason: "computer-chosen" });
+    }
+  });
+  it("does not count the browser, Off or nothing as a computer", () => {
+    for (const place of ["browser", "off", null, undefined] as const) {
+      expect(reachedComputer(place)).toBeNull();
+      expect(browserCapability(ready, autoPlan(true), reachedComputer(place))).toEqual({ mounts: true, reason: "ready" });
     }
   });
 });
