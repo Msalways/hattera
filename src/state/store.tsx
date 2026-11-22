@@ -116,6 +116,7 @@ export interface OptionCardData {
   /** the level this card was re-read against after the thread's approval level
    * changed under it, and found still needing the person */
   recheckedLevel?: string;
+  recheckedWhy?: "question" | "review" | "outbound" | "sandbox" | "native" | "level";
   /** "level-change": the raised level covered this card, so nobody tapped it */
   resolvedBy?: "level-change";
   /** the narrow grant "always allow" remembers, e.g. "Bash:git" */
@@ -3844,10 +3845,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 threadId: action.threadId, threadOnly: true, refreshPermissions: true, acknowledgeLocalAuto,
               })
               : Promise.reject(new Error("This approval change requires the packaged desktop app"))
-            : api<{ bot: BotAnnouncement }>(`/api/bots/${action.botId}/tasks/${action.threadId}`, {
+            : api<{ bot: BotAnnouncement; levelChange?: LevelChangeResult }>(`/api/bots/${action.botId}/tasks/${action.threadId}`, {
               method: "PATCH",
               body: JSON.stringify({ refreshPermissions: true, ...(acknowledgeLocalAuto ? { acknowledgeLocalAuto: true } : {}) }),
-            }).then((result) => result.bot);
+            }).then((result) => {
+              // Same words as the composer: when it lands and what is still waiting.
+              if (result.levelChange) setLevelChangeNotice(action.threadId, { status: "done", ...result.levelChange, at: Date.now() });
+              return result.bot;
+            });
           void refreshed.then((updated) => {
             if (updated) rawDispatch({ type: "botPatched", bot: withTaskWrites(updated) });
           }).catch(showError);

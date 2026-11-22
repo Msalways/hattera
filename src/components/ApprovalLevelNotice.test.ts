@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { clearLevelChangeNotice, levelChangeStale, setLevelChangeNotice } from "@/lib/level-change";
+import { botLevelNeedsStop, clearLevelChangeNotice, levelChangeStale, setLevelChangeNotice } from "@/lib/level-change";
 import { ApprovalLevelNotice } from "./ApprovalLevelNotice";
 
 const render = (busy: boolean, saved: "ask" | "edits" | "auto" = "edits") =>
@@ -51,5 +51,29 @@ describe("approval level notice", () => {
     expect(levelChangeStale({ status: "failed", requested: "edits", at: 1 }, false)).toBe(false);
     expect(levelChangeStale({ status: "done", requested: "edits", appliesAt: "idle", at: 1 }, false)).toBe(false);
     expect(levelChangeStale(undefined, true)).toBe(true);
+  });
+  it("says a waiting request the new level does not cover still needs an answer", () => {
+    setLevelChangeNotice("t1", { status: "done", requested: "edits", effective: "edits", appliesAt: "now", resolved: 0, stillOpen: 2, at: 1 });
+    const html = render(true);
+    expect(html).toContain("2 waiting request still needs your answer.");
+    expect(html).not.toContain("allowed by level change");
+  });
+  it("counts both what the level answered and what it left open", () => {
+    setLevelChangeNotice("t1", { status: "done", requested: "edits", effective: "edits", appliesAt: "now", resolved: 1, stillOpen: 1, at: 1 });
+    const html = render(true);
+    expect(html).toContain("1 waiting approval allowed by level change.");
+    expect(html).toContain("1 waiting request still needs your answer.");
+  });
+});
+
+describe("botLevelNeedsStop", () => {
+  it("lets Ask, Auto-accept edits and Approve for me move while the bot works", () => {
+    for (const a of ["ask", "edits", "auto"] as const) for (const b of ["ask", "edits", "auto"] as const) expect(botLevelNeedsStop(a, b)).toBe(false);
+  });
+  it("needs a stop to enter or leave Full access or Custom", () => {
+    expect(botLevelNeedsStop("full", "ask")).toBe(true);
+    expect(botLevelNeedsStop("custom", "edits")).toBe(true);
+    expect(botLevelNeedsStop("ask", "full")).toBe(true);
+    expect(botLevelNeedsStop("edits", "custom")).toBe(true);
   });
 });

@@ -8,6 +8,7 @@ import { ChevronRight, FileText, Image as ImageIcon, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
+import { botLevelNeedsStop } from "@/lib/level-change";
 import { attachmentBasename } from "@/lib/composer-attachments";
 import { useStore, visibleMessages, type Bot } from "@/state/store";
 import { BOT_PROFILE_LIMITS } from "../../../shared/bot-profile";
@@ -97,7 +98,7 @@ export function SimpleBotPanel({
   const chooseMode = (mode: Extract<ApprovalMode, "ask" | "auto">) => {
     // The same rules as the Permissions section's selector: no change while
     // a turn runs, and Auto on this computer needs its warning first.
-    if (bot.busy || mode === approvalMode) return;
+    if (mode === approvalMode || (bot.busy && botLevelNeedsStop(mode, approvalMode))) return;
     if (mode === "auto" && bot.computer === "local") {
       setLocalAutoWarning(bot.id);
       return;
@@ -223,7 +224,7 @@ export function SimpleBotPanel({
                       type="button"
                       data-approval-choice={choice.mode}
                       aria-pressed={selected}
-                      disabled={Boolean(bot.busy) || !choice.offered}
+                      disabled={(Boolean(bot.busy) && botLevelNeedsStop(choice.mode, approvalMode)) || !choice.offered}
                       onClick={() => chooseMode(choice.mode)}
                       className={cn(
                         "flex min-w-0 flex-col items-start gap-0.5 rounded-xl border px-3 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",

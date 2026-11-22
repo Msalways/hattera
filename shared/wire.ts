@@ -571,6 +571,8 @@ export interface OptionCardData {
   /** The level this card was re-read against after the thread's approval
    * level changed under it, and found still needing the person. */
   recheckedLevel?: string;
+  /** Why that card still needs the person after the re-check. */
+  recheckedWhy?: "question" | "review" | "outbound" | "sandbox" | "native" | "level";
   /** Who answered a permission card that no person tapped: "level-change"
    * when the thread's raised approval level covered it. */
   resolvedBy?: "level-change";

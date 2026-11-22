@@ -14,9 +14,11 @@ export interface LevelChangeNotice {
   requested: ApprovalMode;
   /** the level the running step uses (the old one until the engine takes the new) */
   effective?: ApprovalMode;
-  appliesAt?: "now" | "next-turn" | "idle";
+  appliesAt?: "now" | "next-turn" | "idle" | "new-chats";
   /** waiting approvals the new level answered */
   resolved?: number;
+  /** waiting approvals the new level did not cover; they still need the person */
+  stillOpen?: number;
   error?: string;
   at: number;
 }
@@ -25,8 +27,9 @@ export interface LevelChangeNotice {
 export interface LevelChangeResult {
   requested: ApprovalMode;
   effective: ApprovalMode;
-  appliesAt: "now" | "next-turn" | "idle";
+  appliesAt: "now" | "next-turn" | "idle" | "new-chats";
   resolved: number;
+  stillOpen?: number;
 }
 
 const notices = new Map<string, LevelChangeNotice>();
@@ -61,6 +64,15 @@ export function useLevelChangeNotice(threadId: string | undefined): LevelChangeN
     () => version,
   );
   return threadId ? notices.get(threadId) : undefined;
+}
+
+/** Does moving between these two levels need the bot stopped first? Ask,
+ * Auto-accept edits and Approve for me can be handed to a running engine (or
+ * saved to apply after the step); Full and Custom are a trusted grant, and
+ * leaving one is too. The one rule both the thread and the bot surfaces use. */
+export function botLevelNeedsStop(next: ApprovalMode, current: ApprovalMode): boolean {
+  const trusted = (mode: ApprovalMode) => mode === "full" || mode === "custom";
+  return trusted(next) || trusted(current);
 }
 
 /** A notice that is only about the running step goes away on its own once

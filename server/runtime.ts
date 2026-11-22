@@ -4612,7 +4612,7 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
     ? message.requestId
     : null;
   if (!requestId) return true;
-  const respond = (result: { ok: boolean; bot?: ReturnType<typeof wireBot>; error?: string }) => {
+  const respond = (result: { ok: boolean; bot?: ReturnType<typeof wireBot>; error?: string; levelChange?: LevelChangeAnswer | BotLevelAnswer }) => {
     postDesktopPrivateMessage({
       type: "approval-trusted-mode-result",
       requestId,
@@ -4674,7 +4674,11 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
       respond({ ok: false, error: "Choose this bot's approval level in bot settings before refreshing a thread" });
       return true;
     }
-    if (existing.approvalGrant || threadBusy(botId, target.threadId)) {
+    // Same rule as the composer: a level the engine can take is applied under
+    // a running turn; Full and Custom (a trusted grant) need the step stopped.
+    const refreshBusy = threadBusy(botId, target.threadId);
+    const refreshLive = mode !== "full" && mode !== "custom" && approvalModeFor(target) !== "custom";
+    if (existing.approvalGrant || (refreshBusy && !refreshLive)) {
       respond({ ok: false, error: "Stop this thread and finish its pending approval change first" });
       return true;
     }
@@ -4686,13 +4690,21 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
       respond({ ok: false, error: "Auto mode on this computer requires confirming the warning" });
       return true;
     }
+    const refreshBefore = approvalModeFor(target);
     if (mode === "full" || mode === "custom") {
       store.patchBot(botId, { approvalGrant: { requestId, mode, phase: "prepared", threadId: target.threadId, threadOnly: true, refreshPermissions: true } });
     } else if (!store.refreshTaskPermissions(botId, target.threadId)) {
       respond({ ok: false, error: "That thread is no longer available" });
       return true;
     }
-    respond({ ok: true, bot: wireTrustedApprovalBot(store.bot(botId)!) });
+    // The engine's answer is awaited off this synchronous handler.
+    void (refreshLive && refreshBefore !== mode
+      ? applyLevelToRunningTurn(botId, target.threadId, refreshBefore, mode, refreshBusy)
+      : Promise.resolve(undefined)
+    ).then(
+      (levelChange) => respond({ ok: true, bot: wireTrustedApprovalBot(store.bot(botId)!), ...(levelChange ? { levelChange } : {}) }),
+      () => respond({ ok: true, bot: wireTrustedApprovalBot(store.bot(botId)!) }),
+    );
     return true;
   }
   if (message.threadOnly === true) {
@@ -4703,7 +4715,9 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
     }
     // An ambiguous scoped grant may be cleared, but never a different grant.
     const clearsOwnGrant = mode === "ask" && existing.approvalGrant?.threadOnly && existing.approvalGrant.threadId === threadId;
-    if ((existing.approvalGrant && !clearsOwnGrant) || threadBusy(botId, target.threadId)) {
+    const scopedBusy = threadBusy(botId, target.threadId);
+    const scopedLive = mode !== "full" && mode !== "custom" && approvalModeFor(target) !== "custom";
+    if ((existing.approvalGrant && !clearsOwnGrant) || (scopedBusy && !scopedLive)) {
       respond({ ok: false, error: "Stop this thread and finish its pending approval change first" });
       return true;
     }
@@ -4715,13 +4729,21 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
       respond({ ok: false, error: "Auto mode on this computer requires confirming the warning" });
       return true;
     }
+    let scopedBefore: ApprovalMode | undefined;
     if (mode === "full" || mode === "custom") {
       store.patchBot(botId, { approvalGrant: { requestId, mode, phase: "prepared", threadId: target.threadId, threadOnly: true } });
     } else {
       if (clearsOwnGrant) clearGrant(existing);
+      scopedBefore = approvalModeFor(target);
       store.patchTask(botId, target.threadId, { approvalMode: mode, autoApprove: mode === "auto", alwaysAllow: [] });
     }
-    respond({ ok: true, bot: wireTrustedApprovalBot(store.bot(botId)!) });
+    void (scopedBefore !== undefined && scopedBefore !== mode
+      ? applyLevelToRunningTurn(botId, target.threadId, scopedBefore, mode, scopedBusy)
+      : Promise.resolve(undefined)
+    ).then(
+      (levelChange) => respond({ ok: true, bot: wireTrustedApprovalBot(store.bot(botId)!), ...(levelChange ? { levelChange } : {}) }),
+      () => respond({ ok: true, bot: wireTrustedApprovalBot(store.bot(botId)!) }),
+    );
     return true;
   }
   if (message.modelSelection !== undefined) {
@@ -4758,7 +4780,12 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
   }
   const emergencyDowngrade = existing.busy && isEmergencyApprovalDowngrade(currentMode, mode);
   const clearsPendingElevation = mode === "ask" && existing.approvalGrant !== undefined;
-  if (existing.busy && !emergencyDowngrade && !clearsPendingElevation) {
+  // The bot's level is the default its threads follow: a working thread that
+  // follows it takes the level by the composer's rule, so one the thread rule
+  // can take live may be saved while the bot works. Full and Custom (a
+  // trusted grant) and leaving them still need the stop.
+  const botDefaultOnly = mode !== "full" && mode !== "custom" && currentMode !== "full" && currentMode !== "custom";
+  if (existing.busy && !emergencyDowngrade && !clearsPendingElevation && !botDefaultOnly) {
     respond({ ok: false, error: "Stop this bot's turn before changing its approval level" });
     return true;
   }
@@ -4805,6 +4832,13 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
           error instanceof Error ? error.message : String(error)
         }`,
       }),
+    );
+    return true;
+  }
+  if (existing.busy && botDefaultOnly && currentMode !== mode) {
+    void applyBotLevelToFollowingTurns(botId, currentMode, mode).then(
+      (levelChange) => respond({ ok: true, bot: wireTrustedApprovalBot(store.bot(botId) ?? updated), levelChange }),
+      () => respond({ ok: true, bot: wireTrustedApprovalBot(store.bot(botId) ?? updated) }),
     );
     return true;
   }
@@ -6393,32 +6427,48 @@ async function answerRequest(
   return outcome;
 }
 
-/** After a thread's level is raised under a running turn: re-read each card
- * that is still waiting against the new level, and answer the ones it now
- * covers. A card the new level does not cover stays open, marked as
- * re-checked so the person is told it still needs them. Returns how many
- * were answered. A card is closed only after the engine took the answer, as
- * for any app-granted approval, and is recorded as allowed by level change. */
-async function recheckPendingCardsForLevel(botId: string, threadId: string, mode: ApprovalMode): Promise<number> {
+/** Why a card the level change did not answer is still open. */
+export type RecheckWhy = "question" | "review" | "outbound" | "sandbox" | "native" | "level";
+
+/** After a thread's level changes under a running turn: re-read EVERY card
+ * that is still waiting against the new level, whatever its type. A permission
+ * card the new level covers is answered (recorded as allowed by level change,
+ * only after the engine took the answer). Every other card stays open and is
+ * marked with the level and the reason, so the person is told it still needs
+ * them: a question (a level never answers one), a harness proposal reviewed on
+ * screen, an outbound send, a sandbox widening, a call the provider's own
+ * reviewer holds, or an action the level does not cover. */
+export async function recheckPendingCardsForLevel(botId: string, threadId: string, mode: ApprovalMode): Promise<{ resolved: number; stillOpen: number }> {
   const asker = store.bot(botId);
   const instance = runningTurnEngines.get(threadId);
-  if (!asker || !instance) return 0;
+  if (!asker || !instance) return { resolved: 0, stillOpen: 0 };
   let resolved = 0;
+  let stillOpen = 0;
+  const keep = (messageId: string, card: NonNullable<ReturnType<typeof store.messagesFor>[number]["card"]>, why: RecheckWhy) => {
+    stillOpen += 1;
+    store.patchMessage(threadId, messageId, { card: { ...card, recheckedLevel: mode, recheckedWhy: why } });
+  };
   for (const message of store.messagesFor(threadId)) {
     const card = message.card;
     if (!card || card.answered || card.expired || card.dismissed) continue;
-    if (card.requestType !== "permission" || !card.requestId || !card.tool || card.questionRequest) continue;
-    if (card.heldCode === "approval.held.outbound" || card.heldCode === "approval.held.sandbox") continue;
+    const kind = liveCardKind(card);
+    if (kind === "review") { keep(message.id, card, "review"); continue; }
+    if (kind === "question" || card.requestType !== "permission" || !card.requestId || !card.tool || card.questionRequest) {
+      keep(message.id, card, "question");
+      continue;
+    }
+    if (card.heldCode === "approval.held.outbound") { keep(message.id, card, "outbound"); continue; }
+    if (card.heldCode === "approval.held.sandbox") { keep(message.id, card, "sandbox"); continue; }
     const command = card.commandAllowlist;
     const verdict = levelChangeVerdict(mode, card.tool, {
       commandAllowed: Boolean(command && commandAllowlist.matches(asker.id, command)),
     });
     if (!verdict.approve) {
-      store.patchMessage(threadId, message.id, { card: { ...card, recheckedLevel: mode } });
+      keep(message.id, card, verdict.source === "native-approval" ? "native" : "level");
       continue;
     }
     const outcome = await deliverFullAccessApproval(instance.adapter, threadId, card.requestId, undefined, () => true);
-    if (outcome !== "allowed-once") continue;
+    if (outcome !== "allowed-once") { keep(message.id, card, "level"); continue; }
     resolved += 1;
     const settled = store.messagesFor(threadId).find((candidate) => candidate.id === message.id)?.card;
     if (settled) store.patchMessage(threadId, message.id, { card: { ...settled, resolvedBy: "level-change" } });
@@ -6428,7 +6478,59 @@ async function recheckPendingCardsForLevel(botId: string, threadId: string, mode
       summary: card.subtitle, decision: "auto-approved", source: verdict.source,
     });
   }
-  return resolved;
+  return { resolved, stillOpen };
+}
+
+export interface LevelChangeAnswer {
+  requested: ApprovalMode;
+  /** what the running step uses: the new level only once the engine took it */
+  effective: ApprovalMode;
+  appliesAt: "now" | "next-turn" | "idle";
+  resolved: number;
+  /** waiting cards the new level did not cover; they still need the person */
+  stillOpen: number;
+}
+
+export interface BotLevelAnswer extends Omit<LevelChangeAnswer, "appliesAt"> {
+  appliesAt: LevelChangeAnswer["appliesAt"] | "new-chats";
+}
+
+/** The bot's level is the default its threads follow. A thread with a level of
+ * its own keeps it; a thread that follows the bot takes the new default, so
+ * one that is working is handed the level by the composer's rule. With no such
+ * thread working the change is for new chats and refreshes only. */
+export async function applyBotLevelToFollowingTurns(botId: string, from: ApprovalMode, to: ApprovalMode): Promise<BotLevelAnswer> {
+  const following = store.tasks(botId).filter((task) =>
+    task.approvalMode === undefined && task.autoApprove === undefined && threadBusy(botId, task.threadId));
+  if (!following.length || from === to) return { requested: to, effective: from, appliesAt: "new-chats", resolved: 0, stillOpen: 0 };
+  const answers = await Promise.all(following.map((task) => applyLevelToRunningTurn(botId, task.threadId, from, to, true)));
+  const landed = answers.every((answer) => answer.appliesAt === "now");
+  return {
+    requested: to,
+    effective: landed ? to : from,
+    appliesAt: landed ? "now" : "next-turn",
+    resolved: answers.reduce((sum, answer) => sum + answer.resolved, 0),
+    stillOpen: answers.reduce((sum, answer) => sum + answer.stillOpen, 0),
+  };
+}
+
+/** One rule for every surface that changes a thread's level (the composer,
+ * Refresh permissions, the desktop's private channel): when a turn is running,
+ * hand the level to the engine at once where it can take it, and re-read the
+ * waiting cards; otherwise it is saved and applies after this step. Full and
+ * Custom are never handed over live (they need the trusted transition, and a
+ * stop first), so they report "next-turn" by construction. */
+export async function applyLevelToRunningTurn(
+  botId: string, threadId: string, from: ApprovalMode, mode: ApprovalMode, wasBusy: boolean,
+): Promise<LevelChangeAnswer> {
+  if (!wasBusy) return { requested: mode, effective: mode, appliesAt: "idle", resolved: 0, stillOpen: 0 };
+  const live = runningTurnEngines.get(threadId);
+  const outcome = mode === "ask" || mode === "edits" || mode === "auto"
+    ? await live?.adapter.setApprovalMode?.(threadId, mode).catch(() => "unsupported" as const)
+    : undefined;
+  if (outcome !== "applied") return { requested: mode, effective: from, appliesAt: "next-turn", resolved: 0, stillOpen: 0 };
+  const rechecked = await recheckPendingCardsForLevel(botId, threadId, mode);
+  return { requested: mode, effective: mode, appliesAt: "now", ...rechecked };
 }
 
 type CardRespondResult = { ok: true } | { ok: false; status: number; error: string };
@@ -22903,10 +23005,22 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       }
       const currentApprovalMode = approvalModeFor(existingBot ?? {});
       const approvalChangeRequested = body.approvalMode !== undefined || body.autoApprove !== undefined;
-      if (existingBot?.busy && approvalChangeRequested && requestedApprovalMode !== currentApprovalMode) {
+      // The bot's level is the default its threads follow. One that follows
+      // it and is working is handed the new level by the composer's rule
+      // (live where the engine can take it, else after this step); a thread
+      // with a level of its own keeps it. Full and Custom change what runs
+      // unattended and need the trusted transition and a stop.
+      const botLevelLive = requestedApprovalMode === "ask" || requestedApprovalMode === "edits" || requestedApprovalMode === "auto";
+      const botLevelChanges = Boolean(existingBot?.busy) && approvalChangeRequested && requestedApprovalMode !== currentApprovalMode;
+      if (botLevelChanges && !botLevelLive) {
         return json(res, 409, {
           error: "stop this bot's turn before changing its approval level",
         });
+      }
+      // A bot never widens its own default while it works.
+      if (botLevelChanges && auth.kind === "loopback" && !DESKTOP_MANAGED && !req.headers.origin &&
+        (requestedApprovalMode === "auto" || requestedApprovalMode === "edits") && currentApprovalMode === "ask") {
+        return json(res, 409, { error: "Change approval mode from the app or a paired device while bots are working." });
       }
       if (body.approvalMode !== undefined || body.autoApprove !== undefined) {
         patch.approvalMode = requestedApprovalMode;
@@ -23212,7 +23326,8 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         broadcast({ kind: "sections", sections: store.sections });
         audienceChanged();
       }
-      return json(res, 200, { bot: wireBot(store.bot(bot.id)!) });
+      const botLevelAnswer = botLevelChanges ? await applyBotLevelToFollowingTurns(bot.id, currentApprovalMode, requestedApprovalMode) : undefined;
+      return json(res, 200, { bot: wireBot(store.bot(bot.id)!), ...(botLevelAnswer ? { levelChange: botLevelAnswer } : {}) });
     }
 
     if (method === "POST" && path === "/api/local-computer/interrupt") {
@@ -24410,8 +24525,13 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const profile = store.bot(m[1]);
         if (!profile) return json(res, 404, { error: "no such bot" });
         if (profile.approvalGrant) return json(res, 409, { error: "the bot's approval mode is still being confirmed" });
-        if (threadBusy(profile.id, m[2])) return json(res, 409, { error: "stop this thread before changing its approval mode" });
+        const refreshWasBusy = threadBusy(profile.id, m[2]);
         const nextMode = approvalModeFor({ ...profile, approvalGrant: undefined });
+        // Same rule as the composer: a level the engine can take is applied
+        // under the running turn; Full and Custom need the step stopped first.
+        if (refreshWasBusy && (nextMode === "full" || nextMode === "custom")) {
+          return json(res, 409, { error: "stop this thread before changing its approval mode" });
+        }
         // Full and Custom never travel over the bot-reachable HTTP surface.
         // The desktop's private channel copies those levels, and it is also
         // the only way to leave Custom.
@@ -24434,9 +24554,13 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if ((widensMode || widensAllow) && auth.kind === "loopback" && !DESKTOP_MANAGED && !req.headers.origin && store.bots.some((bot) => bot.busy)) {
           return json(res, 409, { error: "Change approval mode from the app or a paired device while bots are working." });
         }
+        const levelBefore = approvalModeFor(current);
         const task = store.refreshTaskPermissions(profile.id, m[2]);
         if (!task) return json(res, 404, { error: "no such task" });
-        return json(res, 200, { task: wireTask(task, store.bot(profile.id)!.modelSelection), bot: publicBot(store.bot(profile.id)!) });
+        const refreshChange = levelBefore !== nextMode
+          ? await applyLevelToRunningTurn(profile.id, m[2], levelBefore, nextMode, refreshWasBusy)
+          : undefined;
+        return json(res, 200, { task: wireTask(task, store.bot(profile.id)!.modelSelection), bot: publicBot(store.bot(profile.id)!), ...(refreshChange ? { levelChange: refreshChange } : {}) });
       }
       const patch: Parameters<typeof store.patchTask>[2] = {};
       if (body.projectId !== undefined) {
@@ -24488,7 +24612,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       }
       if (body.approvalMode !== undefined || body.autoApprove !== undefined) {
         if (body.autoApprove !== undefined && typeof body.autoApprove !== "boolean") return json(res, 400, { error: "autoApprove must be a boolean" });
-        const mode = body.approvalMode ?? (body.autoApprove ? "auto" : "ask");
+        const mode: ApprovalMode = body.approvalMode ?? (body.autoApprove ? "auto" : "ask");
         // Elevated modes still require the trusted desktop transition. A
         // thread settings PATCH cannot manufacture that grant.
         if (mode !== "ask" && mode !== "auto" && mode !== "edits") return json(res, 403, { error: "Full and Custom access require trusted desktop confirmation" });
@@ -24527,21 +24651,9 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       // when it can take it, and waiting cards are re-read against it. The
       // answer says which happened so the client never implies a step was
       // stopped or that a change landed when it did not.
-      let levelChange: { requested: ApprovalMode; effective: ApprovalMode; appliesAt: "now" | "next-turn" | "idle"; resolved: number } | undefined;
-      if (patch.approvalMode !== undefined) {
-        let appliesAt: "now" | "next-turn" | "idle" = "idle";
-        let resolved = 0;
-        if (wasBusy) {
-          const live = runningTurnEngines.get(current.threadId);
-          const outcome = patch.approvalMode === "ask" || patch.approvalMode === "edits" || patch.approvalMode === "auto"
-            ? await live?.adapter.setApprovalMode?.(current.threadId, patch.approvalMode).catch(() => "unsupported" as const)
-            : undefined;
-          appliesAt = outcome === "applied" ? "now" : "next-turn";
-          if (outcome === "applied") resolved = await recheckPendingCardsForLevel(current.id, current.threadId, patch.approvalMode);
-        }
-        // what the running step uses: the new level only once the engine took it
-        levelChange = { requested: patch.approvalMode, effective: appliesAt === "next-turn" ? approvalModeFor(current) : patch.approvalMode, appliesAt, resolved };
-      }
+      const levelChange = patch.approvalMode !== undefined
+        ? await applyLevelToRunningTurn(current.id, current.threadId, approvalModeFor(current), patch.approvalMode, wasBusy)
+        : undefined;
       return json(res, 200, { task: wireTask(task, store.bot(m[1])!.modelSelection), bot: publicBot(store.bot(m[1])!), ...(levelChange ? { levelChange } : {}) });
     }
     if (m && method === "DELETE") {

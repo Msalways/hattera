@@ -369,7 +369,9 @@ export function ApprovalCard({
             {isRoutineRequest || isSkillRequest || isProfileRequest || isTeamSetup
               ? t("approval.status.waitingConfirmation")
               : card.recheckedLevel
-                ? t("approval.status.stillNeedsOk", { level: card.recheckedLevel })
+                ? card.recheckedWhy
+                  ? t(`approval.status.recheck.${card.recheckedWhy}`, { level: card.recheckedLevel })
+                  : t("approval.status.stillNeedsOk", { level: card.recheckedLevel })
                 : t("approval.status.waitingAnswer")}
           </>
         )}

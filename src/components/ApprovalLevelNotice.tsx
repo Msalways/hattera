@@ -43,6 +43,7 @@ export function ApprovalLevelNotice({ threadId, busy, savedMode }: { threadId: s
     text = t("approvalMode.notice.idle", { level });
   }
   const resolved = notice.status === "done" && notice.resolved ? ` ${t("approvalMode.notice.resolved", { count: String(notice.resolved) })}` : "";
+  const open = notice.status === "done" && notice.stillOpen ? ` ${t("approvalMode.notice.stillOpen", { count: String(notice.stillOpen) })}` : "";
   return (
     <div
       role="status"
@@ -51,7 +52,7 @@ export function ApprovalLevelNotice({ threadId, busy, savedMode }: { threadId: s
       data-state={notice.status === "done" ? notice.appliesAt : notice.status}
       className={notice.status === "failed" ? "px-3 pt-1.5 text-[12.5px] text-danger" : "px-3 pt-1.5 text-[12.5px] text-ink-secondary"}
     >
-      {text}{resolved}
+      {text}{resolved}{open}
     </div>
   );
 }

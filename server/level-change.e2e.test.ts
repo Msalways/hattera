@@ -42,8 +42,9 @@ const messages = async (threadId: string): Promise<any[]> => (await api("GET", `
 const permissionCard = async (threadId: string) =>
   (await messages(threadId)).find((m) => m.kind === "options" && m.card?.requestType === "permission");
 
-describe("raising the approval level under a running turn", () => {
-  beforeAll(async () => {
+async function boot(askTool: string): Promise<void> {
+  stderr = "";
+  {
     home = mkdtempSync(join(tmpdir(), "omb-level-change-"));
     const data = join(home, ".openmausbot");
     mkdirSync(data, { recursive: true });
@@ -55,7 +56,7 @@ describe("raising the approval level under a running turn", () => {
       instances: {
         claude: {
           driver: "claudeAgent",
-          environment: { FAKE_CLAUDE_ASK_TOOL: "Write" },
+          environment: { FAKE_CLAUDE_ASK_TOOL: askTool },
           config: { cli },
         },
       },
@@ -89,12 +90,16 @@ describe("raising the approval level under a running turn", () => {
       if (Date.now() > deadline) throw new Error(`server never came up. stderr:\n${stderr}`);
       await new Promise((resolve) => setTimeout(resolve, 150));
     }
-  }, 60_000);
+  }
+}
+const shutdown = async () => {
+  await waitForExit(child, { signal: "SIGTERM" });
+  await removeTempDir(home);
+};
 
-  afterAll(async () => {
-    await waitForExit(child, { signal: "SIGTERM" });
-    await removeTempDir(home);
-  });
+describe("raising the approval level under a running turn", () => {
+  beforeAll(() => boot("Write"), 60_000);
+  afterAll(shutdown);
 
   it("answers the waiting card as allowed by level change, and the turn carries on", async () => {
     const bot = (await api("GET", "/api/bots?messages=0")).body.bots[0];
@@ -123,7 +128,7 @@ stderr: ${stderr}`, { cause: error });
     // the person raises it from the app: no stop needed, the engine takes it
     const raised = await patchLevel("edits", fromApp);
     expect(raised.status).toBe(200);
-    expect(raised.body.levelChange).toMatchObject({ requested: "edits", effective: "edits", appliesAt: "now", resolved: 1 });
+    expect(raised.body.levelChange).toMatchObject({ requested: "edits", effective: "edits", appliesAt: "now", resolved: 1, stillOpen: 0 });
 
     await expect.poll(async () => (await permissionCard(threadId))?.card.answered, { timeout: 20_000 }).toBe("allow");
     expect((await permissionCard(threadId)).card.resolvedBy).toBe("level-change");
@@ -136,5 +141,77 @@ stderr: ${stderr}`, { cause: error });
     // the level survived: it is what the thread is saved at
     const saved = (await api("GET", "/api/bots?messages=0")).body.bots[0];
     expect(saved.tasks.find((task: any) => task.threadId === threadId).approvalMode).toBe("edits");
+  }, 90_000);
+});
+
+// A card the new level does not cover is not answered: it stays open, says
+// why, and the response counts it, so nothing is silently allowed and nothing
+// is left looking like it was handled.
+describe("a level change that does not cover the waiting card", () => {
+  beforeAll(() => boot("Bash"), 60_000);
+  afterAll(shutdown);
+
+  it("leaves a shell command waiting under Auto-accept edits, says so, and answers it when the person does", async () => {
+    const bot = (await api("GET", "/api/bots?messages=0")).body.bots[0];
+    expect((await api("PATCH", `/api/bots/${bot.id}`, { modelSelection: { instanceId: "claude", model: "claude-fake" } })).status).toBe(200);
+    const threadId: string = bot.threadId;
+    expect((await api("POST", `/api/bots/${bot.id}/messages`, { text: "run it" })).status).toBe(202);
+    await expect.poll(async () => Boolean(await permissionCard(threadId)), { timeout: 30_000 }).toBe(true);
+    await expect.poll(async () => (await api("GET", "/api/bots?messages=0")).body.bots[0].busy, { timeout: 5_000 }).toBe(true);
+
+    const threadLevel = async () => (await api("GET", "/api/bots?messages=0")).body.bots[0].tasks.find((task: any) => task.threadId === threadId).approvalMode;
+    // give the thread a level of its own, so it no longer follows the bot's default
+    expect((await api("PATCH", `/api/bots/${bot.id}/tasks/${threadId}`, { approvalMode: "ask" }, fromApp)).status).toBe(200);
+    expect(await threadLevel()).toBe("ask");
+
+    // the bot-level setting while the bot works: a bot's own shell cannot widen it
+    const botShell = await api("PATCH", `/api/bots/${bot.id}`, { approvalMode: "edits" });
+    expect(botShell.status).toBe(409);
+    // the person can save it; this thread has its own level, so the default is for new chats
+    const botLevel = await api("PATCH", `/api/bots/${bot.id}`, { approvalMode: "edits" }, fromApp);
+    expect(botLevel.status, JSON.stringify(botLevel.body)).toBe(200);
+    expect(botLevel.body.levelChange).toMatchObject({ requested: "edits", appliesAt: "new-chats" });
+    expect(await threadLevel()).toBe("ask");
+    expect((await permissionCard(threadId)).card.answered).toBeUndefined();
+    // Full still needs the bot stopped (and the trusted desktop transition)
+    expect((await api("PATCH", `/api/bots/${bot.id}`, { approvalMode: "full" }, fromApp)).status).toBeGreaterThanOrEqual(400);
+
+    // Refresh permissions copies the bot's level onto the running thread, by the composer's rule
+    const raised = await api("PATCH", `/api/bots/${bot.id}/tasks/${threadId}`, { refreshPermissions: true }, fromApp);
+    expect(raised.status, JSON.stringify(raised.body)).toBe(200);
+    // the engine took the level, but a shell command is not a file edit
+    expect(raised.body.levelChange).toMatchObject({ requested: "edits", effective: "edits", appliesAt: "now", resolved: 0, stillOpen: 1 });
+    const card = (await permissionCard(threadId)).card;
+    expect(card.answered).toBeUndefined();
+    expect(card.recheckedLevel).toBe("edits");
+    expect(card.recheckedWhy).toBe("level");
+
+    // still the person's to answer
+    const answered = await api("POST", `/api/threads/${threadId}/respond`, { requestId: card.requestId, behavior: "allow" }, fromApp);
+    expect(answered.status, JSON.stringify(answered.body)).toBe(200);
+    await expect.poll(async () => (await api("GET", "/api/bots?messages=0")).body.bots[0].busy, { timeout: 20_000 }).toBe(false);
+  }, 90_000);
+});
+
+// The bot's own default reaches a working thread that follows it, by the same
+// rule as the message box: handed to the engine now, the waiting card re-read.
+describe("a bot-level change under a thread that follows the bot", () => {
+  beforeAll(() => boot("Write"), 60_000);
+  afterAll(shutdown);
+
+  it("answers the waiting edit card as allowed by level change", async () => {
+    const bot = (await api("GET", "/api/bots?messages=0")).body.bots[0];
+    expect((await api("PATCH", `/api/bots/${bot.id}`, { modelSelection: { instanceId: "claude", model: "claude-fake" } })).status).toBe(200);
+    const threadId: string = bot.threadId;
+    expect((await api("POST", `/api/bots/${bot.id}/messages`, { text: "write it" })).status).toBe(202);
+    await expect.poll(async () => Boolean(await permissionCard(threadId)), { timeout: 30_000 }).toBe(true);
+    await expect.poll(async () => (await api("GET", "/api/bots?messages=0")).body.bots[0].busy, { timeout: 5_000 }).toBe(true);
+
+    const botLevel = await api("PATCH", `/api/bots/${bot.id}`, { approvalMode: "edits" }, fromApp);
+    expect(botLevel.status, JSON.stringify(botLevel.body)).toBe(200);
+    expect(botLevel.body.levelChange).toMatchObject({ requested: "edits", effective: "edits", appliesAt: "now", resolved: 1, stillOpen: 0 });
+    await expect.poll(async () => (await permissionCard(threadId))?.card.answered, { timeout: 20_000 }).toBe("allow");
+    expect((await permissionCard(threadId)).card.resolvedBy).toBe("level-change");
+    await expect.poll(async () => (await api("GET", "/api/bots?messages=0")).body.bots[0].busy, { timeout: 20_000 }).toBe(false);
   }, 90_000);
 });

@@ -16,6 +16,7 @@ import { Crown } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
+import { botLevelNeedsStop } from "@/lib/level-change";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import { useStore, type Bot } from "@/state/store";
 import type { ApprovalMode } from "../../../shared/approval-mode";
@@ -46,7 +47,7 @@ export function PermissionsSection({
   const [allThreads, setAllThreads] = useState(true);
   const [commandAllowlistTarget, setCommandAllowlistTarget] = useState<{ botId: string; botName: string } | null>(null);
   const setApprovalMode = (mode: ApprovalMode) => {
-    if (bot.busy || mode === approvalMode) return;
+    if (mode === approvalMode || (bot.busy && botLevelNeedsStop(mode, approvalMode))) return;
     if (mode === "full") {
       setAllThreads(true);
       setFullAccessTarget(bot.id);
@@ -146,11 +147,13 @@ export function PermissionsSection({
             onSelect={setApprovalMode}
             menuDirection="down"
             wide
-            disabled={Boolean(bot.busy)}
+            disabled={Boolean(bot.busy) && botLevelNeedsStop(approvalMode, approvalMode)}
+            busy={Boolean(bot.busy)}
             trustedModesAvailable={trustedModesAvailable}
             onManageCommandAllowlist={!draft && ownerOrAdmin === true ? () => setCommandAllowlistTarget({ botId: bot.id, botName: bot.name }) : undefined}
           />
         </div>
+        {bot.busy && <div className="mt-2 text-[12px] text-ink-secondary" data-testid="bot-level-busy-note">{t("approvalMode.botDefaultBusy")}</div>}
         {!draft && approvalMode === "full" && trustedModesAvailable && <button
           type="button" disabled={Boolean(bot.busy)}
           className="mt-3 text-[13px] text-accent hover:underline disabled:opacity-40"
