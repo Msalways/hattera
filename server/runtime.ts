@@ -60,7 +60,7 @@ import {
 } from "../shared/credential-request.ts";
 
 import { createRoomTurnLevels } from "./room-turn-level.ts";
-import { HELD_NOTE, approvalHeldNote, approvalHeldReason, approvalModeForOrigin, autoVerdict, deliverFullAccessApproval, delegatedApprovalMode } from "./auto-approve.ts";
+import { HELD_NOTE, approvalHeldNote, approvalHeldReason, approvalModeForOrigin, autoVerdict, deliverFullAccessApproval, delegatedApprovalMode, levelChangeVerdict } from "./auto-approve.ts";
 import { CommandAllowlistStore, commandAllowlistCandidate } from "./command-allowlist.ts";
 import type { CommandAllowlistCandidate, CommandAllowlistResponse } from "../shared/command-allowlist.ts";
 import { updateClaudeCli } from "./claude-update.ts";
@@ -6391,6 +6391,44 @@ async function answerRequest(
     });
   }
   return outcome;
+}
+
+/** After a thread's level is raised under a running turn: re-read each card
+ * that is still waiting against the new level, and answer the ones it now
+ * covers. A card the new level does not cover stays open, marked as
+ * re-checked so the person is told it still needs them. Returns how many
+ * were answered. A card is closed only after the engine took the answer, as
+ * for any app-granted approval, and is recorded as allowed by level change. */
+async function recheckPendingCardsForLevel(botId: string, threadId: string, mode: ApprovalMode): Promise<number> {
+  const asker = store.bot(botId);
+  const instance = runningTurnEngines.get(threadId);
+  if (!asker || !instance) return 0;
+  let resolved = 0;
+  for (const message of store.messagesFor(threadId)) {
+    const card = message.card;
+    if (!card || card.answered || card.expired || card.dismissed) continue;
+    if (card.requestType !== "permission" || !card.requestId || !card.tool || card.questionRequest) continue;
+    if (card.heldCode === "approval.held.outbound" || card.heldCode === "approval.held.sandbox") continue;
+    const command = card.commandAllowlist;
+    const verdict = levelChangeVerdict(mode, card.tool, {
+      commandAllowed: Boolean(command && commandAllowlist.matches(asker.id, command)),
+    });
+    if (!verdict.approve) {
+      store.patchMessage(threadId, message.id, { card: { ...card, recheckedLevel: mode } });
+      continue;
+    }
+    const outcome = await deliverFullAccessApproval(instance.adapter, threadId, card.requestId, undefined, () => true);
+    if (outcome !== "allowed-once") continue;
+    resolved += 1;
+    const settled = store.messagesFor(threadId).find((candidate) => candidate.id === message.id)?.card;
+    if (settled) store.patchMessage(threadId, message.id, { card: { ...settled, resolvedBy: "level-change" } });
+    store.appendMessage(threadId, { role: "bot", kind: "activity", tool: { name: `${verdict.approve}: ${(card.subtitle ?? "").slice(0, 120)}`, ok: true } });
+    appendDecision(DATA_DIR, {
+      threadId, requestId: card.requestId, botId: asker.id, botName: asker.name, tool: card.tool,
+      summary: card.subtitle, decision: "auto-approved", source: verdict.source,
+    });
+  }
+  return resolved;
 }
 
 type CardRespondResult = { ok: true } | { ok: false; status: number; error: string };
@@ -20123,8 +20161,8 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           });
           return refuseOutbound(
             access.reason === "app"
-              ? `Hattera did not run this: ${currentSender.name} has not been given access to ${appName}. Ask the user to allow it under the bot's Access settings, and do not retry.`
-              : `Hattera did not run this: ${appName} is read-only for ${currentSender.name}, and ${described.label} would write to it. Ask the user before trying again.`,
+              ? `Blocked, needs the user's OK: ${currentSender.name} has not been given access to ${appName}. Ask the user to allow it under the bot's Access settings, and do not retry.`
+              : `Blocked, needs the user's OK: ${appName} is read-only for ${currentSender.name}, and ${described.label} would write to it. Ask the user to allow writing before trying again.`,
           );
         }
         const opaque = connectorCalls.some(call => call.slug === "COMPOSIO_PROXY_EXECUTE");
@@ -24458,9 +24496,14 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if (!supportsApprovalMode(patch.modelSelection ?? current.modelSelection, mode)) {
           return json(res, 400, { error: "This provider does not support the selected approval level" });
         }
-        if (threadBusy(current.id, current.threadId)) return json(res, 409, { error: "stop this thread before changing its approval mode" });
         if (current.approvalGrant) return json(res, 409, { error: "the bot's approval mode is still being confirmed" });
-        if (mode === "auto" && approvalModeFor(current) !== "auto" && auth.kind === "loopback" && !DESKTOP_MANAGED && !req.headers.origin && store.bots.some((bot) => bot.busy)) {
+        // A bot never raises its own level. Its shell is a loopback caller
+        // with no browser origin, and only the person (the app, a paired
+        // device) may widen what runs without asking while a bot works.
+        // Lowering is always safe and stays open to anyone who can reach it.
+        const levelRank = { ask: 0, edits: 1, auto: 2, full: 3, custom: 4 } as const;
+        if (levelRank[mode] > levelRank[approvalModeFor(current)] && auth.kind === "loopback" && !DESKTOP_MANAGED && !req.headers.origin &&
+          (threadBusy(current.id, current.threadId) || store.bots.some((bot) => bot.busy))) {
           return json(res, 409, { error: "Change approval mode from the app or a paired device while bots are working." });
         }
         if (mode === "auto" && current.computer === "local" && approvalModeFor(current) !== "auto" && body.acknowledgeLocalAuto !== true) {
@@ -24475,11 +24518,31 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         }, patch.modelSelection, body.updateBotDefault === true, body.resetApprovalToAsk === true, body.requireAvailableModel === true);
         if (!checked.ok) return json(res, checked.status, { error: checked.error });
       }
+      const wasBusy = patch.approvalMode !== undefined && threadBusy(current.id, current.threadId);
       const task = patch.modelSelection
         ? store.switchTaskModel(m[1], m[2], patch.modelSelection, body.updateBotDefault === true, body.resetApprovalToAsk === true,
           { ...patch, ...hostedModels?.resetTask(current.modelSelection, patch.modelSelection) })!
         : store.patchTask(m[1], m[2], patch)!;
-      return json(res, 200, { task: wireTask(task, store.bot(m[1])!.modelSelection), bot: publicBot(store.bot(m[1])!) });
+      // A level changed under a running turn is handed to the engine at once
+      // when it can take it, and waiting cards are re-read against it. The
+      // answer says which happened so the client never implies a step was
+      // stopped or that a change landed when it did not.
+      let levelChange: { requested: ApprovalMode; effective: ApprovalMode; appliesAt: "now" | "next-turn" | "idle"; resolved: number } | undefined;
+      if (patch.approvalMode !== undefined) {
+        let appliesAt: "now" | "next-turn" | "idle" = "idle";
+        let resolved = 0;
+        if (wasBusy) {
+          const live = runningTurnEngines.get(current.threadId);
+          const outcome = patch.approvalMode === "ask" || patch.approvalMode === "edits" || patch.approvalMode === "auto"
+            ? await live?.adapter.setApprovalMode?.(current.threadId, patch.approvalMode).catch(() => "unsupported" as const)
+            : undefined;
+          appliesAt = outcome === "applied" ? "now" : "next-turn";
+          if (outcome === "applied") resolved = await recheckPendingCardsForLevel(current.id, current.threadId, patch.approvalMode);
+        }
+        // what the running step uses: the new level only once the engine took it
+        levelChange = { requested: patch.approvalMode, effective: appliesAt === "next-turn" ? approvalModeFor(current) : patch.approvalMode, appliesAt, resolved };
+      }
+      return json(res, 200, { task: wireTask(task, store.bot(m[1])!.modelSelection), bot: publicBot(store.bot(m[1])!), ...(levelChange ? { levelChange } : {}) });
     }
     if (m && method === "DELETE") {
       const bot = store.bot(m[1]);

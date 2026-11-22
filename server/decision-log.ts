@@ -62,6 +62,7 @@ export type DecisionKind =
  * by editing a bot's connectorTools, so the call itself needed no card. */
 export type DecisionSource =
   | AutoVerdictSource
+  | "level-change"
   | "self"
   | "question"
   | "auto-fallback"

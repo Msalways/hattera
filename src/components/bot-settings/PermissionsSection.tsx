@@ -117,7 +117,7 @@ export function PermissionsSection({
           <div className="mt-0.5 text-[13px] text-ink-secondary">
             {bot.approvePeerComms
               ? "This bot will stop and ask before it reaches out to another bot."
-              : "Let this bot talk to teammates on its own, without a confirmation step."}
+              : "This bot reaches out to teammates on its own, without asking you first."}
           </div>
           <ProposalStatus bot={bot} kind="owner" />
         </div>

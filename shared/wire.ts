@@ -568,6 +568,12 @@ export interface OptionCardData {
   expired?: boolean;
   /** Catalog key for held when it is one of the fixed notes. */
   heldCode?: string;
+  /** The level this card was re-read against after the thread's approval
+   * level changed under it, and found still needing the person. */
+  recheckedLevel?: string;
+  /** Who answered a permission card that no person tapped: "level-change"
+   * when the thread's raised approval level covered it. */
+  resolvedBy?: "level-change";
   /** the narrow grant "always allow" remembers for a harness-native card. */
   allowKey?: string;
   /** the provider can remember an allow for the rest of its session. */

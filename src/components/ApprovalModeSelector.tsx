@@ -92,6 +92,7 @@ export function ApprovalModeSelector({
   menuDirection = "up",
   wide = false,
   disabled = false,
+  busy = false,
   trustedModesAvailable = true,
   trustedModesNotice,
   onManageCommandAllowlist,
@@ -105,6 +106,10 @@ export function ApprovalModeSelector({
   menuDirection?: "up" | "down";
   wide?: boolean;
   disabled?: boolean;
+  /** The bot is working. Ask, Edits and Auto can still be chosen (the change
+   * reaches the running turn or applies after this step); Full and Custom
+   * need the trusted desktop grant, which only runs while the bot is idle. */
+  busy?: boolean;
   trustedModesAvailable?: boolean;
   trustedModesNotice?: string;
   onManageCommandAllowlist?: () => void;
@@ -226,18 +231,20 @@ export function ApprovalModeSelector({
                     type="button"
                     role="menuitemradio"
                     aria-checked={selected}
-                    disabled={modesDisabled}
+                    disabled={modesDisabled || (busy && (option.mode === "full" || option.mode === "custom"))}
                     title={
-                      disabled ? t("approvalMode.busy") : requiresLocalDesktop ? t("approvalMode.customLocalOnly") : undefined
+                      disabled ? t("approvalMode.busy")
+                        : busy && (option.mode === "full" || option.mode === "custom") ? t("approvalMode.busyTrusted")
+                          : requiresLocalDesktop ? t("approvalMode.customLocalOnly") : undefined
                     }
                     onClick={() => {
-                      if (modesDisabled) return;
+                      if (modesDisabled || (busy && (option.mode === "full" || option.mode === "custom"))) return;
                       onSelect(option.mode);
                       setOpen(false);
                     }}
                     className={cn(
                       "flex items-start gap-3 px-4 py-3 text-left hover:bg-raised-hover",
-                      modesDisabled && "cursor-not-allowed opacity-45 hover:bg-transparent",
+                      (modesDisabled || (busy && (option.mode === "full" || option.mode === "custom"))) && "cursor-not-allowed opacity-45 hover:bg-transparent",
                     )}
                   >
                     <Icon size={18} className="mt-0.5 shrink-0 opacity-80" />

@@ -54,6 +54,7 @@ import { createBotPatchQueue, type BotUpdatePatch } from "./bot-patch-queue";
 import { useChatErrorClear } from "./chat-error";
 import type { OnboardingStatus } from "@/lib/onboarding";
 import { openLiveEvents, publishLiveFrame, publishMissedFrames } from "@/lib/live-events";
+import { setLevelChangeNotice, type LevelChangeResult } from "@/lib/level-change";
 
 const MAX_ROUTINE_RUNS = 2_000;
 const ACTIVE_ROUTINE_RUN_STATUSES = new Set<RoutineRun["status"]>(["queued", "running", "waiting"]);
@@ -112,6 +113,11 @@ export interface OptionCardData {
   /** catalog key for `held` when it is a fixed note, so it reads in the
    * viewer's language; absent for free-text errors and older cards */
   heldCode?: string;
+  /** the level this card was re-read against after the thread's approval level
+   * changed under it, and found still needing the person */
+  recheckedLevel?: string;
+  /** "level-change": the raised level covered this card, so nobody tapped it */
+  resolvedBy?: "level-change";
   /** the narrow grant "always allow" remembers, e.g. "Bash:git" */
   allowKey?: string;
   allowSession?: boolean;
@@ -2855,17 +2861,23 @@ type TrustedApprovalBridge = {
 export async function persistTaskApproval(
   botId: string, threadId: string, patch: TaskUpdatePatch,
   bridge: TrustedApprovalBridge | undefined,
-  request: (path: string, init?: RequestInit) => Promise<{ bot: BotAnnouncement }> = api,
+  request: (path: string, init?: RequestInit) => Promise<{ bot: BotAnnouncement; levelChange?: LevelChangeResult }> = api,
+  /** live: the thread is working. Ask / Edits / Auto then go over the thread
+   * route, which hands the level to the running engine; the desktop's private
+   * channel refuses while a bot works and carries only Full and Custom. */
+  options: { live?: boolean; onLevelChange?: (result: LevelChangeResult) => void } = {},
 ): Promise<BotAnnouncement> {
   const { approvalMode, autoApprove, confirmFullAccess, acknowledgeLocalAuto, ...ordinary } = patch;
   const mode = approvalMode ?? (autoApprove === undefined ? undefined : autoApprove ? "auto" : "ask");
   if (mode === "full" && confirmFullAccess !== true) throw new Error("Confirm Full access for this thread first");
   if ((mode === "full" || mode === "custom") && !bridge) throw new Error("This approval change requires the packaged desktop app");
-  if (mode && bridge) {
+  const liveOrdinary = options.live === true && (mode === "ask" || mode === "edits" || mode === "auto");
+  if (mode && bridge && !liveOrdinary) {
     if (Object.keys(ordinary).length) await request(`/api/bots/${botId}/tasks/${threadId}`, { method: "PATCH", body: JSON.stringify(ordinary) });
     return bridge.setMode(botId, mode, { threadId, threadOnly: true, acknowledgeLocalAuto: acknowledgeLocalAuto === true });
   }
   const result = await request(`/api/bots/${botId}/tasks/${threadId}`, { method: "PATCH", body: JSON.stringify({ ...ordinary, approvalMode, autoApprove, acknowledgeLocalAuto }) });
+  if (result.levelChange) options.onLevelChange?.(result.levelChange);
   return result.bot;
 }
 
@@ -3182,7 +3194,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               threadId, modelSelection: patch.modelSelection, updateBotDefault: Boolean(patch.updateBotDefault),
             });
           }
-          return persistTaskApproval(botId, threadId, patch, window.ogb?.approvals);
+          const mode = patch.approvalMode ?? (patch.autoApprove === undefined ? undefined : patch.autoApprove ? "auto" : "ask");
+          const liveBot = stateRef.current.bots.find((candidate) => candidate.id === botId);
+          const live = mode !== undefined && Boolean(liveBot && currentTaskBot(liveBot, threadId).busy);
+          if (mode !== undefined && live) setLevelChangeNotice(threadId, { status: "saving", requested: mode, at: Date.now() });
+          try {
+            return await persistTaskApproval(botId, threadId, patch, window.ogb?.approvals, api, {
+              live,
+              onLevelChange: (result) => setLevelChangeNotice(threadId, { status: "done", ...result, at: Date.now() }),
+            });
+          } catch (error) {
+            if (mode !== undefined && live) {
+              setLevelChangeNotice(threadId, { status: "failed", requested: mode, error: error instanceof Error ? error.message : String(error), at: Date.now() });
+            }
+            throw error;
+          }
         });
       // Later edits still get saved after an earlier failure, but a send
       // awaiting this batch must observe every rejected setting in it. A

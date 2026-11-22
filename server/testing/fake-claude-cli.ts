@@ -154,6 +154,7 @@
 //
 // Keep this file dependency-free — it runs as a bare `node` subprocess.
 import { spawnSync } from "node:child_process";
+import { connect } from "node:net";
 import { appendFileSync, closeSync, existsSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runRoomHandoffAgent } from "./room-handoff-agent.ts";
@@ -427,7 +428,7 @@ const model = argAfter("--model") ?? "claude-fake";
 // this model, in which case the real CLI silently runs Manual ("default").
 const requestedPermissionMode = argAfter("--permission-mode") ?? "default";
 const autoUnavailableFor = (process.env.FAKE_CLAUDE_AUTO_UNAVAILABLE_MODELS ?? "").split(",").filter(Boolean);
-const permissionMode =
+let permissionMode =
   requestedPermissionMode === "auto" && autoUnavailableFor.includes(model) ? "default" : requestedPermissionMode;
 // The built-in tools init reports, as the real CLI does: --tools when given,
 // else its default set. FAKE_CLAUDE_KEEP_BASH=1 plays a CLI that keeps Bash
@@ -723,6 +724,49 @@ const playTurn = (prompt: JsonValue, late = false) => {
     return;
   }
 
+  // FAKE_CLAUDE_ASK_TOOL=<tool>: the turn asks the permission broker (the
+  // --permission-prompt-tool socket) for that tool, as the real CLI does when
+  // its mode does not already allow it, and continues only once answered.
+  // A set_permission_mode control_request that arrives meanwhile changes the
+  // mode this process reports, as the real CLI's does.
+  if (process.env.FAKE_CLAUDE_ASK_TOOL) {
+    launchFiles ??= readLaunchFiles();
+    const ogb = (launchFiles.mcpConfig as { mcpServers?: Record<string, { args?: string[] }> } | null)?.mcpServers?.ogb;
+    const socketPath = ogb?.args?.[1];
+    const askId = `ask-${process.pid}-${++toolUseCount}`;
+    const tool = process.env.FAKE_CLAUDE_ASK_TOOL;
+    const input = tool === "Bash" ? { command: "echo fixture" } : { file_path: "fixture.txt", content: "fixture" };
+    out({ type: "assistant", message: { content: [{ type: "tool_use", id: askId, name: tool, input }] } });
+    if (!socketPath) {
+      out({ type: "result", is_error: true, result: "fake-claude: no ogb broker socket in --mcp-config" });
+      turnRunning = false;
+      finishIfDone();
+      return;
+    }
+    const sock = connect(socketPath);
+    let acc = "";
+    sock.on("connect", () => sock.write(`${JSON.stringify({ t: "ask", id: askId, tool, input })}\n`));
+    sock.on("data", (c) => {
+      acc += c;
+      const nl = acc.indexOf("\n");
+      if (nl === -1) return;
+      let answer: { behavior?: string } = {};
+      try { answer = JSON.parse(acc.slice(0, nl)); } catch {}
+      sock.destroy();
+      const allowed = answer.behavior === "allow";
+      out({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: askId, is_error: !allowed,
+        content: allowed ? "tool ran" : "denied" }] } });
+      out({ type: "assistant", message: { content: [{ type: "text", text: `ask ${allowed ? "allowed" : "denied"} in ${permissionMode} mode` }] } });
+      finishTurn();
+    });
+    sock.on("error", (e) => {
+      out({ type: "result", is_error: true, result: `fake-claude: broker socket failed: ${String(e)}` });
+      turnRunning = false;
+      finishIfDone();
+    });
+    return;
+  }
+
   if (mode === "hang") {
     // stay alive until killed — lets tests exercise interrupt + the
     // permission broker while a turn is officially in flight. With
@@ -923,6 +967,18 @@ process.stdin.on("data", (c) => {
     try {
       prompt = JSON.parse(line);
     } catch {
+      continue;
+    }
+    if (prompt && typeof prompt === "object" && !Array.isArray(prompt) && prompt.type === "control_request") {
+      const req = prompt.request as { subtype?: string; mode?: string } | undefined;
+      const rid = String(prompt.request_id ?? "");
+      if (req?.subtype === "set_permission_mode" && typeof req.mode === "string") {
+        permissionMode = req.mode;
+        out({ type: "control_response", response: { subtype: "success", request_id: rid, response: { mode: permissionMode } } });
+        out({ type: "system", subtype: "status", status: null, permissionMode, session_id: sessionId });
+      } else {
+        out({ type: "control_response", response: { subtype: "error", request_id: rid, error: "unsupported control request" } });
+      }
       continue;
     }
     if (turnRunning || lateTurnWaiting) {

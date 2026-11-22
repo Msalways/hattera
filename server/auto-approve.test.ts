@@ -14,6 +14,7 @@ import {
   autoVerdict,
   deliverFullAccessApproval,
   delegatedApprovalMode,
+  levelChangeVerdict,
 } from "./auto-approve.ts";
 
 describe("Full access delivery", () => {
@@ -208,5 +209,30 @@ describe("delegatedApprovalMode", () => {
     // Codex has no Auto-accept edits (its Ask already writes the workspace).
     expect(delegatedApprovalMode({ ...base, senderMode: "edits", recipientDriverKind: "codex" })).toBeNull();
     expect(delegatedApprovalMode({ ...base, senderMode: "auto", recipientDriverKind: "codex" })).toBe("auto");
+  });
+});
+
+describe("levelChangeVerdict (a card already waiting when the level is raised)", () => {
+  it.each(["edits", "auto"] as const)("answers a plain file edit under %s as allowed by level change", mode => {
+    for (const tool of ["Write", "Edit", "MultiEdit", "NotebookEdit", "mcp__fs__Write"]) {
+      const verdict = levelChangeVerdict(mode, tool);
+      expect(verdict.source, tool).toBe("level-change");
+      expect(verdict.approve, tool).toMatch(/^allowed by level change/);
+    }
+  });
+  it("leaves everything else with a person", () => {
+    for (const tool of ["Bash", "WebFetch", "AskUserQuestion", "mcp__composio__GMAIL_SEND_EMAIL"]) {
+      expect(levelChangeVerdict("edits", tool).approve, tool).toBeNull();
+    }
+    expect(levelChangeVerdict("ask", "Write").approve).toBeNull();
+  });
+  it("never grants Full or Custom, and never lifts an outbound or sandbox-widening hold", () => {
+    expect(levelChangeVerdict("full", "Write")).toEqual({ approve: null, source: "no-grant" });
+    expect(levelChangeVerdict("custom", "Write")).toEqual({ approve: null, source: "no-grant" });
+    expect(levelChangeVerdict("edits", "mcp__composio__GMAIL_SEND_DRAFT", { commandAllowed: true }).approve).toBeNull();
+    expect(levelChangeVerdict("auto", "Write", { requiresExplicitApproval: true }).approve).toBeNull();
+  });
+  it("still honours what the app already grants a fresh ask", () => {
+    expect(levelChangeVerdict("edits", "Bash", { commandAllowed: true }).source).toBe("command-allowlist");
   });
 });

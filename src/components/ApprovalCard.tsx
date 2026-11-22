@@ -66,6 +66,7 @@ export function approvalCardOutcome(card: OptionCardData): string | undefined {
   if (card.expired === true) return t("approval.status.expired");
   if (!card.answered) return undefined;
   if (card.undone === true) return t("approval.status.undone");
+  if (card.resolvedBy === "level-change" && card.answered === "allow") return t("approval.status.levelChange");
   const isProposal = Boolean(card.routineRequest || card.skillRequest || card.profileRequest || card.modelRequest || card.teamSetupRequest);
   if (card.answered !== "allow") return card.teamSetupRequest?.suggestion ? t("approval.status.notNow") : isProposal ? t("approval.status.cancelled") : t("approval.status.denied");
   if (card.teamSetupRequest) return card.teamSetupRequest.deletion ? "Bot deleted" : "Team setup applied";
@@ -367,7 +368,9 @@ export function ApprovalCard({
             <ShieldCheck size={14} className="text-accent" />
             {isRoutineRequest || isSkillRequest || isProfileRequest || isTeamSetup
               ? t("approval.status.waitingConfirmation")
-              : t("approval.status.waitingAnswer")}
+              : card.recheckedLevel
+                ? t("approval.status.stillNeedsOk", { level: card.recheckedLevel })
+                : t("approval.status.waitingAnswer")}
           </>
         )}
       </div>

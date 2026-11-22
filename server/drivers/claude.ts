@@ -1360,6 +1360,10 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
        * Sonnet 4.5, an org that disabled it), so the flag we passed is not
        * the truth — this is. null until init, or on a CLI that omits it. */
       nativePermissionMode: string | null;
+      /** a set_permission_mode request on its way to the CLI, by request_id */
+      modeRequests: Map<string, (ok: boolean) => void>;
+      /** the mode last confirmed live; unset until one is */
+      liveApprovalMode?: "ask" | "edits" | "auto";
       /** launched with --replay-user-messages (see CLAUDE_REPLAY_FLOOR) */
       replaysUserMessages: boolean;
       /** the running turn, or null between turns */
@@ -1912,7 +1916,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
               // verdict from a Manual session asking about everything.
               const nativeMode = sessions.get(threadId)?.nativePermissionMode ?? null;
               const nativeReview =
-                permissionMode === "auto" && nativeMode !== null
+                (sessions.get(threadId)?.liveApprovalMode ?? (permissionMode === "auto" ? "auto" : null)) === "auto" && nativeMode !== null
                   ? nativeMode === "auto" ? "active" : "inactive"
                   : undefined;
               const questions = askQuestions(ask);
@@ -2011,6 +2015,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
         sessionId: sessionId ?? newSessionId,
         sawInit: false,
         nativePermissionMode: null,
+        modeRequests: new Map(),
         replaysUserMessages,
         turn: { turnId, input: turn, retryAbort, settled: false, sawStreamDelta: false, pendingSteers: new Set(), deferred: null, continuationGrace: null, continuationSilence: null },
         idleTimer: null,
@@ -2104,6 +2109,15 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
         try {
           o = JSON.parse(line);
         } catch {
+          return;
+        }
+        if (o?.type === "control_response") {
+          const reply = o.response as { subtype?: string; request_id?: string } | undefined;
+          const waiting = reply?.request_id ? session.modeRequests.get(reply.request_id) : undefined;
+          if (waiting) {
+            session.modeRequests.delete(reply!.request_id!);
+            waiting(reply?.subtype === "success");
+          }
           return;
         }
         // A stdin message echoed back (--replay-user-messages) carries its
@@ -2686,6 +2700,34 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
       return "steered";
     };
 
+    /** Change the running session's permission mode over its control channel.
+     * The CLI answers a control_response; anything but success, a closed
+     * pipe, or no answer within the grace is "unsupported" so the caller
+     * falls back to the next turn instead of claiming a change that did not
+     * land. Never sends bypassPermissions. */
+    const setApprovalMode = async (threadId: string, mode: "ask" | "edits" | "auto"): Promise<"applied" | "unsupported"> => {
+      const s = sessions.get(threadId);
+      if (!s || !s.turn || s.turn.settled || s.closing || s.child.exitCode !== null) return "unsupported";
+      const native = mode === "auto" ? "auto" : mode === "edits" ? "acceptEdits" : "default";
+      const requestId = randomUUID();
+      const answered = new Promise<boolean>((resolve) => {
+        const timer = setTimeout(() => { s.modeRequests.delete(requestId); resolve(false); }, 5000);
+        timer.unref?.();
+        s.modeRequests.set(requestId, (ok) => { clearTimeout(timer); resolve(ok); });
+      });
+      if (!s.child.stdin.writable || s.child.stdin.destroyed) { s.modeRequests.delete(requestId); return "unsupported"; }
+      const wrote = await new Promise<boolean>((resolve) => {
+        try {
+          s.child.stdin.write(JSON.stringify({ type: "control_request", request_id: requestId, request: { subtype: "set_permission_mode", mode: native } }) + "\n", (error) => resolve(!error));
+        } catch { resolve(false); }
+      });
+      if (!wrote) { s.modeRequests.delete(requestId); return "unsupported"; }
+      if (!(await answered)) return "unsupported";
+      s.nativePermissionMode = native;
+      s.liveApprovalMode = mode;
+      return "applied";
+    };
+
     // Sign in from Settings: the unmodified CLI's own login, driven over pipes
     // (server/drivers/claude-login-auth.ts). Same environment as every turn.
     const login = new ClaudeLoginController({ cli: config.cli, environment, onAuthenticated: async () => { await refreshModels(); } });
@@ -2850,6 +2892,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
         },
         sendTurn,
         steer,
+        setApprovalMode,
         interruptTurn: async (threadId) => active.get(threadId)?.stop(),
         respondToRequest: async (threadId, requestId, decision) => {
           // fail-closed by construction: no broker, or an ask that already

@@ -36,6 +36,7 @@ import { LocalComputerAutoWarning } from "./LocalComputerAutoWarning";
 import { PlaceChip } from "./PlaceChip";
 import { FullAccessWarning } from "./FullAccessWarning";
 import { ApprovalModeSelector } from "./ApprovalModeSelector";
+import { ApprovalLevelNotice } from "./ApprovalLevelNotice";
 import { CommandAllowlistDialog } from "./CommandAllowlistDialog";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
 import {
@@ -590,7 +591,11 @@ export function Composer({
     refocusInput();
   };
   const setApprovalMode = (mode: ApprovalMode) => {
-    if (!modeBot || modeBot.busy || mode === approvalModeFor(modeBot)) return;
+    if (!modeBot || mode === approvalModeFor(modeBot)) return;
+    // Full and Custom are the trusted desktop grant and wait for the bot to
+    // be idle; Ask, Edits and Auto reach the running turn (or apply after
+    // this step) and say which in the notice under the composer.
+    if (modeBot.busy && (mode === "full" || mode === "custom")) return;
     if ((mode === "full" || mode === "custom") && !trustedThreadAccess) return;
     if (mode === "full") {
       setApprovalWarning({ mode, botId: modeBot.id, threadId: modeBot.threadId });
@@ -1015,6 +1020,9 @@ export function Composer({
             full line of its own above the chips instead. */}
         <div data-tour="composer" className="@container/composer relative z-[1] rounded-3xl bg-composer px-2 py-1.5 ring-1 ring-composer-ring">
         {replyTo && <ComposerReplyStrip message={replyTo} fallbackName={bot?.name} onClear={onClearReply} />}
+        {modeBot && approvalEngine && !remoteClient && (
+          <ApprovalLevelNotice threadId={modeBot.threadId} busy={Boolean(modeBot.busy)} savedMode={approvalModeFor(modeBot)} />
+        )}
         <div data-composer-row className="flex items-end gap-1 @max-[30rem]/composer:flex-wrap">
           <input
             ref={fileInput}
@@ -1077,7 +1085,7 @@ export function Composer({
                   providerName={approvalEngine.displayName}
                   driverKind={approvalEngine.driverKind}
                   onSelect={setApprovalMode}
-                  disabled={Boolean(modeBot.busy)}
+                  busy={Boolean(modeBot.busy)}
                   trustedModesAvailable={trustedThreadAccess}
                   onManageCommandAllowlist={ownerOrAdmin === true ? () => setCommandAllowlistTarget({ botId: modeBot.id, botName: modeBot.name, threadId: modeBot.threadId }) : undefined}
                 />
