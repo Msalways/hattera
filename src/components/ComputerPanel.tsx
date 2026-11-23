@@ -1307,6 +1307,7 @@ export function ComputerPanel({
       bot, place, seat: placeSeat, config: state.config, instances: state.instances,
       // This PC is ready when this app can pick it, or the server says the bot's engine can run commands here or computer control is set up (a shell that ran here used to read "Not ready").
       local: { ready: localSelectable || botCaps?.thisPc.shell.available === true || botCaps?.thisPc.control.ready === true, reason: localDisabledReason ?? t("computer.unavailableLocal") },
+      localChecking: botCaps === null && !localSelectable,
       ...browserFacts(botCaps),
       ...(place === "cloud" ? { computer: cloudComputer } : {}),
       ...(place === "auto" && currentTeamComputer ? { teamComputer: currentTeamComputer.name } : {}),

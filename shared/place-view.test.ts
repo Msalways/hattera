@@ -212,3 +212,12 @@ describe("RC-2: browser state before the server answers", () => {
     expect(placeState(facts({ place: "browser", browserOn: false })).state).toBe("browser-off");
   });
 });
+
+describe("RC-2: this computer before the server answers", () => {
+  it("reads checking, not 'Not ready', while the answer is pending, and settles once it arrives", () => {
+    const pending = placeState(facts({ place: "local", local: { ready: false, reason: "x" }, localChecking: true }));
+    expect(pending.state).toBe("local-checking");
+    expect(placeState(facts({ place: "local", local: { ready: false, reason: "x" } })).state).toBe("local-unavailable");
+    expect(placeState(facts({ place: "local", local: { ready: true } })).state).toBe("local");
+  });
+});

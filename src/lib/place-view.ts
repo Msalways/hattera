@@ -63,6 +63,8 @@ export function placeFacts(input: {
   browserOn: boolean;
   /** No answer yet (browserFacts): the place reads "checking". */
   browserChecking?: boolean;
+  /** No answer yet and this app cannot pick this computer itself: the place reads "checking". */
+  localChecking?: boolean;
   /** The server said "not-installed": on, but no engine yet. */
   browserMissing?: boolean;
 }): PlaceFacts {
@@ -79,6 +81,7 @@ export function placeFacts(input: {
     toolsAllowComputer: canUseMcpServer(bot.toolScope, "computer"),
     browserOn: input.browserOn,
     ...(input.browserChecking ? { browserChecking: true } : {}),
+    ...(input.localChecking ? { localChecking: true } : {}),
     ...(input.browserMissing ? { browserMissing: true } : {}),
     role: seat.role,
     mode: seat.mode,
@@ -111,7 +114,7 @@ export function placeBlocked(view: PlaceView): boolean {
 export function placeHasIssue(view: PlaceView): boolean {
   // "browser-checking" is not blocked (nothing is wrong), but its words, not the
   // place's usual description, are what the person should read until it settles.
-  return placeBlocked(view) || view.state === "browser-checking" || view.state === "cc-tools-off" || view.state === "cc-sign-in" || view.state === "cc-needs-key"
+  return placeBlocked(view) || view.state === "browser-checking" || view.state === "local-checking" || view.state === "cc-tools-off" || view.state === "cc-sign-in" || view.state === "cc-needs-key"
     || view.state === "cc-unavailable";
 }
 

@@ -3886,6 +3886,8 @@
   "place.view.browserCannot.line": "{model} can't use the built-in browser.",
   "place.view.local.short": "Your screen",
   "place.view.local.line": "Uses your screen, mouse, and keyboard.",
+  "place.view.localChecking.short": "Checking…",
+  "place.view.localChecking.line": "Checking whether this computer is ready.",
   "place.view.localUnavailable.short": "Not ready",
   "place.view.localUnavailable.line": "{reason}",
   "place.view.vm.short": "Private desktop",
