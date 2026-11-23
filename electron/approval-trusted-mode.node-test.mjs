@@ -427,3 +427,20 @@ test("safe Ask timeouts do not enqueue a redundant recovery", async () => {
   await assert.rejects(coordinator.request(proc, "bot-1", "ask"), /did not answer/);
   assert.equal(proc.messages.length, 1);
 });
+
+test("keeps a valid levelChange from the server reply and rejects a malformed one", () => {
+  const bot = { id: "bot-1", approvalMode: "edits" };
+  const levelChange = { requested: "edits", effective: "ask", appliesAt: "next-turn", resolved: 0, stillOpen: 1 };
+  const base = { type: "approval-trusted-mode-result", requestId: REQUEST_ID, ok: true, bot };
+  assert.deepEqual(decodeTrustedApprovalModeResult({ ...base, levelChange: { ...levelChange, extra: "dropped" } }), { requestId: REQUEST_ID, ok: true, bot, levelChange });
+  assert.equal("levelChange" in decodeTrustedApprovalModeResult(base), false);
+  for (const bad of [
+    { ...levelChange, appliesAt: "later" },
+    { ...levelChange, requested: "unsafe" },
+    { ...levelChange, resolved: -1 },
+    { ...levelChange, stillOpen: "1" },
+    "next-turn",
+  ]) {
+    assert.throws(() => decodeTrustedApprovalModeResult({ ...base, levelChange: bad }), /invalid level change/);
+  }
+});

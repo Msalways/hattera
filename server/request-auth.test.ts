@@ -15,6 +15,7 @@ import {
   isSameOrigin,
   provesSameOrigin,
   parseCookies,
+  provesPerson,
   requestOrigin,
   requestSource,
   requiredScope,
@@ -618,5 +619,32 @@ describe("loopback trust: owner on one person's machine, service on a shared wor
     expect(as("POST", "/api/auth/pairing", "d".repeat(43)).auth).toBeNull();
     expect(as("POST", "/api/auth/pairing", "", null).auth).toBeNull();
     expect(as("POST", "/api/auth/pairing", secret, null).auth).toBeNull();
+  });
+});
+
+describe("provesPerson (who may widen what a working bot does unasked)", () => {
+  const loopback = { kind: "loopback", scopes: ["admin", "client"] } as const;
+  const session = { kind: "session", via: "cookie", scopes: ["admin", "client"], session: {} as never } as const;
+  it("accepts a real session and the desktop app's capability", () => {
+    expect(provesPerson(session, false)).toBe(true);
+    expect(provesPerson(loopback, true)).toBe(true);
+  });
+  it("never accepts a bare loopback request, whatever headers it sent", () => {
+    // headers are not an input at all: the same auth is refused whether the
+    // request carried a same-origin Origin, a Referer, Sec-Fetch-Site or any Host
+    for (const headers of [
+      {},
+      { origin: "http://127.0.0.1:8080" },
+      { referer: "http://127.0.0.1:8080/" },
+      { "sec-fetch-site": "same-origin" },
+      { host: "localhost", origin: "http://localhost" },
+    ] as Array<Record<string, string>>) {
+      const auth = resolveRequestAuth(request({ host: "127.0.0.1:8080", ...headers }), {
+        sessions: new SessionRegistry({ file: join(tmpdir(), "omb-proves-person-sessions.json") }), cookieName: "c", streamPath: "/api/stream", url: new URL("http://127.0.0.1:8080/api/bots/b"),
+      }).auth;
+      expect(auth?.kind, JSON.stringify(headers)).toBe("loopback");
+      expect(provesPerson(auth!, false), JSON.stringify(headers)).toBe(false);
+    }
+    expect(provesPerson({ ...loopback, trust: "service" }, false)).toBe(false);
   });
 });

@@ -160,6 +160,43 @@ export function autoVerdict(
   return { approve: null, source: "no-grant" };
 }
 
+// File edits are what "Auto-accept edits" accepts. Names are the bare tool
+// names the engines raise (Claude's Edit/Write/MultiEdit/NotebookEdit).
+const FILE_EDIT_TOOLS = new Set(["edit", "write", "multiedit", "notebookedit"]);
+
+export interface LevelChangeVerdict {
+  /** Chip text when the new level covers the waiting card, null when it
+   * still needs a person. */
+  approve: string | null;
+  /** "level-change" when the new level is what allows it; otherwise why the
+   * card stays (the same source autoVerdict gives). */
+  source: AutoVerdictSource | "level-change";
+}
+
+/** Would raising a thread to `mode` answer a card that is already waiting?
+ *
+ * A card raised at one level is re-read against the new one: Auto-accept
+ * edits and Approve for me cover a plain file edit; anything the app itself
+ * already grants (a saved command, a web search under Approve for me) is
+ * granted as it would be for a fresh ask. Nothing else is answered here -
+ * not a question, not an outbound send, not a sandbox widening, and never
+ * Full access, which is never reached through a level change. The engine's
+ * own reviewer judges calls made after the change, not this one. */
+export function levelChangeVerdict(
+  mode: ApprovalMode,
+  tool: string,
+  context?: { requiresExplicitApproval?: boolean; commandAllowed?: boolean },
+): LevelChangeVerdict {
+  if (mode === "full" || mode === "custom") return { approve: null, source: "no-grant" };
+  const fresh = autoVerdict(mode, tool, context);
+  if (fresh.approve) return fresh;
+  if (fresh.source === "outbound-guard" || fresh.source === "explicit-approval-block") return fresh;
+  if ((mode === "edits" || mode === "auto") && FILE_EDIT_TOOLS.has(bareToolName(tool))) {
+    return { approve: `allowed by level change: ${tool}`, source: "level-change" };
+  }
+  return fresh;
+}
+
 /** Every fixed note a held card can show, by catalog key.
  *
  * The card is the last thing between a bot and someone's filesystem, so the

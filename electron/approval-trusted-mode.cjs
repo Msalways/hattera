@@ -87,6 +87,31 @@ function trustedApprovalModeCommit(requestId, botId, mode) {
   return { ...confirmation, type: "approval-trusted-mode-commit" };
 }
 
+const LEVEL_APPLIES_AT = new Set(["now", "next-turn", "idle", "new-chats"]);
+const count = (value) => Number.isSafeInteger(value) && value >= 0;
+
+/** The server's answer to a level change, validated field by field; anything
+ * else is a malformed reply, never passed on half-trusted. */
+function decodeLevelChange(value) {
+  if (
+    !plainObject(value) ||
+    !APPROVAL_MODES.has(value.requested) ||
+    !APPROVAL_MODES.has(value.effective) ||
+    !LEVEL_APPLIES_AT.has(value.appliesAt) ||
+    !count(value.resolved) ||
+    !count(value.stillOpen)
+  ) {
+    throw new Error("invalid level change in trusted approval-mode result");
+  }
+  return {
+    requested: value.requested,
+    effective: value.effective,
+    appliesAt: value.appliesAt,
+    resolved: value.resolved,
+    stillOpen: value.stillOpen,
+  };
+}
+
 function decodeTrustedApprovalModeResult(rawMessage) {
   const message = rawMessage?.data ?? rawMessage;
   if (!plainObject(message) || message.type !== "approval-trusted-mode-result") return null;
@@ -103,7 +128,9 @@ function decodeTrustedApprovalModeResult(rawMessage) {
     ) {
       throw new Error("invalid bot in trusted approval-mode result");
     }
-    return { requestId: message.requestId, ok: true, bot: message.bot };
+    const result = { requestId: message.requestId, ok: true, bot: message.bot };
+    if (message.levelChange !== undefined) result.levelChange = decodeLevelChange(message.levelChange);
+    return result;
   }
   if (message.error !== undefined && typeof message.error !== "string") {
     throw new Error("invalid trusted approval-mode result error");

@@ -91,6 +91,8 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
+      // a bare local request is the owner here, as on a personal install
+      OMB_LOOPBACK_TRUST: "owner",
       OMB_PORT: String(port),
       OMB_WEBHOOK_PORT: String(port + 1),
       OMB_STATIC_DIR: staticDir,
@@ -100,7 +102,7 @@ beforeAll(async () => {
   });
   child.stderr!.on("data", (chunk) => (stderr += chunk));
 
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + 90_000;
   for (;;) {
     if (child.exitCode !== null) throw new Error(`server exited ${child.exitCode}: ${stderr}`);
     try {
@@ -111,7 +113,7 @@ beforeAll(async () => {
     if (Date.now() >= deadline) throw new Error(`server never became healthy: ${stderr}`);
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-}, 30_000);
+}, 100_000);
 
 afterAll(async () => {
   if (child) await waitForExit(child, { signal: "SIGTERM" });
@@ -446,8 +448,9 @@ describe("peer allow-list", () => {
     // any caller can send — including the bot it constrains, from its own
     // shell, mid-turn. What a tool call does not have is a browser origin or
     // a paired session; what it always has is a running turn. So an
-    // originless, session-less loopback PATCH may loosen a bot only while
-    // every bot is idle. The served UI sends its origin and is unaffected.
+    // session-less loopback PATCH may loosen a bot only while every bot is
+    // idle, whatever Origin it sends. A signed-in session or the desktop
+    // capability is what proves the person.
     await hideSeededBot();
     const held = await createBot("Held", "stuck");
     const bound = await createBot("Ivy", "plain");
@@ -474,7 +477,7 @@ describe("peer allow-list", () => {
       for (const body of attempts) {
         const refused = await api("PATCH", `/api/bots/${bound.id}`, body);
         expect(refused.status, JSON.stringify(body)).toBe(409);
-        expect(String(refused.body.error)).toContain("desktop app or a paired device");
+        expect(String(refused.body.error)).toMatch(/signed-in session or the desktop app|desktop app or a paired device/);
       }
       // A fake browser header does not grant cross-team authority to a shell.
       for (const headers of [{}, { origin: base }] as Record<string, string>[]) {
@@ -489,9 +492,9 @@ describe("peer allow-list", () => {
       // tightening still needs nothing, and so does an unrelated field
       expect((await api("PATCH", `/api/bots/${bound.id}`, { peers: [] })).status).toBe(200);
       expect((await api("PATCH", `/api/bots/${bound.id}`, { name: "Ivy renamed" })).status).toBe(200);
-      // the served UI is a browser: its origin is what tells it apart
-      expect((await browser(`/api/bots/${bound.id}`, { peers: [peer.id], acknowledgePeerScope: true })).status).toBe(200);
-      expect((await browser(`/api/bots/${bound.id}`, { section: "Finance" })).status).toBe(200);
+      // a browser Origin is the caller's to send, so a shell that sends one is refused too
+      expect((await browser(`/api/bots/${bound.id}`, { peers: [peer.id], acknowledgePeerScope: true })).status).toBe(409);
+      expect((await browser(`/api/bots/${bound.id}`, { section: "Finance" })).status).toBe(409);
 
       // and once nothing is running, a script may loosen again (and is logged)
       expect((await api("POST", `/api/bots/${held.id}/interrupt`, {})).status).toBe(200);

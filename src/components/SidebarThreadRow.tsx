@@ -259,6 +259,8 @@ type ThreadRowProps = {
   onSnooze?: (task: ThreadRowTask, snoozedUntil: number | null) => void;
   /** Copy this bot's current approval level and saved approvals onto this thread. */
   onRefreshPermissions?: (task: ThreadRowTask) => void;
+  /** Whether refreshing needs the thread stopped (a trusted level). Unset means yes. */
+  refreshNeedsStop?: (task: ThreadRowTask) => boolean;
 };
 
 /** Same fields, each the same value: lists build each row's task afresh
@@ -276,7 +278,7 @@ const sameThreadRow = ({ task: previousTask, ...previous }: ThreadRowProps, { ta
 
 /** One quiet row for bot and group histories. Surface denotes selection;
  * working/waiting/unread remain independent signals, never different cards. */
-export const SidebarThreadRow = memo(function SidebarThreadRow({ task, ownerId, current, compact, folders, onSelect, onRename, onRegenerateTitle, onDelete, onMove, onArchive, onPin, onSnooze, onRefreshPermissions, activityLabel, now }: ThreadRowProps) {
+export const SidebarThreadRow = memo(function SidebarThreadRow({ task, ownerId, current, compact, folders, onSelect, onRename, onRegenerateTitle, onDelete, onMove, onArchive, onPin, onSnooze, onRefreshPermissions, refreshNeedsStop, activityLabel, now }: ThreadRowProps) {
   const [menu, setMenu] = useState<{ left: number; top: number } | null>(null);
   const menuMotion = useHeldMenuMotion(menu);
   const [renaming, setRenaming] = useState(false);
@@ -397,7 +399,7 @@ export const SidebarThreadRow = memo(function SidebarThreadRow({ task, ownerId, 
         </div>
       </div>}
       {onSnooze && snoozed && <button type="button" onClick={() => { setMenu(null); onSnooze(task, null); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-[12px] text-ink hover:bg-raised"><BellOff size={12} />{t("task.stopSnoozing")}</button>}
-      {onRefreshPermissions && <button type="button" disabled={isWorking(task)} title={t("task.refreshPermissionsHint")} onClick={() => { setMenu(null); onRefreshPermissions(task); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-[12px] text-ink hover:bg-raised disabled:opacity-40"><RefreshCw size={12} />{t("task.refreshPermissions")}</button>}
+      {onRefreshPermissions && <button type="button" disabled={isWorking(task) && (refreshNeedsStop?.(task) ?? true)} title={t("task.refreshPermissionsHint")} onClick={() => { setMenu(null); onRefreshPermissions(task); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-[12px] text-ink hover:bg-raised disabled:opacity-40"><RefreshCw size={12} />{t("task.refreshPermissions")}</button>}
       <button type="button" disabled={isWorking(task)} onClick={() => { setMenu(null); setDeleting(true); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-[12px] text-danger hover:bg-raised disabled:opacity-40"><Trash2 size={12} />{t("task.deleteAria")}</button>
     </div>, document.body)}
     <ConfirmDialog open={deleting} title={t("task.deleteConfirm")} body={t("task.deleteBody", { title: task.title })} confirmLabel={t("task.deleteAria")}

@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { api, useStore, formatTime, visibleMessages, currentTaskBot, botOpensTo, openBot, openThread, type Action, type AppState, type Bot, type BotProject, type Group, type InstanceInfo, type Message } from "@/state/store";
 import { approvalModeFor } from "../../shared/approval-mode";
+import { botLevelNeedsStop } from "@/lib/level-change";
 import { avatarCropRadius, botAvatarProfile } from "../../shared/bot-avatar";
 import { peerLine } from "@/lib/peer-message";
 import { liveActivityLabel } from "@/lib/live-activity";
@@ -1109,6 +1110,10 @@ export function BotThreadList({ bot, selected, density, query, pendingQueued, re
     onArchive: (task: { threadId: string }, archivedAt: number | null) => dispatch({ type: "updateTask", botId, threadId: task.threadId, patch: { archivedAt } }),
     onPin: (task: { threadId: string }, pinned: boolean) => dispatch({ type: "updateTask", botId, threadId: task.threadId, patch: { pinned } }),
     onSnooze: (task: { threadId: string }, snoozedUntil: number | null) => dispatch({ type: "updateTask", botId, threadId: task.threadId, patch: { snoozedUntil } }),
+    // Refresh follows the composer's rule: only a trusted level (or leaving
+    // one) needs the thread stopped first.
+    refreshNeedsStop: (task: { threadId: string }) =>
+      botLevelNeedsStop(approvalModeFor(latest.current), approvalModeFor(currentTaskBot(latest.current, task.threadId))),
     onRefreshPermissions: (task: { threadId: string }) => {
       const current = latest.current;
       const mode = approvalModeFor(current);

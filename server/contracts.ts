@@ -372,6 +372,18 @@ export interface ProviderAdapter {
    *   the answer was in flight). The caller must NOT re-queue: the words
    *   may already be running, and replaying them would execute them twice. */
   steer?(threadId: ThreadId, text: string): Promise<SteerOutcome>;
+  /** Change the approval level of the turn running on this thread, without
+   * stopping it. Only an engine whose live session accepts a mode change
+   * implements it (Claude: a set_permission_mode control request).
+   *
+   * - "applied" — the engine confirmed the new mode; its next tool call or
+   *   permission check uses it.
+   * - "unsupported" — nothing live to change (no running turn, the engine
+   *   fixes its mode at launch, or it refused). The caller still saves the
+   *   level, which then takes effect at the next turn, and says so.
+   * Only ask / edits / auto are ever sent: widening to full access is never a
+   * live change. */
+  setApprovalMode?(threadId: ThreadId, mode: "ask" | "edits" | "auto"): Promise<"applied" | "unsupported">;
   hasSession(threadId: ThreadId): boolean;
   stopAll(): Promise<void>;
   onEvent(listener: RuntimeEventListener): () => void;
