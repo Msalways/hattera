@@ -1094,6 +1094,27 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
     if (r.error) return { text: `Couldn't retry that thread: ${String(r.error)}`, isError: true };
     return { text: typeof r.message === "string" ? r.message : "The thread is running again. Its result stays in that thread; you are not woken for it — check it later with session_search or list_threads if you need to." };
   }
+  if (name === "stop_thread") {
+    const threadId = String(args.thread_id ?? "").trim();
+    const reason = typeof args.reason === "string" ? args.reason.trim() : "";
+    if (!threadId || !reason) return { text: "stop_thread needs thread_id (from list_threads) and reason (one sentence).", isError: true };
+    const r = await api("/api/internal/stop-thread", {
+      method: "POST",
+      body: JSON.stringify({ fromBotId: BOT_ID, fromThreadId: THREAD_ID, toThreadId: threadId, reason }),
+    });
+    if (r.error) return { text: `Couldn't stop that thread: ${String(r.error)}`, isError: true };
+    return { text: typeof r.message === "string" ? r.message : "The thread was stopped. Its history and files are kept." };
+  }
+  if (name === "cancel_request") {
+    const requestId = String(args.request_id ?? "").trim();
+    if (!requestId) return { text: "cancel_request needs the request_id from the coordinate_bots receipt.", isError: true };
+    const r = await api("/api/internal/cancel-request", {
+      method: "POST",
+      body: JSON.stringify({ fromBotId: BOT_ID, fromThreadId: THREAD_ID, requestId }),
+    });
+    if (r.error) return { text: `Couldn't withdraw that request: ${String(r.error)}`, isError: true };
+    return { text: typeof r.message === "string" ? r.message : "The request was withdrawn before it started." };
+  }
   if (name === "memory_log") {
     if (typeof args.text !== "string" || !args.text.trim()) {
       return { text: "memory_log needs text: one line about what happened.", isError: true };
