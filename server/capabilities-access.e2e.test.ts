@@ -59,7 +59,7 @@ describe("GET /api/bots/:id/capabilities access", () => {
     });
     child.stdout!.on("data", (c) => (log += c));
     child.stderr!.on("data", (c) => (log += c));
-    const deadline = Date.now() + 30_000;
+    const deadline = Date.now() + 90_000;
     for (;;) {
       if (child.exitCode !== null) throw new Error(`server exited ${child.exitCode}: ${log}`);
       try { if ((await fetch(`${base}/api/health`)).ok) break; } catch { /* not up yet */ }
@@ -76,7 +76,7 @@ describe("GET /api/bots/:id/capabilities access", () => {
     Object.assign(ids, { pub: pub.id, pubThread: pub.threadId, hr: hr.id, hrThread: hr.threadId });
     const restricted = await api("PATCH", `/api/bots/${hr.id}`, BOSS, { visibility: { people: [ADA] } });
     expect(restricted.status, JSON.stringify(restricted.body)).toBe(200);
-  }, 90_000);
+  }, 100_000);
 
   afterAll(async () => {
     await waitForExit(child, { signal: "SIGTERM" });

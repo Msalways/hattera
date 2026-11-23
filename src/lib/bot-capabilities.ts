@@ -32,35 +32,55 @@ export interface BotCapabilities {
 
 // One small cache shared by the Computer panel and the place chip, so both
 // show the same answer for the same conversation. Tests seed it directly.
+// A refresh is tracked per conversation: while one is in flight the hook
+// answers null ("checking"), never the previous value, and each request has a
+// generation so a late reply from an older request cannot overwrite a newer one.
 const cache = new Map<string, BotCapabilities>();
+const pending = new Set<string>();
+const generation = new Map<string, number>();
 const listeners = new Set<() => void>();
 const keyOf = (botId: string, threadId: string | undefined) => `${botId}:${threadId ?? ""}`;
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
+const notify = () => { for (const listener of listeners) listener(); };
 const looksValid = (value: unknown): value is BotCapabilities => {
   const v = value as Partial<BotCapabilities> | null;
   return Boolean(v && typeof v === "object" && v.browser && typeof v.browser.available === "boolean" && v.thisPc?.shell && v.thisPc?.control);
 };
 
 export function seedBotCapabilities(botId: string, threadId: string | undefined, value: BotCapabilities | null): void {
-  if (value) cache.set(keyOf(botId, threadId), value); else cache.delete(keyOf(botId, threadId));
-  for (const listener of listeners) listener();
+  const key = keyOf(botId, threadId);
+  if (value) cache.set(key, value); else cache.delete(key);
+  // A seeded answer is the latest word: any request still in flight is stale.
+  generation.set(key, (generation.get(key) ?? 0) + 1);
+  pending.delete(key);
+  notify();
 }
 
 /** The answer for one bot and conversation; fetched again whenever
  * `refreshKey` changes (a switch, the engine or the place changed). null until
- * it arrives or when the server predates the route. */
+ * it arrives, while a refresh is in flight, after a failed refresh, or when the
+ * server predates the route. */
 export function useBotCapabilities(botId: string | undefined, threadId: string | undefined, refreshKey: string): BotCapabilities | null {
   const key = botId ? keyOf(botId, threadId) : "";
-  const value = useSyncExternalStore(subscribe, () => cache.get(key) ?? null, () => cache.get(key) ?? null);
+  const read = () => (pending.has(key) ? null : cache.get(key) ?? null);
+  const value = useSyncExternalStore(subscribe, read, read);
   useEffect(() => {
     if (!botId) return;
-    let active = true;
+    const mine = (generation.get(key) ?? 0) + 1;
+    generation.set(key, mine);
+    pending.add(key);
+    notify();
     const suffix = threadId ? `?threadId=${encodeURIComponent(threadId)}` : "";
+    const settle = (next: BotCapabilities | null) => {
+      if (generation.get(key) !== mine) return; // a newer request or seed owns the answer
+      pending.delete(key);
+      if (next) cache.set(key, next); else cache.delete(key); // a failed refresh must not leave the old answer standing
+      notify();
+    };
     void api<unknown>(`/api/bots/${botId}/capabilities${suffix}`)
-      .then((next) => { if (active && looksValid(next)) seedBotCapabilities(botId, threadId, next); })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [botId, threadId, refreshKey]);
+      .then((next) => settle(looksValid(next) ? next : null))
+      .catch(() => settle(null));
+  }, [botId, threadId, refreshKey, key]);
   return value;
 }
 
