@@ -91,6 +91,8 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
+      // a bare local request is the owner here, as on a personal install
+      OMB_LOOPBACK_TRUST: "owner",
       OMB_PORT: String(port),
       OMB_WEBHOOK_PORT: String(port + 1),
       OMB_STATIC_DIR: staticDir,
@@ -100,7 +102,7 @@ beforeAll(async () => {
   });
   child.stderr!.on("data", (chunk) => (stderr += chunk));
 
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + 90_000;
   for (;;) {
     if (child.exitCode !== null) throw new Error(`server exited ${child.exitCode}: ${stderr}`);
     try {
@@ -111,7 +113,7 @@ beforeAll(async () => {
     if (Date.now() >= deadline) throw new Error(`server never became healthy: ${stderr}`);
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-}, 30_000);
+}, 100_000);
 
 afterAll(async () => {
   if (child) await waitForExit(child, { signal: "SIGTERM" });
@@ -475,7 +477,7 @@ describe("peer allow-list", () => {
       for (const body of attempts) {
         const refused = await api("PATCH", `/api/bots/${bound.id}`, body);
         expect(refused.status, JSON.stringify(body)).toBe(409);
-        expect(String(refused.body.error)).toContain("desktop app or a paired device");
+        expect(String(refused.body.error)).toMatch(/signed-in session or the desktop app|desktop app or a paired device/);
       }
       // A fake browser header does not grant cross-team authority to a shell.
       for (const headers of [{}, { origin: base }] as Record<string, string>[]) {

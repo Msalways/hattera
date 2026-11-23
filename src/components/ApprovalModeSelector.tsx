@@ -107,7 +107,7 @@ export function ApprovalModeSelector({
   wide?: boolean;
   disabled?: boolean;
   /** The bot is working. Ask, Edits and Auto can still be chosen (the change
-   * reaches the running turn or applies after this step); Full and Custom
+   * reaches the running turn or applies on the next turn); Full and Custom
    * need the trusted desktop grant, which only runs while the bot is idle. */
   busy?: boolean;
   trustedModesAvailable?: boolean;

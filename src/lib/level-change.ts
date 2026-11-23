@@ -68,7 +68,7 @@ export function useLevelChangeNotice(threadId: string | undefined): LevelChangeN
 
 /** Does moving between these two levels need the bot stopped first? Ask,
  * Auto-accept edits and Approve for me can be handed to a running engine (or
- * saved to apply after the step); Full and Custom are a trusted grant, and
+ * saved to apply on the next turn); Full and Custom are a trusted grant, and
  * leaving one is too. The one rule both the thread and the bot surfaces use. */
 export function botLevelNeedsStop(next: ApprovalMode, current: ApprovalMode): boolean {
   const trusted = (mode: ApprovalMode) => mode === "full" || mode === "custom";

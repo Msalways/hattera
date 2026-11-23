@@ -6523,7 +6523,7 @@ export async function applyBotLevelToFollowingTurns(botId: string, from: Approva
 /** One rule for every surface that changes a thread's level (the composer,
  * Refresh permissions, the desktop's private channel): when a turn is running,
  * hand the level to the engine at once where it can take it, and re-read the
- * waiting cards; otherwise it is saved and applies after this step. Full and
+ * waiting cards; otherwise it is saved and applies on the next turn. Full and
  * Custom are never handed over live (they need the trusted transition, and a
  * stop first), so they report "next-turn" by construction. */
 export async function applyLevelToRunningTurn(
@@ -23013,7 +23013,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       const approvalChangeRequested = body.approvalMode !== undefined || body.autoApprove !== undefined;
       // The bot's level is the default its threads follow. One that follows
       // it and is working is handed the new level by the composer's rule
-      // (live where the engine can take it, else after this step); a thread
+      // (live where the engine can take it, else on the next turn); a thread
       // with a level of its own keeps it. Full and Custom change what runs
       // unattended and need the trusted transition and a stop.
       const botLevelLive = requestedApprovalMode === "ask" || requestedApprovalMode === "edits" || requestedApprovalMode === "auto";

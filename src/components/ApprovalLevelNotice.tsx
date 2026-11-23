@@ -14,7 +14,7 @@ const levelLabel = (mode: ApprovalMode | undefined) =>
 /** The line under the composer after a person changes a thread's approval
  * level: what it affects (this thread, not the bot's default), what the
  * running step uses now, and when the change lands. Announced politely to
- * screen readers. It says "applies after this step" for an engine that can't
+ * screen readers. It says "applies on the next turn" for an engine that can't
  * take the level mid-turn, and never implies the running step was stopped. */
 export function ApprovalLevelNotice({ threadId, busy, savedMode }: { threadId: string; busy: boolean; savedMode: ApprovalMode }) {
   const notice = useLevelChangeNotice(threadId);

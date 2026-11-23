@@ -27,11 +27,11 @@ describe("approval level notice", () => {
     expect(html).toMatch(/Auto-accept edits/);
     expect(html).toMatch(/1/);
   });
-  it("says 'applies after this step' for an engine that cannot take it mid-turn, naming the level the step still uses", () => {
+  it("says 'applies on the next turn' for an engine that cannot take it mid-turn, naming the level the step still uses", () => {
     setLevelChangeNotice("t1", { status: "done", requested: "auto", effective: "ask", appliesAt: "next-turn", resolved: 0, at: 1 });
     const html = render(true);
     expect(html).toContain('data-state="next-turn"');
-    expect(html).toContain("applies after this step");
+    expect(html).toContain("applies on the next turn");
     expect(html).toMatch(/Ask for approval/);
     expect(html).toContain("wasn&#x27;t stopped");
     expect(html).toContain("The bot&#x27;s default is unchanged");
