@@ -4,6 +4,8 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 import type { Bot } from "@/state/store";
 import { browserAvailable, type FeatureFlagConfig } from "@/lib/feature-flags";
 import { t } from "@/lib/i18n";
+import { seedBotCapabilities } from "@/lib/bot-capabilities";
+import { seedCapabilitiesFor } from "@/lib/bot-capabilities.fixture";
 
 const fixture = vi.hoisted(() => {
   vi.stubGlobal("window", {});
@@ -28,6 +30,7 @@ afterAll(() => vi.unstubAllGlobals());
 const bot = { id: "browser-fixture", name: "Browser fixture", modelSelection: { instanceId: "fixture" } } as Bot;
 const render = (config: FeatureFlagConfig & { cloudHome?: boolean }, browser?: boolean) => {
   fixture.config = config;
+  seedCapabilitiesFor({ ...bot, browser }, config);
   return renderToStaticMarkup(createElement(ComputerPanel, { bot: { ...bot, browser } }));
 };
 
@@ -46,7 +49,7 @@ describe("Browser panel installation access", () => {
   });
 
   it("does not offer an install on unsupported hosts and still shows a ready engine", () => {
-    expect(render({ features: { browser: true }, browserEngine: { kind: "unavailable", installable: false } })).not.toContain("Browser engine not installed");
+    expect(render({ features: { browser: true }, browserEngine: { kind: "unavailable", installable: false } })).not.toContain("Install the browser engine");
     // A ready browser waits for the owner check before opening a live stream.
     expect(render({ features: { browser: true }, browserEngine: { kind: "engine" } })).toContain("Loading browser…");
   });
@@ -60,6 +63,39 @@ describe("Browser panel installation access", () => {
     expect(installing).toContain("Installing…");
     expect(installing).toContain('disabled=""');
     expect(installing).not.toContain("has its own browser");
+  });
+});
+
+describe("Browser switch reads the server's answer, not the config", () => {
+  const switchRow = (markup: string) => /<div data-testid="browser-switch-row".*?<\/button>/s.exec(markup)?.[0] ?? "";
+  const renderUnseeded = (config: FeatureFlagConfig) => {
+    fixture.config = config;
+    seedBotCapabilities(bot.id, undefined, null); // nothing answered yet
+    return renderToStaticMarkup(createElement(ComputerPanel, { bot }));
+  };
+
+  it("says checking, and holds the switch, while the answer is on its way", () => {
+    const markup = renderUnseeded({ features: { browser: true }, browserEngine: { kind: "unavailable", installable: false } });
+    expect(markup).toContain("Checking the browser");
+    expect(switchRow(markup)).toContain('disabled=""');
+    expect(markup).not.toContain("not installed");
+  });
+
+  it("turns on from the server's 'installed', whatever the config says", () => {
+    // config claims no engine and no install; the server says it is installed
+    const config = { features: { browser: true }, browserEngine: { kind: "unavailable", installable: false } } as const;
+    fixture.config = config;
+    seedCapabilitiesFor({ ...bot, browser: false }, { features: { browser: true }, browserEngine: { kind: "engine" } });
+    const markup = renderToStaticMarkup(createElement(ComputerPanel, { bot: { ...bot, browser: false } }));
+    expect(switchRow(markup)).not.toContain('disabled=""');
+  });
+
+  it("holds the switch when the server says the engine is missing and cannot be installed", () => {
+    const config = { features: { browser: true }, browserEngine: { kind: "engine" } } as const;
+    fixture.config = config;
+    seedCapabilitiesFor({ ...bot, browser: false }, { features: { browser: true }, browserEngine: { kind: "unavailable" } });
+    const markup = renderToStaticMarkup(createElement(ComputerPanel, { bot: { ...bot, browser: false } }));
+    expect(switchRow(markup)).toContain('disabled=""');
   });
 });
 

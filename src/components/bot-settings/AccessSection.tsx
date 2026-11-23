@@ -5,7 +5,7 @@
 // list, webhooks list, and always-allowed list (the first read-only view of
 // standing grants) are new.
 import { useEffect, useState } from "react";
-import { browserUnavailableReason } from "@/lib/feature-flags";
+import { browserFacts, browserStatus, useBotCapabilities } from "@/lib/bot-capabilities";
 import { ChevronDown, ChevronRight, FolderOpen, Plus } from "lucide-react";
 
 import { api, useStore, type Bot } from "@/state/store";
@@ -522,18 +522,21 @@ export function AccessSection({
     connectedAppsConfigured,
     connectedAppsEnabled,
     connectorGrantState,
-    canUseBrowser,
-    desktopBrowser,
-    browserBlockedOnWindows,
-    browserFeature,
-    browserAllowed,
-    browserEnabled,
   } = derived;
   const browserInstallable = state.config?.browserEngine?.installable === true;
+  // The server's answer for this bot; nothing here works it out from flags.
+  const botCaps = useBotCapabilities(bot.id, undefined,
+    [bot.browser, bot.computer, bot.modelSelection.instanceId, state.config?.features?.browser, state.config?.browserEngine?.kind, state.config?.browserEngine?.installing].join("|"));
+  const browserSt = browserStatus(botCaps, browserInstallable);
+  const browserOn = botCaps?.browser.available === true;
+  // Only what no switch here can fix: the workspace switch, the model, an engine that cannot be installed.
+  const sw = botCaps?.browser.switches;
+  const browserBlocked = Boolean(sw && (!sw.workspaceOn || !sw.engineSupports || (!sw.engineInstalled && !browserInstallable)));
   const { capabilities } = useDesktopCapabilities();
   const placeSeat = usePlaceSeat(state.config, capabilities.host?.platform ?? "other");
   const worksOn = placeViewFor(placeFacts({
     bot, place: bot.computer ?? "auto", seat: placeSeat, config: state.config, instances: state.instances,
+    ...browserFacts(botCaps),
   }));
   const [inventory, setInventory] = useState<ConnectorInventory | null>(null);
 
@@ -668,30 +671,23 @@ export function AccessSection({
         <div>
           <div className="text-[15px] font-medium text-ink">Browser</div>
           <div className="mt-0.5 text-[13px] text-ink-secondary">
-            {!desktopBrowser
-              ? browserBlockedOnWindows && !browserInstallable
-                ? "Not available on this Windows machine yet: install the browser engine with `hattera browser install`."
-                : browserUnavailableReason(state.config)
-              : !browserFeature
-                ? "The built-in browser is switched off under App Settings → Computers."
-                : !canUseBrowser
-                  ? "This bot's current model cannot use the built-in browser."
-                  : bot.computer === "off"
-                    ? "Works on is set to Off, so this bot has no browser. Choose another place in the Computer panel to give it one."
-                    : browserEnabled
-                      ? "This bot has its own browser with its own logins."
-                      : "Keep the built-in browser unavailable to this bot."}
+            {bot.computer === "off"
+              ? "Works on is set to Off, so this bot has no browser. Choose another place in the Computer panel to give it one."
+              : browserOn
+                ? "This bot has its own browser with its own logins."
+                : `${t(browserSt.reasonKey as LocaleKey)}${browserSt.nextKey ? ` ${t(browserSt.nextKey as LocaleKey)}` : ""}`}
           </div>
           <ProposalStatus bot={bot} kind="owner" />
         </div>
         <Switch
-          checked={browserEnabled && bot.computer !== "off"}
+          checked={browserOn && bot.computer !== "off"}
           aria-label="Give this bot a built-in browser"
           disabled={
             bot.computer === "off" ||
-            (!browserEnabled && ((!desktopBrowser && !browserInstallable) || !browserFeature || !canUseBrowser))
+            botCaps === null ||
+            (!browserOn && browserBlocked)
           }
-          onClick={() => patch({ browser: !browserAllowed })}
+          onClick={() => patch({ browser: bot.browser === false })}
           title={bot.computer === "off" ? "Works on is set to Off, so this bot has no browser" : undefined}
           className="disabled:cursor-not-allowed"
         />

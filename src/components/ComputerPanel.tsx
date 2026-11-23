@@ -34,6 +34,7 @@ import {
   Smartphone,
   X,
 } from "lucide-react";
+import { browserEngineInstalled, browserFacts, browserStatus, useBotCapabilities } from "@/lib/bot-capabilities";
 import { api, ApiError, currentTaskBot, useStore, type Bot, type ConfigStatus } from "@/state/store";
 import { setAdvancedMode, useAdvancedMode } from "@/lib/interface-mode";
 import { ComputerFilesPane } from "./ComputerFilesPane";
@@ -55,7 +56,7 @@ import { BrowserPanel } from "./BrowserPanel";
 // The Data tab's code (and, behind it, vega-embed) loads the
 // first time the tab opens, never with the app.
 const DataPanel = lazy(() => import("./data/DataPanel").then((module) => ({ default: module.DataPanel })));
-import { browserAvailable, browserUnavailableReason, builtInBrowserEnabled } from "@/lib/feature-flags";
+import { browserUnavailableReason, builtInBrowserEnabled } from "@/lib/feature-flags";
 import { transitionComputerControlLease, type ComputerControlAction } from "@/lib/computer-control";
 import { LocalScreenPreview } from "./LocalScreenPreview";
 import { LinuxLocalControl } from "./LinuxLocalControl";
@@ -384,11 +385,12 @@ export function ComputerPanel({
     : storedPanelView === "routines" || storedPanelView === "android" ? "computer" : storedPanelView;
   const androidStatus = useAndroidUsbDevices();
   const androidConnected = androidStatus.devices.length > 0;
-  // Keep installation reachable before the engine is ready. Actual browser
-  // operations below still require browserAvailableHere.
-  const browserAvailableHere = browserAvailable(state.config);
-  const browserEnabled = builtInBrowserEnabled(state.config) && bot.browser !== false
-    && (browserAvailableHere || state.config?.browserEngine?.installable === true);
+  // The server decides what this bot's turns get; this panel only shows it.
+  const botCaps = useBotCapabilities(profileBot.id, profileBot.threadId,
+    [profileBot.browser, profileBot.computer, profileBot.modelSelection.instanceId, state.config?.features?.browser, state.config?.browserEngine?.kind, state.config?.browserEngine?.installing].join("|"));
+  const browserSwitchedOn = botCaps?.browser.available === true;
+  const browserInstallable = state.config?.browserEngine?.installable === true;
+  const browserEnabled = browserSwitchedOn || (botCaps?.browser.availableReason === "not-installed" && browserInstallable);
   // bumped when a Boat API key is saved inline, to re-run the spin-up flow
   const [retry, setRetry] = useState(0);
   // Auto is a server decision (including an existing Local VM). Do not guess
@@ -1233,7 +1235,15 @@ export function ComputerPanel({
   // Simple mode's Browser tab when the browser is off: the same installation
   // switch as Settings → Computers → Built-in browser, plus this bot's own
   // browser switch, turned on together.
-  const browserCanTurnOn = browserAvailableHere || state.config?.browserEngine?.installable === true;
+  // The engine fact is the server's answer (null while it is being asked), not config.
+  const browserChecking = botCaps === null;
+  const browserCanTurnOn = browserEngineInstalled(botCaps) === true || browserInstallable;
+  // Configured / available / needs you / unknown, each with its reason and next step.
+  const browserSt = browserStatus(botCaps, browserInstallable);
+  // An engine this server cannot install: its own reason (an unsupported platform, say) is the useful words.
+  const browserStatusText = botCaps && !botCaps.browser.switches.engineInstalled && !browserCanTurnOn
+    ? browserUnavailableReason(state.config)
+    : `${t(browserSt.reasonKey as LocaleKey)}${browserSt.nextKey ? ` ${t(browserSt.nextKey as LocaleKey)}` : ""}`;
   const [browserTurningOn, setBrowserTurningOn] = useState(false);
   const turnOnBrowser = async () => {
     if (browserTurningOn) return;
@@ -1266,13 +1276,13 @@ export function ComputerPanel({
       <Globe size={15} className="shrink-0 text-ink-secondary" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-medium text-ink">{t("computer.browserSwitch.title", { name: bot.name })}</div>
-        {!browserCanTurnOn && <div className="text-[11.5px] text-ink-secondary">{browserUnavailableReason(state.config)}</div>}
+        {!browserSwitchedOn && <div data-testid="browser-switch-reason" className="text-[11.5px] text-ink-secondary">{browserChecking ? t(browserSt.titleKey as LocaleKey) : browserStatusText}</div>}
       </div>
       <Switch
-        checked={browserEnabled}
-        disabled={browserTurningOn || (!browserEnabled && !browserCanTurnOn)}
+        checked={browserSwitchedOn}
+        disabled={browserTurningOn || browserChecking || (!browserSwitchedOn && !browserCanTurnOn)}
         aria-label={t("computer.browserSwitch.title", { name: bot.name })}
-        onClick={() => (browserEnabled ? turnOffBrowser() : void turnOnBrowser())}
+        onClick={() => (browserSwitchedOn ? turnOffBrowser() : void turnOnBrowser())}
       />
     </div>
   );
@@ -1295,7 +1305,10 @@ export function ComputerPanel({
   const viewOf = (place: PlaceFacts["place"], refusal?: PlaceFacts["refusal"]): PlaceView => placeViewFor({
     ...placeFacts({
       bot, place, seat: placeSeat, config: state.config, instances: state.instances,
-      local: { ready: localSelectable, reason: localDisabledReason ?? t("computer.unavailableLocal") },
+      // This PC is ready when this app can pick it, or the server says the bot's engine can run commands here or computer control is set up (a shell that ran here used to read "Not ready").
+      local: { ready: localSelectable || botCaps?.thisPc.shell.available === true || botCaps?.thisPc.control.ready === true, reason: localDisabledReason ?? t("computer.unavailableLocal") },
+      localChecking: botCaps === null && !localSelectable,
+      ...browserFacts(botCaps),
       ...(place === "cloud" ? { computer: cloudComputer } : {}),
       ...(place === "auto" && currentTeamComputer ? { teamComputer: currentTeamComputer.name } : {}),
     }),
@@ -1537,9 +1550,11 @@ export function ComputerPanel({
           {browserSwitchRow}
           <div className="mt-2 flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-8 text-center">
             <Globe size={22} className="text-ink-secondary" aria-hidden="true" />
-            <div className="text-[14px] font-medium text-ink">{t("computer.browserOff.title")}</div>
-            <p className="text-[12px] leading-5 text-ink-secondary">
-              {browserCanTurnOn ? t("computer.browserOff.body", { name: bot.name }) : browserUnavailableReason(state.config)}
+            <div className="text-[14px] font-medium text-ink" data-testid="browser-state-title">{t(browserSt.titleKey as LocaleKey)}</div>
+            <p className="text-[12px] leading-5 text-ink-secondary" data-testid="browser-state-body">
+              {browserSt.reason === "bot-off" || browserSt.reason === "workspace-off"
+                ? (browserCanTurnOn ? t("computer.browserOff.body", { name: bot.name }) : browserStatusText)
+                : browserStatusText}
             </p>
             {errorText && (
               <div role="alert" className="w-full rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">

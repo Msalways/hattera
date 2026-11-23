@@ -2,6 +2,7 @@ import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import type { Bot, InstanceInfo } from "@/state/store";
+import { seedBotCapabilities, type BotCapabilities } from "@/lib/bot-capabilities";
 
 vi.stubGlobal("window", {});
 const fixture = vi.hoisted(() => ({ config: null as unknown, menuOpen: false, computerMcp: true }));
@@ -144,5 +145,36 @@ describe("J11: the chip names a place's problem in the panel's words", () => {
     expect(row).toContain('disabled=""');
     expect(row).toContain("Not with this model");
     expect(row).toContain("title=\"grok-4.6 can&#x27;t use a computer. Choose a model that can, such as Claude or ChatGPT.\"");
+  });
+});
+
+describe("RC-2: the place menu while the server's capability answer is still loading", () => {
+  afterEach(() => { fixture.menuOpen = false; fixture.config = null; seedBotCapabilities("bot", "thread", null); });
+  const browserRow = () => {
+    fixture.menuOpen = true;
+    fixture.config = { features: { browser: true }, browserEngine: { kind: "engine" } };
+    const html = renderToStaticMarkup(createElement(PlaceChip, { bot: { ...bot, computer: "browser" }, live: false, onPin: () => {} }));
+    return html.split('role="menuitemradio"').slice(1)
+      .map((row) => row.slice(row.indexOf(">") + 1, row.indexOf("</button>")).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim())
+      .find((text) => /^Browser/.test(text)) ?? "NO BROWSER ROW";
+  };
+
+  it("says checking, never Browser is off, until the answer arrives", () => {
+    seedBotCapabilities("bot", "thread", null);
+    const row = browserRow();
+    expect(row).toMatch(/checking/i);
+    expect(row).not.toMatch(/browser is off/i);
+  });
+
+  it("settles to the server's answer once it arrives", () => {
+    const caps = (available: boolean) => ({
+      browser: { mounts: available, reason: "ready", available, availableReason: available ? "ready" : "bot-off", message: "",
+        switches: { workspaceOn: true, botOn: available, engineSupports: true, engineInstalled: true } },
+      thisPc: { control: { ready: false }, shell: { available: false } },
+    }) as unknown as BotCapabilities;
+    seedBotCapabilities("bot", "thread", caps(false));
+    expect(browserRow()).toMatch(/browser is off/i);
+    seedBotCapabilities("bot", "thread", caps(true));
+    expect(browserRow()).not.toMatch(/checking|browser is off/i);
   });
 });

@@ -4,7 +4,6 @@
 // stay pure prop-takers. This hook is the one place in the bot settings
 // dialog that still reaches into useStore.
 import { useDesktopCapabilities } from "../DesktopCapabilities";
-import { browserAvailable, builtInBrowserEnabled } from "@/lib/feature-flags";
 import { stateForBot } from "@/lib/mascot";
 import { useStore, type Bot } from "@/state/store";
 import { approvalModeFor } from "../../../shared/approval-mode";
@@ -73,12 +72,6 @@ export function useBotSettingsDerived(bot: Bot) {
   const connectedAppsConfigured = state.config?.composio?.configured === true;
   const connectedAppsEnabled = bot.composio !== false;
   const connectorGrantState: ConnectorGrantsState = connectorGrantsState(bot);
-  const canUseBrowser = engine?.capabilities?.browserMcp === true;
-  const desktopBrowser = browserAvailable(state.config);
-  const browserBlockedOnWindows = window.ogb?.platform === "win32" && !desktopBrowser;
-  const browserFeature = builtInBrowserEnabled(state.config);
-  const browserAllowed = bot.browser !== false;
-  const browserEnabled = browserFeature && browserAllowed;
   const sectionName = bot.section?.trim() || "General";
   const currentChief = state.bots.find(
     (candidate) =>
@@ -98,12 +91,6 @@ export function useBotSettingsDerived(bot: Bot) {
     connectedAppsConfigured,
     connectedAppsEnabled,
     connectorGrantState,
-    canUseBrowser,
-    desktopBrowser,
-    browserBlockedOnWindows,
-    browserFeature,
-    browserAllowed,
-    browserEnabled,
     sectionName,
     currentChief,
     botRoutines,

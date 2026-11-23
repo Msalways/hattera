@@ -34,6 +34,7 @@ vi.mock("@/state/store", async (importOriginal) => {
   };
 });
 
+import { seedCapabilitiesFor } from "@/lib/bot-capabilities.fixture";
 import { SettingsModal } from "./SettingsModal";
 import { ComputerPanel } from "./ComputerPanel";
 import { AccessSection } from "./bot-settings/AccessSection";
@@ -50,8 +51,8 @@ const switchTag = (markup: string, label: string) => {
   return match![0];
 };
 const settings = () => renderToStaticMarkup(createElement(SettingsModal));
-const access = () => renderToStaticMarkup(createElement(BotAccess, { bot }));
-const panel = (browser: boolean) => renderToStaticMarkup(createElement(ComputerPanel, { bot: { ...bot, browser } }));
+const access = () => { seedCapabilitiesFor(bot, fixture.config, { engineSupports: fixture.browserMcp }); return renderToStaticMarkup(createElement(BotAccess, { bot })); };
+const panel = (browser: boolean) => { seedCapabilitiesFor({ ...bot, browser }, fixture.config); return renderToStaticMarkup(createElement(ComputerPanel, { bot: { ...bot, browser } })); };
 
 beforeEach(() => {
   fixture.config = { features: { browser: false }, browserEngine: { kind: "unavailable", installable: true } };
@@ -81,6 +82,10 @@ describe("browser installation opt-in", () => {
     expect(markup.match(/<button[^>]*>Browser<\/button>/)).toBeNull();
     expect(panel(false)).not.toContain("Install the browser engine");
     expect(panel(true)).toContain("Install the browser engine");
+    // The tile says what is true: not installed, with the next step, never "off".
+    const tile = panel(true);
+    expect(tile).toContain("Browser engine not installed");
+    expect(tile).not.toContain("The browser is off");
     expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 

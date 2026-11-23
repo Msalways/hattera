@@ -8,7 +8,7 @@ import type { CloudAccountState } from "../../electron/cloud-account.mjs";
 import { activeLocale, t } from "@/lib/i18n";
 import { cloudPlanView } from "@/lib/cloud-plan";
 import { engineSignedOut } from "@/lib/failed-turn";
-import { browserAvailable, builtInBrowserEnabled, type FeatureFlagConfig } from "@/lib/feature-flags";
+import type { FeatureFlagConfig } from "@/lib/feature-flags";
 import { writeComputerPanelView } from "@/lib/computer-panel-view";
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
@@ -58,6 +58,15 @@ export function placeFacts(input: {
   local?: PlaceFacts["local"];
   computer?: PlaceFacts["computer"];
   teamComputer?: string;
+  /** The server's answer (src/lib/bot-capabilities.ts), never a config flag.
+   * False until that answer arrives. */
+  browserOn: boolean;
+  /** No answer yet (browserFacts): the place reads "checking". */
+  browserChecking?: boolean;
+  /** No answer yet and this app cannot pick this computer itself: the place reads "checking". */
+  localChecking?: boolean;
+  /** The server said "not-installed": on, but no engine yet. */
+  browserMissing?: boolean;
 }): PlaceFacts {
   const { bot, config, seat } = input;
   const instance = input.instances.find((candidate) => candidate.instanceId === bot.modelSelection.instanceId);
@@ -70,7 +79,10 @@ export function placeFacts(input: {
     backend: bot.cloudBackend === "vps" ? "vps" : "box",
     engine: engineFacts(instance, bot.modelSelection.model),
     toolsAllowComputer: canUseMcpServer(bot.toolScope, "computer"),
-    browserOn: builtInBrowserEnabled(config) && browserAvailable(config),
+    browserOn: input.browserOn,
+    ...(input.browserChecking ? { browserChecking: true } : {}),
+    ...(input.localChecking ? { localChecking: true } : {}),
+    ...(input.browserMissing ? { browserMissing: true } : {}),
     role: seat.role,
     mode: seat.mode,
     ...(input.local ? { local: input.local } : {}),
@@ -94,13 +106,15 @@ export function placeRowViewFor(row: PlaceRow, seat: PlaceSeat, worksOnLabel?: s
 
 /** Whether a place can't be picked at all: no setting here makes it work. */
 export function placeBlocked(view: PlaceView): boolean {
-  return view.state === "cc-cannot" || view.state === "cc-on-my-cloud" || view.state === "browser-off" || view.state === "browser-cannot"
+  return view.state === "cc-cannot" || view.state === "cc-on-my-cloud" || view.state === "browser-off" || view.state === "browser-missing" || view.state === "browser-cannot"
     || view.state === "vm-cannot" || view.state === "local-unavailable";
 }
 
 /** Whether a place's state is a problem to name on its card, not its usual description. */
 export function placeHasIssue(view: PlaceView): boolean {
-  return placeBlocked(view) || view.state === "cc-tools-off" || view.state === "cc-sign-in" || view.state === "cc-needs-key"
+  // "browser-checking" is not blocked (nothing is wrong), but its words, not the
+  // place's usual description, are what the person should read until it settles.
+  return placeBlocked(view) || view.state === "browser-checking" || view.state === "local-checking" || view.state === "cc-tools-off" || view.state === "cc-sign-in" || view.state === "cc-needs-key"
     || view.state === "cc-unavailable";
 }
 

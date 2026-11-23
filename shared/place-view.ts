@@ -20,8 +20,8 @@ export const PLACE_STATES = [
   "cc-cannot", "cc-tools-off", "cc-sign-in", "cc-new", "cc-starting", "cc-waking", "cc-on", "cc-asleep",
   "cc-no-hours", "cc-at-once", "cc-unavailable", "cc-ended", "cc-no-start", "cc-clearing", "cc-provider",
   "cc-on-my-cloud", "cc-needs-key", "vps",
-  "browser", "browser-off", "browser-cannot",
-  "local", "local-unavailable", "vm", "vm-cannot", "place-failed",
+  "browser", "browser-checking", "browser-off", "browser-missing", "browser-cannot",
+  "local", "local-checking", "local-unavailable", "vm", "vm-cannot", "place-failed",
   "off",
 ] as const;
 export type PlaceState = (typeof PLACE_STATES)[number];
@@ -107,6 +107,14 @@ export interface PlaceFacts {
   toolsAllowComputer: boolean;
   /** The built-in browser is switched on for this installation and bot. */
   browserOn: boolean;
+  /** The server has not answered yet (src/lib/bot-capabilities.ts returns null):
+   * neither on nor off, so the place reads "checking", never "Browser is off". */
+  browserChecking?: boolean;
+  /** This computer's readiness depends on the server's answer, which has not arrived: never "Not ready" before it does. */
+  localChecking?: boolean;
+  /** The browser is switched on but its engine is not installed (the server's
+   * "not-installed" reason): not the same as off, and fixed differently. */
+  browserMissing?: boolean;
   role: "admin" | "user";
   mode?: "simple" | "advanced";
   /** The cloud computer as last seen; unknown reads as not made yet. */
@@ -169,12 +177,18 @@ export const PLACE_EN = {
   "place.view.vps.line": "Uses your own server, connected over SSH.",
   "place.view.browser.short": "Web pages only",
   "place.view.browser.line": "Works in the built-in browser only: web pages, no desktop apps.",
+  "place.view.browserChecking.short": "Checking…",
+  "place.view.browserChecking.line": "Checking whether the built-in browser is available.",
   "place.view.browserOff.short": "Browser is off",
   "place.view.browserOff.line": "The built-in browser is switched off.",
+  "place.view.browserMissing.short": "Not installed",
+  "place.view.browserMissing.line": "The browser engine isn't installed on this server yet.",
   "place.view.browserCannot.short": "Not with this model",
   "place.view.browserCannot.line": "{model} can't use the built-in browser.",
   "place.view.local.short": "Your screen",
   "place.view.local.line": "Uses your screen, mouse, and keyboard.",
+  "place.view.localChecking.short": "Checking…",
+  "place.view.localChecking.line": "Checking whether this computer is ready.",
   "place.view.localUnavailable.short": "Not ready",
   "place.view.localUnavailable.line": "{reason}",
   "place.view.vm.short": "Private desktop",
@@ -264,9 +278,12 @@ const STATE: Record<PlaceState, { key: string; action: PlaceActionId | null }> =
   "cc-needs-key": { key: "ccNeedsKey", action: "add-boat-key" },
   vps: { key: "vps", action: null },
   browser: { key: "browser", action: null },
+  "browser-checking": { key: "browserChecking", action: null },
   "browser-off": { key: "browserOff", action: "turn-on-browser" },
+  "browser-missing": { key: "browserMissing", action: "turn-on-browser" },
   "browser-cannot": { key: "browserCannot", action: "choose-model" },
   local: { key: "local", action: null },
+  "local-checking": { key: "localChecking", action: null },
   "local-unavailable": { key: "localUnavailable", action: null },
   vm: { key: "vm", action: "open-vm-settings" },
   "vm-cannot": { key: "vmCannot", action: "choose-model" },
@@ -321,9 +338,12 @@ export function placeState(facts: PlaceFacts): { state: PlaceState; params: Plac
   }
   if (facts.place === "browser") {
     if (!facts.engine.browser) return { state: "browser-cannot", params: { bot, model } };
-    return facts.browserOn ? { state: "browser", params: { bot } } : { state: "browser-off", params: { bot } };
+    if (facts.browserChecking) return { state: "browser-checking", params: { bot } };
+    if (facts.browserOn) return { state: "browser", params: { bot } };
+    return facts.browserMissing ? { state: "browser-missing", params: { bot } } : { state: "browser-off", params: { bot } };
   }
   if (facts.place === "local") {
+    if (facts.localChecking) return { state: "local-checking", params: { bot } };
     return facts.local?.ready === false
       ? { state: "local-unavailable", params: { bot, reason: facts.local.reason ?? "" } }
       : { state: "local", params: { bot } };

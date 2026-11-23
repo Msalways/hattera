@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { browserFacts, useBotCapabilities } from "@/lib/bot-capabilities";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
@@ -26,12 +27,15 @@ export function usePlaceViews(bot: Bot): Record<Place, { view: PlaceView; reacha
   // offers (an OMB Cloud home), are not reachable.
   const allowed = state.config?.managedPolicy?.computers ?? { thisComputer: true, localVm: true, box: true, vps: true };
   const providerSupportsLocal = instanceSupportsLocalComputer(state.instances, bot);
+  // The server's answer, the same one the Computer panel shows.
+  const botCaps = useBotCapabilities(bot.id, bot.threadId,
+    [bot.browser, bot.computer, bot.modelSelection.instanceId, state.config?.features?.browser, state.config?.browserEngine?.kind].join("|"));
   const local = {
-    ready: localComputerSelectable({ capabilities, providerSupportsLocal }),
+    ready: localComputerSelectable({ capabilities, providerSupportsLocal }) || botCaps?.thisPc.shell.available === true || botCaps?.thisPc.control.ready === true,
     reason: localComputerDisabledReason({ capabilities, providerSupportsLocal }) ?? t("computer.unavailableLocal"),
   };
   const entry = (place: Place) => {
-    const view = placeViewFor(placeFacts({ bot, place, seat, config: state.config, instances: state.instances, local }));
+    const view = placeViewFor(placeFacts({ bot, place, seat, config: state.config, instances: state.instances, local, ...browserFacts(botCaps) }));
     const policy = (place === "cloud" ? allowed[backend] : place === "vm" ? allowed.localVm : place === "local" ? allowed.thisComputer : true)
       && placeOffered(place, state.config);
     return { view, policy, reachable: policy && !placeBlocked(view) };

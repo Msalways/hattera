@@ -126,6 +126,8 @@ describe("placeState", () => {
     expect(placeState(facts({ place: "off" })).state).toBe("off");
     expect(placeState(facts({ place: "browser" })).state).toBe("browser");
     expect(placeState(facts({ place: "browser", browserOn: false })).state).toBe("browser-off");
+    // switched on but no engine yet: not installed, never "off"
+    expect(placeState(facts({ place: "browser", browserOn: false, browserMissing: true })).state).toBe("browser-missing");
     expect(placeState(facts({ place: "browser", engine: { name: "X", computer: true, browser: false, signedIn: true } })).state).toBe("browser-cannot");
     expect(placeState(facts({ place: "local", local: { ready: false, reason: "Not yet." } }))).toEqual({
       state: "local-unavailable", params: { bot: "Scout", reason: "Not yet." },
@@ -201,5 +203,21 @@ describe("cloudRefusal reads the Admin's refusals", () => {
     expect(cloudRefusal({ message: "Start the $20/month Boat plan to create sandboxes.", status: 402 }, false))
       .toEqual({ state: "cc-provider", params: { words: "Start the $20/month Boat plan to create sandboxes." } });
     expect(included("something new").state).toBe("cc-no-start");
+  });
+});
+
+describe("RC-2: browser state before the server answers", () => {
+  it("reads checking, not off, while the answer is pending, and never blocks the place", () => {
+    expect(placeState(facts({ place: "browser", browserOn: false, browserChecking: true })).state).toBe("browser-checking");
+    expect(placeState(facts({ place: "browser", browserOn: false })).state).toBe("browser-off");
+  });
+});
+
+describe("RC-2: this computer before the server answers", () => {
+  it("reads checking, not 'Not ready', while the answer is pending, and settles once it arrives", () => {
+    const pending = placeState(facts({ place: "local", local: { ready: false, reason: "x" }, localChecking: true }));
+    expect(pending.state).toBe("local-checking");
+    expect(placeState(facts({ place: "local", local: { ready: false, reason: "x" } })).state).toBe("local-unavailable");
+    expect(placeState(facts({ place: "local", local: { ready: true } })).state).toBe("local");
   });
 });
