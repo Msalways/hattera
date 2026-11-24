@@ -433,13 +433,7 @@ export const Transcript = memo(function Transcript({
               {first.from && cluster && (
                 <ClusterLabel bot={memberOf(first.from.botId)} name={first.from.name} color={first.from.color} />
               )}
-              <ActivityRun messages={item.messages} forceOpen={item.messages.some((step) => step.id === focusedId)}>
-                {item.messages.map((step) => (
-                  <div key={step.id} className="contents" data-mid={step.id}>
-                    <RoomToolChip message={step} />
-                  </div>
-                ))}
-              </ActivityRun>
+              <ActivityRun messages={item.messages} focusedId={focusedId} renderStep={(step) => <RoomToolChip message={step} />} />
             </div>
           );
         }

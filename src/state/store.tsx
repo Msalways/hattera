@@ -18,7 +18,7 @@ import { DATA_ROUTES, type DataSheet, type DataTable } from "../../shared/data-s
 import type { TurnDigest } from "../../shared/digest";
 import type { ToolScope } from "../../shared/tool-scope";
 import type { ModelVariantOption, RuntimeEvent } from "../../shared/runtime-events";
-import { foldLiveTurn, parseFrameCursor, type LiveCursor, type LiveTurn } from "@/lib/live-turn";
+import { foldLiveTurn, parseFrameCursor, THOUGHTS_MAX, thoughtsOf, type LiveCursor, type LiveTurn, type ThoughtRecord } from "@/lib/live-turn";
 import type { MausColor, MausMotion } from "@/lib/mascot";
 import type { BotAvatarCrop } from "../../shared/bot-avatar";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
@@ -194,9 +194,11 @@ export interface Message {
    * narration of the same chip ("reading a file"), used by call mode. */
   /** `setup` marks an error fixed by installing something, not by retrying.
    * `summary` is the call's input on one redacted line (the shell command). */
-  tool?: { name: string; ok?: boolean; spoken?: string; setup?: boolean; claudeUpdate?: boolean; place?: PlaceRow; summary?: string; input?: string; output?: string ; itemId?: string; outputPath?: string; fullResult?: boolean };
+  tool?: { name: string; ok?: boolean; spoken?: string; setup?: boolean; claudeUpdate?: boolean; place?: PlaceRow; summary?: string; input?: string; output?: string ; itemId?: string; outputPath?: string; fullResult?: boolean; durationMs?: number };
   /** user messages sent into a running turn — the model saw it mid-turn */
   steered?: boolean;
+  /** a peer bot's context folded into a running turn: never a new request */
+  aside?: boolean;
   /** a user message that did not come from typing here: through the
    * server's API, or spoken during a Live call. */
   via?: "api" | "call";
@@ -980,6 +982,9 @@ export interface AppState {
   /** In-flight reasoning/reply text per thread, folded from streamed deltas.
    * Display-only and never persisted; the stored message replaces it. */
   liveTurns: Record<string, LiveTurn>;
+  /** Finished thoughts per thread, kept so one stays reopenable after its turn
+   * ends. Display-only; the server does not store reasoning. */
+  thoughts: Record<string, ThoughtRecord[]>;
   config: ConfigStatus | null;
   /** The Live call the harness is running, including a call that has just
    * ended; null when no call is known. Follows `live.call` SSE frames and
@@ -1583,6 +1588,28 @@ function dismissOnboardingCard(state: AppState, botId: string): AppState {
   return quiz ? patchCard(state, botId, quiz.id, { dismissed: true }) : state;
 }
 
+/** A thought anchored on an optimistic message follows it to its stored id. */
+function repointThoughtAnchors(state: AppState, threadId: string, from: string, to: string): AppState {
+  const live = state.liveTurns[threadId];
+  const records = state.thoughts[threadId];
+  const liveHit = live?.anchorId === from || (live?.thoughts.some((segment) => segment.anchorId === from) ?? false);
+  const recordHit = records?.some((thought) => thought.anchorId === from) ?? false;
+  if (!liveHit && !recordHit) return state;
+  return {
+    ...state,
+    liveTurns: liveHit && live
+      ? { ...state.liveTurns, [threadId]: {
+        ...live,
+        anchorId: live.anchorId === from ? to : live.anchorId,
+        thoughts: live.thoughts.map((segment) => (segment.anchorId === from ? { ...segment, anchorId: to } : segment)),
+      } }
+      : state.liveTurns,
+    thoughts: recordHit && records
+      ? { ...state.thoughts, [threadId]: records.map((thought) => (thought.anchorId === from ? { ...thought, anchorId: to } : thought)) }
+      : state.thoughts,
+  };
+}
+
 const optimisticMessageId = (sendId: string): string => `optimistic-${sendId}`;
 
 function optimisticUserMessage(
@@ -2014,8 +2041,8 @@ export function reducer(state: AppState, action: Action): AppState {
       const optimisticIndex = optimisticId
         ? bot.messages.findIndex((message) => message.id === optimisticId)
         : -1;
-      if (optimisticIndex >= 0) {
-        return updateBot(stamped, bot.id, (current) => ({
+      if (optimisticIndex >= 0 && optimisticId) {
+        const swapped = updateBot(stamped, bot.id, (current) => ({
           ...current,
           messages: current.messages.map((message, index) =>
             index === optimisticIndex ? action.message : message
@@ -2024,6 +2051,7 @@ export function reducer(state: AppState, action: Action): AppState {
             ? action.message.id
             : current.activeLeafId,
         }));
+        return repointThoughtAnchors(swapped, action.threadId, optimisticId, action.message.id);
       }
       // every server-side append chains onto (and becomes) the active leaf
       const next = updateBot(stamped, bot.id, (b) => {
@@ -2125,8 +2153,17 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     case "liveTurnRuntime": {
       const previous = state.liveTurns[action.event.threadId];
-      const next = foldLiveTurn(previous, action.event, action.cursor);
+      const threadId = action.event.threadId;
+      // the thought sits right after the last stored message when it began
+      const anchorId = state.bots.find((bot) => bot.threadId === threadId)?.messages?.at(-1)?.id;
+      const next = foldLiveTurn(previous, action.event, action.cursor, anchorId);
       if (next === previous) return state;
+      // a finished turn keeps its thought, so it stays where it was and reopenable
+      const finished = action.event.type === "turn.completed" && previous && !previous.ended ? thoughtsOf(previous, Date.parse(action.event.createdAt) || undefined) : [];
+      if (finished.length) {
+        const kept = [...(state.thoughts[threadId] ?? []), ...finished].slice(-THOUGHTS_MAX);
+        state = { ...state, thoughts: { ...state.thoughts, [threadId]: kept } };
+      }
       if (!next) {
         return { ...state, liveTurns: Object.fromEntries(Object.entries(state.liveTurns).filter(([threadId]) => threadId !== action.event.threadId)) };
       }
@@ -2690,6 +2727,7 @@ export function dataSheetFromResponse(body: unknown, botId: string): DataSheet {
 export const initialState: AppState = {
   modelVariantSessions: {},
   liveTurns: {},
+  thoughts: {},
   backgroundThreadEvents: {},
   loadingOlder: {},
   transcriptGeneration: {},
@@ -3040,6 +3078,8 @@ export function liveTurnFrameAction(event: RuntimeEvent, cursor?: LiveCursor): A
   return event.type === "content.delta" ||
     event.type === "turn.started" ||
     event.type === "turn.completed" ||
+    // a tool starting is what ends the thinking before it
+    (event.type === "item.started" && event.itemType === "tool") ||
     (event.type === "item.completed" && event.itemType === "assistant_text")
     ? { type: "liveTurnRuntime", event, ...(cursor ? { cursor } : {}) }
     : null;

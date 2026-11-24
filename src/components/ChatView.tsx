@@ -1,4 +1,4 @@
-import { Component, createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
+import { Component, createContext, Fragment, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { brand } from "@/lib/brand";
 import { useShowThreads } from "@/lib/thread-preferences";
@@ -65,11 +65,12 @@ import { isProviderSafetyBlock, PROVIDER_SAFETY_GUIDANCE, PROVIDER_SAFETY_HELP_U
 import { isCancelledTranscriptRow } from "../../shared/client-cancel";
 import { BotAvatar } from "./Avatar";
 import { TurnPresence } from "./TurnPresence";
+import { LiveTurn, useGrowToEnd } from "./LiveTurn";
+import { resolveThoughtAnchor, visibleLiveTurn } from "@/lib/live-turn";
 import { showToolCallsEnabled, skillAuthoringEnabled } from "@/lib/feature-flags";
 import { normalizeState, stateForBot } from "@/lib/mascot";
 import { peerLine, peerRequest, type PeerLine } from "@/lib/peer-message";
 import { showWorkingDots } from "@/lib/turn-tail";
-import { liveActivityPhrases } from "@/lib/live-activity";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { VoiceNoteBubble, type VoiceNoteAttachment } from "./VoiceNoteBubble";
 import { RawMarkdownView, RawToggleAction } from "./RawMarkdownToggle";
@@ -116,10 +117,14 @@ import { effectivePlace, toolPlace, type EffectivePlace } from "@/lib/place";
 import { cn } from "@/lib/cn";
 import { activeLocale, t } from "@/lib/i18n";
 import { COMPACT_BUBBLE } from "@/lib/compact-chip";
-import { groupTranscript, isStatusActivity } from "@/lib/activity-runs";
+import { groupTranscript, isStatusActivity, splitRunsAtThoughts } from "@/lib/activity-runs";
 import { StatusActivityRow } from "@/components/StatusActivityRow";
 import { CancelledTurnRow } from "./CancelledTurnRow";
 import { ActivityRun } from "./ActivityRun";
+import { useFocusAcrossRegroup } from "./useFocusAcrossRegroup";
+import { TurnToolsHeader } from "./TurnToolsHeader";
+import { digestsCoveredByHeader, toolCountsByTurn, toolTurnStates, type ToolTurnState } from "@/lib/tool-rows";
+import { ThoughtSlot } from "./ThoughtBlock";
 import { TurnNarrationRun } from "./TurnNarrationRun";
 import { webhookMessageView } from "@/lib/webhook-message";
 import { splitTranscriptAttachments } from "@/lib/composer-attachments";
@@ -787,7 +792,7 @@ function PeerLabel({ peer }: { peer: PeerLine }) {
 }
 
 /** A tool run: spinner while live, check/cross once settled. */
-const ActivityChip = memo(function ActivityChip({ message, place = "auto" }: { message: Message; place?: EffectivePlace }) {
+const ActivityChip = memo(function ActivityChip({ message, place = "auto", turnState = "active" }: { message: Message; place?: EffectivePlace; turnState?: ToolTurnState }) {
   const { bots, dispatch } = useChatRows();
   const tool = message.tool;
   if (!tool) return null;
@@ -810,7 +815,7 @@ const ActivityChip = memo(function ActivityChip({ message, place = "auto" }: { m
       </div>
     );
   }
-  return <ToolActivity tool={tool} place={toolPlace(tool.name, place)} />;
+  return <ToolActivity tool={tool} place={toolPlace(tool.name, place)} turnState={turnState} />;
 });
 
 /** A routine run's receipt. It opens the run's own thread, so it follows
@@ -879,6 +884,8 @@ const MessagesList = memo(function MessagesList({
   engine,
   unreadDividerId,
   unreadDividerFading,
+  thoughtAnchors,
+  resolveThoughtAnchorFor,
   onStartEdit,
   onCancelEdit,
   onSubmitEdit,
@@ -903,18 +910,29 @@ const MessagesList = memo(function MessagesList({
   /** The New divider goes above the row holding this message. */
   unreadDividerId: string | null;
   unreadDividerFading: boolean;
+  /** Stored messages a thought sits right after (finished ones and the live one). */
+  thoughtAnchors: ReadonlySet<string>;
+  resolveThoughtAnchorFor: (anchorId: string | undefined, startedAt: number | undefined) => string | null;
   onStartEdit: (id: string) => void;
   onCancelEdit: () => void;
   onSubmitEdit: (id: string, text: string) => void;
   onRegenerate: () => void;
   onReply: (message: Message) => void;
 }) {
-  const { botId, threadId, botName, focus, showToolCalls, locale } = useChatRows();
+  const { botId, threadId, botName, focus, showToolCalls, locale, busy } = useChatRows();
   // Finished tool chips become compact runs; settled assistant narration
   // becomes one reversible turn row while the terminal answer stays visible.
   // The locale refreshes the turn labels when the language changes.
-  const items = useMemo(() => groupTranscript(messages), [messages, locale]);
+  // With tool rows shown the narration stays in stream order beside them; the
+  // "Worked" fold would be a second activity anchor over the same turn.
+  const items = useMemo(
+    () => splitRunsAtThoughts(groupTranscript(messages, !showToolCalls), thoughtAnchors),
+    [messages, locale, showToolCalls, thoughtAnchors],
+  );
+  const toolStates = useMemo(() => toolTurnStates(messages, busy), [messages, busy]);
+  const coveredDigests = useMemo(() => digestsCoveredByHeader(messages), [messages]);
   const newestMessageId = messages.at(-1)?.id;
+  const toolCounts = useMemo(() => toolCountsByTurn(messages), [messages]);
   let newestUserMessageId: string | undefined;
   for (let i = messages.length - 1; i >= 0 && !newestUserMessageId; i--) {
     if (messages[i]!.role === "user") newestUserMessageId = messages[i]!.id;
@@ -929,14 +947,38 @@ const MessagesList = memo(function MessagesList({
     dividerPlaced = true;
     return <NewMessagesDivider fading={unreadDividerFading} />;
   };
+  // Thoughts sit in the stream, right after the item holding the message the
+  // thinking began after.
+  // The turn header (tool count) belongs at the top of its turn: when the
+  // thinking hangs off the request row, the header goes above it.
+  const hoistedHeaders = new Set<string>();
+  const headerOf = (item: (typeof items)[number] | undefined) => {
+    const head = item && (item.kind === "message" ? item.message : item.messages[0]);
+    return head && showToolCalls && toolCounts.get(head.id) ? head : undefined;
+  };
+  const thoughtsAfter = (item: (typeof items)[number], node: ReactNode, next?: (typeof items)[number]) => {
+    const ids = item.kind === "message" ? [item.message.id] : item.messages.map((message) => message.id);
+    const here = thoughtAnchors.size ? ids.filter((id) => thoughtAnchors.has(id)) : [];
+    if (!here.length) return node;
+    const head = item.kind === "message" && item.message.role === "user" ? headerOf(next) : undefined;
+    if (head) hoistedHeaders.add(head.id);
+    return (
+      <Fragment key={item.kind === "message" ? item.message.id : item.id}>
+        {node}
+        {head && <TurnToolsHeader count={toolCounts.get(head.id)!} />}
+        {here.map((id) => <ThoughtSlot key={`${threadId}:${id}`} threadId={threadId} afterId={id} resolveAnchor={resolveThoughtAnchorFor} />)}
+      </Fragment>
+    );
+  };
   return (
     <>
-      {items.map((item, i) => {
+      {items.map((item, i) => thoughtsAfter(item, ((item: (typeof items)[number], i: number) => {
         const previous = items[i - 1];
         const prev = previous && (previous.kind === "message" ? previous.message : previous.messages.at(-1));
         const first = item.kind === "message" ? item.message : item.messages[0];
         const newDay = !prev || localDay(prev.at) !== localDay(first.at);
         const divider = dividerAbove(item.kind === "message" ? [item.message] : item.messages);
+        const toolsHeader = headerOf(item) && !hoistedHeaders.has(first.id) ? <TurnToolsHeader count={toolCounts.get(first.id)!} /> : null;
         if (item.kind === "turn") {
           return (
             <div key={item.id} className="contents">
@@ -971,13 +1013,8 @@ const MessagesList = memo(function MessagesList({
             <div key={item.id} className="contents">
               {newDay && <DaySeparator at={first.at} today={today} />}
               {divider}
-              <ActivityRun messages={item.messages} forceOpen={item.messages.some((step) => step.id === focusedId)}>
-                {item.messages.map((step) => (
-                  <div key={step.id} className="contents" data-mid={step.id}>
-                    <ActivityChip message={step} place={place} />
-                  </div>
-                ))}
-              </ActivityRun>
+              {toolsHeader}
+              <ActivityRun messages={item.messages} focusedId={focusedId} renderStep={(step) => <ActivityChip message={step} place={place} turnState={toolStates.get(step.id) ?? "unknown"} />} />
             </div>
           );
         }
@@ -1040,11 +1077,11 @@ const MessagesList = memo(function MessagesList({
                 );
               }
               if (!showToolCalls && !m.comm && !m.threadRef && !m.dataResult) return null;
-              return <ActivityChip message={m} place={place} />;
+              return <ActivityChip message={m} place={place} turnState={toolStates.get(m.id) ?? "unknown"} />;
             }
             case "digest":
               // the summary of the turn's tool chips: shown under the same setting
-              return showToolCalls ? <DigestChip message={m} /> : null;
+              return showToolCalls && !coveredDigests.has(m.id) ? <DigestChip message={m} /> : null;
             case "compaction":
               return <CompactionChip message={m} />;
             case "screen":
@@ -1076,15 +1113,16 @@ const MessagesList = memo(function MessagesList({
             }
           }
         })();
-        if (!row) return divider && <div key={m.id} className="contents">{divider}</div>;
+        if (!row) return (divider || toolsHeader) && <div key={m.id} className="contents">{divider}{toolsHeader}</div>;
         return (
           <div key={m.id} className="contents" data-mid={m.id}>
             {newDay && <DaySeparator at={m.at} today={today} />}
             {divider}
+            {toolsHeader}
             {row}
           </div>
         );
-      })}
+      })(item, i), items[i + 1]))}
     </>
   );
 });
@@ -1241,6 +1279,39 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
     [messages],
   );
   const unreadDivider = useUnreadDivider({ threadId: bot.threadId, messages, following });
+  // What the engine is streaming right now. Display only: the stored message
+  // replaces it, and it never enters `messages` (so the memoised list does
+  // not re-render per delta).
+  const live = visibleLiveTurn(state.liveTurns[bot.threadId ?? ""]);
+  const thoughtRecords = state.thoughts[bot.threadId ?? ""];
+  const liveThought = live?.reasoning ? { anchorId: live.anchorId, startedAt: live.thoughtStartedAt } : undefined;
+  const liveSegments = live?.thoughts ?? [];
+  // Earlier segments only change when one closes, never per delta.
+  const liveSegmentsKey = liveSegments.map((s) => `${s.anchorId ?? ""}@${s.startedAt ?? ""}`).join("|");
+  const messageIds = useMemo(() => new Set(messages.map((m) => m.id)), [messages]);
+  const resolveThoughtAnchorFor = useCallback(
+    (anchorId: string | undefined, startedAt: number | undefined) => resolveThoughtAnchor(messages, messageIds, anchorId, startedAt),
+    [messages, messageIds],
+  );
+  const thoughtAnchors = useMemo(() => {
+    const anchors = new Set<string>();
+    for (const thought of thoughtRecords ?? []) {
+      const id = resolveThoughtAnchorFor(thought.anchorId, thought.startedAt);
+      if (id) anchors.add(id);
+    }
+    const liveId = liveThought && resolveThoughtAnchorFor(liveThought.anchorId, liveThought.startedAt);
+    if (liveId) anchors.add(liveId);
+    for (const segment of liveSegments) {
+      const id = resolveThoughtAnchorFor(segment.anchorId, segment.startedAt);
+      if (id) anchors.add(id);
+    }
+    return anchors;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thoughtRecords, liveThought?.anchorId, liveThought?.startedAt, liveSegmentsKey, resolveThoughtAnchorFor]);
+  const growToEnd = useGrowToEnd(following, scrollRef);
+  const liveReplyShown = useRef(false);
+  if (live?.reply) liveReplyShown.current = true;
+  else if (!bot.busy) liveReplyShown.current = false;
 
   // What the rows read besides their own message (see ChatRows).
   const bots = useDrawnBots(state.bots);
@@ -1293,7 +1364,6 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   // is finished, the whole bubble pops in above the mascot.
   const lastMessage = messages.at(-1);
   const toolInFlight = lastMessage?.kind === "activity" && lastMessage.tool?.ok === undefined;
-  const activity = liveActivityPhrases(lastMessage);
   const waiting = Boolean(
     bot.busy &&
       bot.activity !== "waiting-on-you" &&
@@ -1305,6 +1375,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   useEffect(() => () => {
     if (poppingTimer.current) clearTimeout(poppingTimer.current);
   }, []);
+  const focusAcrossRegroup = useFocusAcrossRegroup(transcriptRef);
   useLayoutEffect(() => {
     if (poppingTimer.current) clearTimeout(poppingTimer.current);
     poppingTimer.current = null;
@@ -1317,6 +1388,12 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   useLayoutEffect(() => {
     if (lastMessage?.role !== "bot" || lastMessage.kind !== "text" || !wasWaiting.current) return;
     wasWaiting.current = false;
+    // The reply was already on screen as it streamed: the stored message takes
+    // its place as it is, with no pop-in to flash over it.
+    if (liveReplyShown.current) {
+      liveReplyShown.current = false;
+      return;
+    }
     const messageId = lastMessage.id;
     if (poppingTimer.current) clearTimeout(poppingTimer.current);
     setPopping(messageId);
@@ -1551,6 +1628,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
       >
         <div
           ref={transcriptRef}
+          onFocusCapture={focusAcrossRegroup.onFocusCapture}
+          onBlurCapture={focusAcrossRegroup.onBlurCapture}
           className="glass-scroller-content flex w-full flex-col gap-3"
           style={{ paddingBottom: composerDock.pad }}
           role="log"
@@ -1584,6 +1663,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
               engine={state.instances.find((i) => i.instanceId === bot.modelSelection.instanceId)}
               unreadDividerId={unreadDivider.messageId}
               unreadDividerFading={unreadDivider.fading}
+              thoughtAnchors={thoughtAnchors}
+              resolveThoughtAnchorFor={resolveThoughtAnchorFor}
               onStartEdit={startEdit}
               onCancelEdit={cancelEdit}
               onSubmitEdit={submitEdit}
@@ -1609,25 +1690,16 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
               </div>
             </div>
           )}
+          {live?.reasoning && <ThoughtSlot key={bot.threadId} threadId={bot.threadId} afterId={null} resolveAnchor={resolveThoughtAnchorFor} />}
+          <LiveTurn key={bot.threadId} live={live} botName={bot.name} mentionPeers={mentionPeers} onGrow={growToEnd} />
+          {/* One neutral anchor per turn: "Working…" until the first real item.
+              A running tool row or streamed text is the anchor after that, so
+              no mascot, rotating phrase or timer sits beside it. */}
           <TurnPresence
-            avatar={
-              // BotAvatar, not a bare MausAvatar: an uploaded profile image
-              // (and a chosen mascot body) must match the sidebar row.
-              <BotAvatar
-                bot={bot}
-                state={toolInFlight ? "working" : "thinking"}
-                size={36}
-                forward={false}
-                lookAround={1}
-                trackPointer={false}
-              />
-            }
-            visible={presenceVisible}
-            phrases={activity.phrases}
-            phase={activity.phase}
+            avatar={null}
+            visible={presenceVisible && !live && !toolInFlight}
             seed={`${bot.id}:${bot.threadId ?? ""}:${busySince ?? ""}`}
-            answering={popping !== null}
-            since={busySince}
+            quietLabel={t("chat.live.working")}
           />
         </div>
       </div>

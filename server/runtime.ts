@@ -8227,10 +8227,13 @@ bus.subscribe((event: RuntimeEvent) => {
         if (messageId) {
           // the whole tool object is replaced, so carry `spoken` across —
           // dropping it here would silently un-narrate every completed tool
-          const existing = store.messagesFor(event.threadId).find((m) => m.id === messageId)?.tool;
+          const stored = store.messagesFor(event.threadId).find((m) => m.id === messageId);
+          const existing = stored?.tool;
           toolName = existing?.name ?? "tool";
+          // measured: the row was stored at its start event, this is its end
+          const durationMs = stored ? Math.max(0, Date.now() - stored.at) : undefined;
           store.patchMessage(event.threadId, messageId, {
-            tool: { ...existing, name: toolName, ok: event.ok, output: event.output },
+            tool: { ...existing, name: toolName, ok: event.ok, output: event.output, ...(durationMs !== undefined ? { durationMs } : {}) },
           });
           toolMessageByItem.delete(itemKey);
         }

@@ -451,6 +451,9 @@ export interface WireMessage {
     /** Whether the harness captured the full redacted result. Private
      * server-local spill paths are not exposed to clients. */
     fullResult?: boolean;
+    /** Measured wall time of the call, from its start event to its terminal
+     * event. Absent when the call has not finished or was never measured. */
+    durationMs?: number;
   };
   /** A bot line a "post" webhook wrote: whoever called the webhook chose
    * its words. On a Cloud home a conversation holding one is someone else's

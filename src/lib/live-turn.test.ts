@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RuntimeEvent } from "../../shared/runtime-events";
-import { foldLiveTurn, LIVE_TURN_MAX_CHARS, parseFrameCursor, visibleLiveTurn, type LiveTurn } from "./live-turn";
+import { foldLiveTurn, LIVE_TURN_MAX_CHARS, parseFrameCursor, resolveThoughtAnchor, thoughtOf, thoughtsOf, visibleLiveTurn, type LiveTurn } from "./live-turn";
 
 let n = 0;
 let seq = 0;
@@ -346,5 +346,84 @@ describe("foldLiveTurn", () => {
     expect(live?.truncated).toBe(true);
     // the other stream is capped independently
     expect(run([started(), delta("reasoning_text", "r")], live)?.reasoning).toBe("r");
+  });
+});
+
+describe("thought timing and anchor", () => {
+  const at = (event: RuntimeEvent, iso: string): RuntimeEvent => ({ ...event, createdAt: iso } as RuntimeEvent);
+  const T0 = "2026-11-20T00:00:00.000Z";
+  const T4 = "2026-11-20T00:00:04.000Z";
+
+  it("anchors the thought to the message stored when reasoning began", () => {
+    const live = foldLiveTurn(undefined, at(delta("reasoning_text", "hm"), T0), undefined, "m7");
+    expect(live).toMatchObject({ anchorId: "m7", thoughtStartedAt: Date.parse(T0), thoughtEndedAt: undefined });
+    // more reasoning keeps the first anchor and start
+    const more = foldLiveTurn(live, at(delta("reasoning_text", "m"), T4), undefined, "m9");
+    expect(more).toMatchObject({ anchorId: "m7", thoughtStartedAt: Date.parse(T0), thoughtEndedAt: undefined });
+  });
+
+  it("ends the thought at the first non-reasoning event, and only once", () => {
+    const live = run([at(delta("reasoning_text", "hm"), T0), at(delta("assistant_text", "ans"), T4), at(delta("assistant_text", "wer"), "2026-11-20T00:00:09.000Z")]);
+    expect(live?.thoughtEndedAt).toBe(Date.parse(T4));
+    expect(thoughtOf(live!)?.seconds).toBe(4);
+  });
+
+  it("a replayed frame does not end the thought", () => {
+    const first = at(delta("reasoning_text", "hm"), T0);
+    const live = run([first]);
+    const replayed = foldLiveTurn(live, at(started(), T4), { streamId: STREAM, seq: 0 });
+    expect(replayed?.thoughtEndedAt).toBeUndefined();
+  });
+
+  it("is unmeasured when the time cannot be read, and never below 1s", () => {
+    const bad = foldLiveTurn(undefined, { ...delta("reasoning_text", "x"), createdAt: "nope" } as RuntimeEvent, undefined, "m1");
+    expect(thoughtOf(bad!)?.seconds).toBeNull();
+    const quick = run([at(delta("reasoning_text", "x"), T0), at(delta("assistant_text", "y"), "2026-11-20T00:00:00.100Z")]);
+    expect(thoughtOf(quick!)?.seconds).toBe(1);
+    expect(thoughtOf(run([started()])!)).toBeNull();
+  });
+
+  it("uses the turn's end when nothing else closed the thought", () => {
+    const live = run([at(delta("reasoning_text", "x"), T0)]);
+    expect(thoughtOf(live!, Date.parse(T4))?.seconds).toBe(4);
+  });
+});
+
+describe("separate thoughts around a tool", () => {
+  const at = (event: RuntimeEvent, iso: string): RuntimeEvent => ({ ...event, createdAt: iso } as RuntimeEvent);
+  const toolStart = (): RuntimeEvent => tag({ ...base(), type: "item.started", itemType: "tool", itemId: "tool-1" } as RuntimeEvent);
+  const T = (s: number) => `2026-11-20T00:00:0${s}.000Z`;
+  it("reasoning after a tool is a new thought at its own anchor, not merged into the first", () => {
+    const first = foldLiveTurn(undefined, at(delta("reasoning_text", "plan "), T(0)), undefined, "m1");
+    const afterTool = foldLiveTurn(foldLiveTurn(first, at(toolStart(), T(2))), at(delta("reasoning_text", "then "), T(5)), undefined, "tool-1");
+    expect(afterTool?.thoughts).toEqual([{ anchorId: "m1", startedAt: Date.parse(T(0)), endedAt: Date.parse(T(2)), text: "plan " }]);
+    expect(afterTool).toMatchObject({ reasoning: "then ", anchorId: "tool-1", thoughtStartedAt: Date.parse(T(5)), thoughtEndedAt: undefined });
+    expect(thoughtsOf(afterTool!).map((thought) => [thought.text, thought.seconds])).toEqual([["plan ", 2], ["then ", null]]); // the newest is still open, so unmeasured
+  });
+  it("interleaved reasoning with no boundary between stays one thought", () => {
+    const live = run([at(delta("reasoning_text", "a"), T(0)), at(delta("assistant_text", "x"), T(1)), at(delta("reasoning_text", "b"), T(2))]);
+    expect(live?.thoughts).toEqual([]);
+    expect(live?.reasoning).toBe("ab");
+  });
+  it("a turn that ends clears the earlier segments", () => {
+    const first = foldLiveTurn(undefined, at(delta("reasoning_text", "plan"), T(0)), undefined, "m1");
+    const resumed = foldLiveTurn(foldLiveTurn(first, at(toolStart(), T(2))), at(delta("reasoning_text", "more"), T(5)), undefined, "tool-1");
+    expect(run([completed()], resumed)?.thoughts).toEqual([]);
+  });
+});
+
+describe("resolveThoughtAnchor", () => {
+  const messages = [{ id: "u1", at: 100 }, { id: "a1", at: 300 }, { id: "u2", at: 900 }];
+  const ids = new Set(messages.map((m) => m.id));
+  it("uses the anchor when its message is in the transcript", () => {
+    expect(resolveThoughtAnchor(messages, ids, "a1", 100)).toBe("a1");
+  });
+  it("falls back to the last message stored before the thinking began", () => {
+    expect(resolveThoughtAnchor(messages, ids, "gone", 500)).toBe("a1");
+    expect(resolveThoughtAnchor(messages, ids, undefined, 950)).toBe("u2");
+  });
+  it("is the end of the transcript when nothing places it", () => {
+    expect(resolveThoughtAnchor(messages, ids, "gone", undefined)).toBeNull();
+    expect(resolveThoughtAnchor(messages, ids, undefined, 50)).toBeNull();
   });
 });

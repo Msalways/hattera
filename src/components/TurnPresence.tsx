@@ -73,6 +73,7 @@ export function TurnPresence({
   seed = "",
   answering = false,
   since = null,
+  quietLabel,
 }: {
   avatar: ReactNode;
   visible: boolean;
@@ -86,6 +87,10 @@ export function TurnPresence({
   answering?: boolean;
   /** Turn start (epoch ms) — shows a self-ticking elapsed readout while working. */
   since?: number | null;
+  /** The turn is streaming its own text, so the rotating phrases step aside.
+   * null shows no phrase; a string shows that plain, unanimated label (an
+   * engine with no reasoning stream says "Working", never a made-up thought). */
+  quietLabel?: string | null;
 }) {
   const [mounted, setMounted] = useState(visible);
   const [presencePhase, setPhase] = useState<"think" | "answer" | "out">(answering ? "answer" : "think");
@@ -128,6 +133,7 @@ export function TurnPresence({
           <span className="flex items-baseline gap-2 leading-none">
             {/* the outgoing phrase floats over the incoming one, so the width
                 follows the shown phrase and the timer moves once per swap */}
+            {quietLabel === undefined ? (
             <span className="turn-phrase relative grid text-[13px]">
               {previous !== null && previous !== current && (
                 <ShimmerPhrase
@@ -143,6 +149,9 @@ export function TurnPresence({
                 className={previous !== null ? "turn-phrase-in" : undefined}
               />
             </span>
+            ) : quietLabel !== null ? (
+              <span data-quiet-label className="text-[13px] text-ink-tertiary">{quietLabel}</span>
+            ) : null}
             {since !== null && (
               <WorkingTimer since={since} className="text-[11.5px] text-ink-tertiary" />
             )}
