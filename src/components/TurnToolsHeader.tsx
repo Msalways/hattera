@@ -2,13 +2,19 @@ import { Wrench } from "lucide-react";
 import { t } from "@/lib/i18n";
 
 /** The turn's header: how many tools it used, and a way to the first one.
- * Rendered only for a turn that has tools, directly above its first tool row,
- * in the same wrapper (the rows themselves stay in stream order below). Not a second activity
- * card: it carries a count and one jump, nothing else. */
+ * Rendered only for a turn that has tools, at the top of the turn above its
+ * first row (the rows themselves stay in stream order below). Not a second
+ * activity card: it carries a count and one jump, nothing else. */
 export function TurnToolsHeader({ count }: { count: number }) {
   if (count < 1) return null;
   const jump = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const row = event.currentTarget.closest("[data-turn-tools]")?.parentElement?.querySelector<HTMLElement>("[data-tool-row]");
+    // The first tool row after this header in document order is the turn's
+    // first tool, wherever the wrappers between them fall.
+    const header = event.currentTarget.closest("[data-turn-tools]");
+    if (!header) return;
+    const row = [...header.ownerDocument.querySelectorAll<HTMLElement>("[data-tool-row]")].find(
+      (node) => header.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     if (!row) return;
     const target = row.querySelector<HTMLElement>("summary, button") ?? row;
     target.scrollIntoView({ block: "nearest" });

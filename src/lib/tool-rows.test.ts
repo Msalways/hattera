@@ -39,9 +39,9 @@ describe("tool rows", () => {
     const segs = segmentToolRun([tool("1", "Read", true), tool("2", "Read", true), tool("3", "Read")], true);
     expect(segs.map((s) => s.kind)).toEqual(["group", "row"]);
   });
-  it("counts tools per turn and anchors the count on the first tool", () => {
-    const counts = toolCountsByTurn([user("u1"), tool("a", "Read", true), text("t"), tool("b", "Bash", true), user("u2"), text("x"), user("u3"), tool("c", "Bash", true)]);
-    expect([...counts]).toEqual([["a", 2], ["c", 1]]);
+  it("counts tools per turn and anchors the count on the turn's first row, not its first tool", () => {
+    const counts = toolCountsByTurn([user("u1"), text("t0"), tool("a", "Read", true), text("t"), tool("b", "Bash", true), user("u2"), text("x"), user("u3"), tool("c", "Bash", true)]);
+    expect([...counts]).toEqual([["t0", 2], ["c", 1]]);
   });
 });
 

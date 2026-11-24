@@ -949,13 +949,23 @@ const MessagesList = memo(function MessagesList({
   };
   // Thoughts sit in the stream, right after the item holding the message the
   // thinking began after.
-  const thoughtsAfter = (item: (typeof items)[number], node: ReactNode) => {
+  // The turn header (tool count) belongs at the top of its turn: when the
+  // thinking hangs off the request row, the header goes above it.
+  const hoistedHeaders = new Set<string>();
+  const headerOf = (item: (typeof items)[number] | undefined) => {
+    const head = item && (item.kind === "message" ? item.message : item.messages[0]);
+    return head && showToolCalls && toolCounts.get(head.id) ? head : undefined;
+  };
+  const thoughtsAfter = (item: (typeof items)[number], node: ReactNode, next?: (typeof items)[number]) => {
     const ids = item.kind === "message" ? [item.message.id] : item.messages.map((message) => message.id);
     const here = thoughtAnchors.size ? ids.filter((id) => thoughtAnchors.has(id)) : [];
     if (!here.length) return node;
+    const head = item.kind === "message" && item.message.role === "user" ? headerOf(next) : undefined;
+    if (head) hoistedHeaders.add(head.id);
     return (
       <Fragment key={item.kind === "message" ? item.message.id : item.id}>
         {node}
+        {head && <TurnToolsHeader count={toolCounts.get(head.id)!} />}
         {here.map((id) => <ThoughtSlot key={`${threadId}:${id}`} threadId={threadId} afterId={id} resolveAnchor={resolveThoughtAnchorFor} />)}
       </Fragment>
     );
@@ -968,7 +978,7 @@ const MessagesList = memo(function MessagesList({
         const first = item.kind === "message" ? item.message : item.messages[0];
         const newDay = !prev || localDay(prev.at) !== localDay(first.at);
         const divider = dividerAbove(item.kind === "message" ? [item.message] : item.messages);
-        const toolsHeader = showToolCalls && toolCounts.get(first.id) ? <TurnToolsHeader count={toolCounts.get(first.id)!} /> : null;
+        const toolsHeader = headerOf(item) && !hoistedHeaders.has(first.id) ? <TurnToolsHeader count={toolCounts.get(first.id)!} /> : null;
         if (item.kind === "turn") {
           return (
             <div key={item.id} className="contents">
@@ -1103,7 +1113,7 @@ const MessagesList = memo(function MessagesList({
             }
           }
         })();
-        if (!row) return divider && <div key={m.id} className="contents">{divider}</div>;
+        if (!row) return (divider || toolsHeader) && <div key={m.id} className="contents">{divider}{toolsHeader}</div>;
         return (
           <div key={m.id} className="contents" data-mid={m.id}>
             {newDay && <DaySeparator at={m.at} today={today} />}
@@ -1112,7 +1122,7 @@ const MessagesList = memo(function MessagesList({
             {row}
           </div>
         );
-      })(item, i)))}
+      })(item, i), items[i + 1]))}
     </>
   );
 });

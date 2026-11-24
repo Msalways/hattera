@@ -165,20 +165,22 @@ function countedTool(message: Message): boolean {
   return !isStatusActivity(message) && failedTurnCause(message.tool.name) === null;
 }
 
-/** Tool messages of each turn: the id of its first tool and how many there
- * were. Counted by turn identity (see `turnIndexes`), so a steered message in
- * the middle of one turn does not make a second header. */
+/** Tool counts per turn, keyed by the turn's first row: the header sits at the
+ * top of the turn (contract item 1), not above its first tool. Counted by turn
+ * identity (see `turnIndexes`), so a steered message in the middle of one turn
+ * does not make a second header. A turn with no counted tool has no entry. */
 export function toolCountsByTurn(messages: readonly Message[]): Map<string, number> {
-  const counts = new Map<string, number>();
   const turns = turnIndexes(messages);
-  const firstOfTurn = new Map<number, string>();
+  const headOfTurn = new Map<number, string>();
+  const tools = new Map<number, number>();
   messages.forEach((message, i) => {
     const turn = turns[i];
-    if (turn === undefined || !countedTool(message)) return;
-    const first = firstOfTurn.get(turn) ?? message.id;
-    firstOfTurn.set(turn, first);
-    counts.set(first, (counts.get(first) ?? 0) + 1);
+    if (turn === undefined) return;
+    if (!headOfTurn.has(turn)) headOfTurn.set(turn, message.id);
+    if (countedTool(message)) tools.set(turn, (tools.get(turn) ?? 0) + 1);
   });
+  const counts = new Map<string, number>();
+  for (const [turn, count] of tools) counts.set(headOfTurn.get(turn)!, count);
   return counts;
 }
 
