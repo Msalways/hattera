@@ -47,7 +47,7 @@ async function startServer() {
   const log = openSync(logPath, "a", 0o600);
   server = spawn(process.execPath, ["--experimental-strip-types", join(root, "server/index.ts")], {
     cwd: root,
-    env: { ...verificationServerEnvironment({}, dataDir, Number(new URL(url).port)), OMB_TEST_INTERNAL_CAPABILITY_KEY: capabilityKey },
+    env: { ...verificationServerEnvironment({}, dataDir, Number(new URL(url).port)), OMB_TEST_HARNESS: "1", OMB_TEST_INTERNAL_CAPABILITY_KEY: capabilityKey },
     stdio: ["ignore", log, log],
   });
   closeSync(log);

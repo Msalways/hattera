@@ -1228,7 +1228,7 @@ beforeAll(async () => {
       FAKE_CLAUDE_TEXT_DUMP: oneShotTextDump,
       // the real CLI runs Manual for these even when asked for auto
       FAKE_CLAUDE_AUTO_UNAVAILABLE_MODELS: "claude-haiku-4-5",
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+      OMB_TEST_HARNESS: "1", OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -6551,7 +6551,7 @@ describe("harness HTTP API", () => {
           OMB_STATIC_DIR: isolatedStatic,
           FAKE_CLAUDE_MODE: "hang",
           FAKE_CLAUDE_DUMP: isolatedDump,
-          OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+          OMB_TEST_HARNESS: "1", OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
         },
         stdio: ["ignore", "pipe", "pipe"],
       },

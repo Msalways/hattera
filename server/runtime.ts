@@ -685,6 +685,7 @@ import { createTokenLedgerRoutes } from "./routes/token-ledger.ts";
 import { createUsageRoutes } from "./routes/usage.ts";
 import { withScopeHint } from "./connector-scope-hint.ts";
 import { objectStorageFromEnv } from "./object-storage.ts";
+import { testCapabilityKey, warnIfTestCapabilityKeyIgnored } from "./test-capability-key.ts";
 
 const PORT = Number(process.env.OMB_PORT || process.env.OGB_PORT || 8799);
 const WEBHOOK_PORT = Number(process.env.OMB_WEBHOOK_PORT || PORT + 1);
@@ -829,6 +830,8 @@ if (CLOUD_HOME) {
   console.log(`cloud home ${CLOUD_HOME.machineId}: bots run on the engines the person signs in to here`);
   for (const warning of CLOUD_HOME.warnings) console.warn(`cloud home: ${warning}`);
 }
+// A test key outside the test harness is ignored; say so once at startup.
+warnIfTestCapabilityKeyIgnored();
 // Cloud Pro's included Boat, voice and decision relay tokens, when the Admin
 // set them: held in memory from here on, like the signing secret.
 holdIncludedServices(CLOUD_ENV);
@@ -17646,7 +17649,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       return json(res, applied.ok ? 200 : 400, { ...applied, report: orgLibrary.lastReport() });
     }
     if (method === "POST" && path === "/api/testing/internal-capability") {
-      const expected = process.env.OMB_TEST_INTERNAL_CAPABILITY_KEY ?? "";
+      const expected = testCapabilityKey();
       const actual = Array.isArray(req.headers["x-openmausbot-test-capability"])
         ? ""
         : String(req.headers["x-openmausbot-test-capability"] ?? "");

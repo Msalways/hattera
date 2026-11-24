@@ -36,7 +36,7 @@ it("loads, queries, shows, pages, renders and exports through the real server", 
     const log = openSync(logPath, "a", 0o600);
     server = spawn(process.execPath, ["--experimental-strip-types", fileURLToPath(new URL("../index.ts", import.meta.url))], {
       cwd: fileURLToPath(new URL("../..", import.meta.url)),
-      env: { ...verificationServerEnvironment({}, dataDir, Number(new URL(url).port)), OMB_TEST_INTERNAL_CAPABILITY_KEY: CAPABILITY_KEY },
+      env: { ...verificationServerEnvironment({}, dataDir, Number(new URL(url).port)), OMB_TEST_HARNESS: "1", OMB_TEST_INTERNAL_CAPABILITY_KEY: CAPABILITY_KEY },
       stdio: ["ignore", log, log],
     });
     closeSync(log);

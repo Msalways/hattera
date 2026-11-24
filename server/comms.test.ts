@@ -314,7 +314,7 @@ describe("legacy routine comms e2e (fake ACP fleet)", () => {
       HOME: home,
       USERPROFILE: home,
       OMB_PORT: String(PORT),
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+      OMB_TEST_HARNESS: "1", OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
       // Keep the production ask budget: the gated-peer test verifies the
       // caller is released promptly without a test-only timeout override.
     };
