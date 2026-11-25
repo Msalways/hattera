@@ -92,7 +92,7 @@ beforeAll(async () => {
       USERPROFILE: home,
       OMB_PORT: String(PORT),
       OMB_WEBHOOK_PORT: String(WEBHOOK_PORT),
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+      OMB_TEST_HARNESS: "1", OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

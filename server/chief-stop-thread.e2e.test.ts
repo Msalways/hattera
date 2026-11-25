@@ -200,7 +200,7 @@ async function directRoute(test: (f: any) => Promise<void>) {
   let server: ChildProcess | undefined;
   try {
     await waitForExit(fixture.child, { signal: "SIGTERM" });
-    const childEnv = { ...verificationServerEnvironment({}, dataDir, Number(new URL(url).port)), OMB_TEST_INTERNAL_CAPABILITY_KEY: CAPABILITY_KEY };
+    const childEnv = { ...verificationServerEnvironment({}, dataDir, Number(new URL(url).port)), OMB_TEST_HARNESS: "1", OMB_TEST_INTERNAL_CAPABILITY_KEY: CAPABILITY_KEY };
     const log = openSync(logPath, "a", 0o600);
     server = spawn(process.execPath, verificationServerArgs(childEnv), { cwd: join(import.meta.dirname, ".."), env: childEnv, stdio: ["ignore", log, log] });
     closeSync(log);

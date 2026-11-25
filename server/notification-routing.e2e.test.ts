@@ -150,7 +150,7 @@ beforeAll(async () => {
       // the question-card test leaves its peer turn open on purpose; keep the
       // synchronous ask from parking for the production four minutes
       OMB_ASK_BOT_TIMEOUT_MS: "6000",
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+      OMB_TEST_HARNESS: "1", OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

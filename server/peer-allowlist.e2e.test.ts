@@ -94,7 +94,7 @@ beforeAll(async () => {
       OMB_PORT: String(port),
       OMB_WEBHOOK_PORT: String(port + 1),
       OMB_STATIC_DIR: staticDir,
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+      OMB_TEST_HARNESS: "1", OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

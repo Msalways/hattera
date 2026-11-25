@@ -52,7 +52,7 @@ Object.assign(env, {
   npm_config_cache: join(scratch, "npm-cache"), npm_config_userconfig: join(home, ".npmrc"),
   npm_config_globalconfig: join(home, "global-npmrc"), npm_config_registry: "https://registry.npmjs.org/",
   HATTERA_DATA_DIR: data, HATTERA_ENVIRONMENT_LABEL: "npm-qualification",
-  OMB_TEST_INTERNAL_CAPABILITY_KEY: randomBytes(24).toString("hex"),
+  OMB_TEST_HARNESS: "1", OMB_TEST_INTERNAL_CAPABILITY_KEY: randomBytes(24).toString("hex"),
 });
 const ports = [];
 for (let i = 0; i < 2; i++) {
