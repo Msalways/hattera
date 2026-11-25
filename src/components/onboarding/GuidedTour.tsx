@@ -10,7 +10,7 @@ import { readAdvancedMode } from "@/lib/interface-mode";
 import { ANCHOR_EFFECTS, currentStep, stepNumber, TOUR_STEPS, withTourFinished, type TourEffect, type TourStep } from "@/lib/guided-tour";
 import { t } from "@/lib/i18n";
 import type { MausState } from "@/lib/mascot";
-import { hintSeenPatch, personWaiting } from "@/lib/onboarding";
+import { hintSeenPatch, personWaiting, skipPatch } from "@/lib/onboarding";
 import { sendKeyLabel, useSendKey } from "@/lib/send-key";
 import type { LocaleKey } from "@/locales";
 import { api, useStore } from "@/state/store";
@@ -108,10 +108,12 @@ export function GuidedTour() {
   );
 
   const save = useCallback(
-    (finish: boolean, id?: TourStep["id"]) => {
+    (finish: boolean, id?: TourStep["id"], skip = false) => {
       // A skip must follow an in-flight Next, not disappear behind its guard.
       const operation = pending.current.then(async () => {
-        const patch = finish
+        const patch = skip
+          ? skipPatch(latestRecord.current)
+          : finish
           ? { onboarding: { hintsSeen: withTourFinished(latestRecord.current) } }
           : id ? hintSeenPatch(latestRecord.current, id) : null;
         if (!patch) return;
@@ -139,7 +141,7 @@ export function GuidedTour() {
     [step, run, save],
   );
 
-  const finish = useCallback(() => {
+  const close = useCallback((skipped: boolean) => {
     if (closed.current) return;
     closed.current = true;
     setDismissed(true);
@@ -147,13 +149,18 @@ export function GuidedTour() {
     if (state.computerOpen) run("closeComputer");
     if (state.pluginsOpen) run("closeApps");
     run("backToChat");
-    void save(true).catch(() => {});
+    void save(true, undefined, skipped).catch(() => {});
     dispatch({ type: "toggleTour", open: false });
   }, [state.computerOpen, state.pluginsOpen, run, save, dispatch]);
+  // Finish ends this tour only; Skip ends every tour, as in the welcome flow.
+  const finish = useCallback(() => close(false), [close]);
+  const skip = useCallback(() => close(true), [close]);
 
   // A tip never sits over an approval or question waiting for the person:
   // it would cover the command. The tour holds its place and returns after.
-  const waiting = personWaiting(state.bots.find((b) => b.id === state.selectedId)?.messages);
+  // The active conversation may be a room, whose cards live on the group.
+  const conversation = state.groups?.find((g) => g.id === state.selectedId) ?? state.bots.find((b) => b.id === state.selectedId);
+  const waiting = personWaiting(conversation?.messages);
   const active = !dismissed && Boolean(record?.completedAt) && !state.welcomeOpen && step !== null && !waiting;
 
   // entering a step runs its effect once per step
@@ -210,7 +217,7 @@ export function GuidedTour() {
       mascot={MASCOT[step.id]}
       progress={closing ? undefined : t("onboarding.tour.progress", { current, total })}
       primary={{ label: closing ? t("onboarding.tour.finish") : t("onboarding.tour.next"), onClick: closing ? finish : () => advance() }}
-      secondary={closing ? undefined : { label: t("onboarding.tour.skip"), onClick: finish }}
+      secondary={closing ? undefined : { label: t("onboarding.tour.skip"), onClick: skip }}
       onDone={finish}
     >
       {copy(step.id, sendKeyLabel(sendKey))}
