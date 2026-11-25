@@ -357,7 +357,8 @@ function ReplayAppTourButton() {
             method: "PUT",
             body: JSON.stringify({ onboarding: {
               // Upgraded users may have completed only the legacy browser gate.
-              ...(!state.config?.onboarding?.completedAt ? completionPatch().onboarding : {}),
+              // Replaying the tour is asking for it: it lifts an earlier skip.
+              ...(!state.config?.onboarding?.completedAt ? completionPatch().onboarding : { outcome: "finished" as const }),
               hintsSeen: withTourReset(state.config?.onboarding),
             } }),
             signal: AbortSignal.timeout(10_000),

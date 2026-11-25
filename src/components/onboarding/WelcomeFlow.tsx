@@ -24,6 +24,7 @@ import {
   beatWidth,
   beatsFor,
   completionPatch,
+  skipPatch,
   flowDotsShown,
   nextBeat,
   previousBeat,
@@ -70,6 +71,13 @@ function beatTitle(beat: BeatId): string | null {
 
 type Motion = Exclude<MausMotion, "none">;
 
+// A replay re-saves the completion time only: it must not turn an earlier skip
+// into a finish, or the other way round.
+const replayPatch = () => {
+  const { completedAt, version } = completionPatch().onboarding;
+  return { onboarding: { completedAt, version } };
+};
+
 export function WelcomeFlow({
   bot,
   onDone,
@@ -84,7 +92,8 @@ export function WelcomeFlow({
 }: {
   /** The seeded bot the exit beat names; null when the roster is empty. */
   bot: Bot | null;
-  onDone: () => void;
+  /** How the flow ended: a skip ends every tour, a finish hands over to the guided tour. */
+  onDone: (reason: "completed" | "skipped") => void;
   /** Replays skip nothing but are tracked separately. */
   replay?: boolean;
   /** Open on a given beat: the preview, and resuming after the engines beat
@@ -103,7 +112,7 @@ export function WelcomeFlow({
   /** The engines beat's organisation row asks for Settings → Organisation. */
   onOpenOrganisation?: () => void;
 }) {
-  const { dispatch } = useStore();
+  const { state, dispatch } = useStore();
   const { capabilities } = useDesktopCapabilities();
   const beats = beatsFor({ dictation: dictation ?? capabilities.dictation.available, reel, hosted });
   const [beat, setBeat] = useState<BeatId>(() => (initialBeat && beats.includes(initialBeat) ? initialBeat : "hello"));
@@ -150,16 +159,16 @@ export function WelcomeFlow({
       // one release of the old browser-side gate, so a downgrade stays quiet
       setEmailGateDone("submitted");
       // A slow/offline server must not trap the user behind the welcome card.
-      onDone();
+      onDone(reason);
       try {
-        const config = await api("/api/config", { method: "PUT", body: JSON.stringify(completionPatch()), signal: AbortSignal.timeout(10_000) });
+        const config = await api("/api/config", { method: "PUT", body: JSON.stringify(replay ? replayPatch() : reason === "skipped" ? skipPatch(state.config?.onboarding) : completionPatch()), signal: AbortSignal.timeout(10_000) });
         dispatch({ type: "configStatus", config });
       } catch {
         // offline or a paired client without admin scope: the caller still
         // closes the tour; it comes back next launch, which is the honest state
       }
     },
-    [beat, dispatch, onDone, replay],
+    [beat, dispatch, onDone, replay, state.config?.onboarding],
   );
 
   const next = nextBeat(beats, beat);

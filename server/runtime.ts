@@ -16412,6 +16412,7 @@ function configStatus() {
     onboarding: {
       completedAt: cfg.onboarding?.completedAt ?? "",
       version: cfg.onboarding?.version ?? 0,
+      ...(cfg.onboarding?.outcome ? { outcome: cfg.onboarding.outcome } : {}),
       reelSeen: cfg.onboarding?.reelSeen === true,
       hintsSeen: cfg.onboarding?.hintsSeen ?? [],
       ...(cfg.onboarding?.firstTurnAt ? { firstTurnAt: cfg.onboarding.firstTurnAt } : {}),

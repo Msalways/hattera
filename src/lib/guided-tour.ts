@@ -73,8 +73,11 @@ function stepDone(record: OnboardingStatus | undefined, id: TourStepId): boolean
   return (record?.hintsSeen ?? []).includes(id);
 }
 
-/** The first step not yet done, or null when the tour is over. */
+/** The first step not yet done, or null when the tour is over or was skipped. */
 export function currentStep(record: OnboardingStatus | undefined): TourStep | null {
+  // a skipped welcome flow ends every tour (toursEnded in lib/onboarding.ts;
+  // not imported here, which would make the two modules import each other)
+  if (record?.completedAt && record.outcome === "skipped") return null;
   return TOUR_STEPS.find((step) => !stepDone(record, step.id)) ?? null;
 }
 

@@ -45,42 +45,63 @@ function render(quiet: boolean) {
   return tree as { type?: unknown } | null;
 }
 
+const approval = { kind: "options", card: { requestId: "r", tool: "Bash", answered: undefined } };
+const connector = { kind: "connector", connector: { status: "required" } };
+const record = () => ({ ...EMPTY_ONBOARDING, completedAt: "2026-09-23T00:00:00.000Z", version: WELCOME_VERSION });
+const setChat = (messages: unknown[], onboarding: Record<string, unknown> = { ...record(), hintsSeen: withTourFinished(record()) }) => {
+  store.state = {
+    config: { onboarding },
+    welcomeOpen: false,
+    selectedId: "bot-1",
+    bots: [{ id: "bot-1", threadId: "t-1", busy: false, messages }],
+  };
+};
+
 beforeEach(() => {
   fixture.values = [];
   store.api.mockReset();
   vi.stubGlobal("window", {});
-  const record = { ...EMPTY_ONBOARDING, completedAt: "2026-09-23T00:00:00.000Z", version: WELCOME_VERSION };
-  store.state = {
-    config: { onboarding: { ...record, hintsSeen: withTourFinished(record) } },
-    welcomeOpen: false,
-    selectedId: "bot-1",
-    // an approval card is on screen: the first spotlight it explains
-    bots: [{ id: "bot-1", threadId: "t-1", busy: false, messages: [{ kind: "options", card: { requestId: "r", tool: "Bash", answered: false } }] }],
-  };
+  setChat([connector]);
 });
 
 describe("first-conversation spotlights", () => {
-  it("explain the approval card as before", () => {
+  it("explain the connect-app card as before", () => {
     render(false);
     for (const effect of fixture.effects) effect();
     expect(render(false)?.type).toBe(Spotlight);
   });
 
-  it("let the approval tip go once the approval it explains is answered", () => {
-    store.api.mockResolvedValue({});
+  it("show no tip while an approval is waiting for the person", () => {
+    setChat([approval]);
+    render(false);
+    for (const effect of fixture.effects) effect();
+    expect(render(false)).toBeNull();
+  });
+
+  it("show no tip while a question is waiting for the person", () => {
+    setChat([connector, { kind: "options", card: { requestId: "q", questionRequest: {}, options: ["a", "b"] } }]);
+    render(false);
+    for (const effect of fixture.effects) effect();
+    expect(render(false)).toBeNull();
+  });
+
+  it("come back once the approval is answered", () => {
+    setChat([connector, approval]);
+    render(false);
+    for (const effect of fixture.effects) effect();
+    expect(render(false)).toBeNull();
+    (store.state.bots as Array<{ messages: Array<{ card?: { answered?: string } }> }>)[0].messages[1]!.card!.answered = "allow";
     render(false);
     for (const effect of fixture.effects) effect();
     expect(render(false)?.type).toBe(Spotlight);
+  });
 
-    // Allow once: the card is answered and the reply streams in under it
-    const bots = store.state.bots as Array<{ busy: boolean; messages: Array<{ card: { answered: string | false } }> }>;
-    bots[0].busy = true;
-    bots[0].messages[0].card.answered = "allow";
-    expect(render(false)).toBeNull();
+  it("stay away after the welcome flow was skipped", () => {
+    setChat([connector], { ...record(), outcome: "skipped", hintsSeen: [] });
+    render(false);
     for (const effect of fixture.effects) effect();
     expect(render(false)).toBeNull();
-    // counted as seen, so the next approval does not bring it back
-    expect(store.api).toHaveBeenCalledWith("/api/config", expect.objectContaining({ method: "PUT", body: expect.stringContaining("spot.approval") }));
+    expect(store.api).not.toHaveBeenCalled();
   });
 
   it("stay away from a hosted member, who could never dismiss them for good", () => {

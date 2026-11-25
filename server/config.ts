@@ -354,6 +354,9 @@ const onboardingConfigSchema = z.object({
   completedAt: z.string().trim().max(40).optional(),
   /** Which welcome flow was completed; a newer flow may re-show itself. */
   version: z.number().int().min(0).max(1000).optional(),
+  /** How the welcome flow ended; absent on records saved before it existed,
+   * which read as finished. A skip ends every tour. */
+  outcome: z.enum(["finished", "skipped"]).optional(),
   reelSeen: z.boolean().optional(),
   hintsSeen: z.array(z.string().trim().min(1).max(60)).max(100).optional(),
   /** OMB Cloud home only: when a bot's turn first finished on this machine
@@ -661,7 +664,7 @@ export interface AppConfig {
   /** Opt-in product experiments. Every flag defaults to disabled. */
   features?: { skillAuthoring?: boolean; showToolCalls?: boolean; browser?: boolean; sharedComputers?: boolean; claudeUserMcp?: boolean; llmThreadTitles?: boolean; autoRecall?: boolean; routinesInConversation?: boolean; skillsLibrary?: boolean };
   /** First-run progress; see onboardingConfigSchema. */
-  onboarding?: { completedAt?: string; version?: number; reelSeen?: boolean; hintsSeen?: string[]; firstTurnAt?: string };
+  onboarding?: { completedAt?: string; version?: number; outcome?: "finished" | "skipped"; reelSeen?: boolean; hintsSeen?: string[]; firstTurnAt?: string };
   /** Named browser sessions any bot can be pointed at. */
   browserProfiles?: BrowserProfile[];
   /** CDP target of a Chrome the operator already has running (a bare port,

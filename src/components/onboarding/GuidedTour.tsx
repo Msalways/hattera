@@ -10,7 +10,7 @@ import { readAdvancedMode } from "@/lib/interface-mode";
 import { ANCHOR_EFFECTS, currentStep, stepNumber, TOUR_STEPS, withTourFinished, type TourEffect, type TourStep } from "@/lib/guided-tour";
 import { t } from "@/lib/i18n";
 import type { MausState } from "@/lib/mascot";
-import { hintSeenPatch } from "@/lib/onboarding";
+import { hintSeenPatch, personWaiting } from "@/lib/onboarding";
 import { sendKeyLabel, useSendKey } from "@/lib/send-key";
 import type { LocaleKey } from "@/locales";
 import { api, useStore } from "@/state/store";
@@ -151,7 +151,10 @@ export function GuidedTour() {
     dispatch({ type: "toggleTour", open: false });
   }, [state.computerOpen, state.pluginsOpen, run, save, dispatch]);
 
-  const active = !dismissed && Boolean(record?.completedAt) && !state.welcomeOpen && step !== null;
+  // A tip never sits over an approval or question waiting for the person:
+  // it would cover the command. The tour holds its place and returns after.
+  const waiting = personWaiting(state.bots.find((b) => b.id === state.selectedId)?.messages);
+  const active = !dismissed && Boolean(record?.completedAt) && !state.welcomeOpen && step !== null && !waiting;
 
   // entering a step runs its effect once per step
   useEffect(() => {
