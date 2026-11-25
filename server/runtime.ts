@@ -4,6 +4,7 @@
 // First, before any module that could start a process: a Cloud home's
 // secrets off the launcher's pipe (cloud-secrets-boot.ts).
 import { BOOT_CLOUD_SECRETS } from "./cloud-secrets-boot.ts";
+import { delegatedThreadTitle } from "./delegation-title.ts";
 import { reportedTokens, type TokenUsage } from "../shared/token-usage.ts";
 import { postgresRuntime } from "./postgres-runtime.ts";
 import { configureProviderAccount, providerAccountInput } from "./provider-account-setup.ts";
@@ -19379,7 +19380,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
               // continues it and runs once the work already there is done.
               const continued = destination ? undefined : store.workThread(target.botId, internalSender.id, address.threadId);
               if (!destination) {
-                const task = continued ?? store.createTask(target.botId, `@${internalSender.name} · work`, false, undefined,
+                const task = continued ?? store.createTask(target.botId, delegatedThreadTitle(internalSender.name, parsed.data.message), false, undefined,
                   { botId: internalSender.id, name: internalSender.name, kind: "work", threadId: address.threadId, at: Date.now() });
                 if (!task) throw new Error("The recipient no longer exists");
                 target.threadId = task.threadId;

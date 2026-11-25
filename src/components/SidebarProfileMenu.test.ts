@@ -34,8 +34,8 @@ describe("profileInitials", () => {
 
   it("falls back to the email, then to a placeholder", () => {
     expect(profileInitials({ email: "you@x.dev" })).toBe("Y");
-    expect(profileInitials({})).toBe("?");
-    expect(profileInitials(undefined)).toBe("?");
+    expect(profileInitials({})).toBe("");
+    expect(profileInitials(undefined)).toBe("");
   });
 
   it("ignores whitespace-only names", () => {

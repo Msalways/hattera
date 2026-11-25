@@ -131,7 +131,7 @@ export function groupActivityByDay(rows: ActivityRow[], now: Date): ActivityDay[
 export type ChipTone = "ok" | "danger" | "accent" | "warn";
 
 /** One short word per outcome, plus the tone that colors it. */
-export function outcomeChip(outcome: ActivityOutcome): { text: string; tone: ChipTone } {
+export function outcomeChip(outcome: ActivityOutcome, reason?: string): { text: string; tone: ChipTone } {
   switch (outcome) {
     case "ran":
       return { text: "Ran", tone: "ok" };
@@ -143,6 +143,8 @@ export function outcomeChip(outcome: ActivityOutcome): { text: string; tone: Chi
       return { text: "Allowed", tone: "ok" };
     case "denied":
       return { text: "Denied", tone: "danger" };
+    case "blocked":
+      return { text: reason?.trim() ? t("activity.blockedWithReason", { reason: reason.trim() }) : t("activity.blocked"), tone: "warn" };
     case "waiting":
       return { text: "Needs you", tone: "warn" };
   }

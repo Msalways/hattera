@@ -31,6 +31,7 @@ import { OrganizationSettings } from "./OrganizationSettings";
 import { CloudAccountSettings } from "./CloudAccountSettings";
 import { ProSettingsCard } from "./ProIntroduction";
 import { Card, SettingRow, Switch } from "./SettingsPrimitives";
+import { BrowserInstallHint } from "./BrowserInstallHint";
 import { effortLabel } from "./ModelPicker";
 import { EFFORT_LEVELS, isEffortLevel } from "../../shared/wire";
 import { shortcutLabel } from "./ShortcutHint";
@@ -731,7 +732,7 @@ function BuiltInBrowserRow() {
         : browserBlockedOnWindows
         ? t("settings.experimental.browserWindows")
         : browserUnavailableReason(state.config)}
-    message={error ? <p role="alert" className="text-danger">{error}</p> : null}
+    message={error ? <p role="alert" className="text-danger">{error}</p> : browserBlockedOnWindows && !desktopBrowser ? <BrowserInstallHint /> : null}
     >
       <Switch
           checked={browser}

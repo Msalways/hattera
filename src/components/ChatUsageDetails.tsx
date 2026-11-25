@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Gauge, Loader2, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
+import { useAdvancedMode } from "@/lib/interface-mode";
 import { useModalDialog } from "@/hooks/use-modal-dialog";
 import type { AppState, Bot, TaskUsage } from "@/state/store";
 import {
@@ -57,14 +58,14 @@ function ContextOccupancy({ usage }: { usage: TaskUsage | undefined }) {
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-3">
         <span className={cn("text-[15px] font-semibold tabular-nums", tone)}>{share.percent !== undefined ? `${share.percent}%` : contextChip(usage)}</span>
-        <span className="text-[12px] text-ink-secondary">{contextDetail(usage)}</span>
+        <span className="text-[12px] text-ink-secondary">{share.percent !== undefined ? t("chat.usage.contextUsed", { percent: String(share.percent) }) : contextDetail(usage)}</span>
       </div>
       {share.window && share.percent !== undefined && (
         <div className="h-1.5 overflow-hidden rounded-full bg-inset" role="meter" aria-label={t("chat.usage.details.contextOccupancy")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.max(0, share.percent))}>
           <div className={cn("h-full rounded-full", share.tone === "danger" ? "bg-danger" : share.tone === "warning" ? "bg-warning" : "bg-success")} style={{ width: `${Math.min(100, Math.max(0, share.percent))}%` }} />
         </div>
       )}
-      <p className="text-[12px] leading-relaxed text-ink-secondary">{t("chat.usage.details.contextNote")}</p>
+      <p className="text-[12px] leading-relaxed text-ink-secondary">{t("chat.usage.contextUsedNote")}</p>
     </div>
   );
 }
@@ -123,6 +124,7 @@ export function ChatUsageDetailsDialog({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   useModalDialog(dialogRef, onClose);
+  const advanced = useAdvancedMode();
   const usage = taskUsageForThread(bot);
   const instanceId = bot.modelSelection.instanceId;
   const instanceName = instances.find((instance) => instance.instanceId === instanceId)?.displayName ?? instanceId;
@@ -149,12 +151,13 @@ export function ChatUsageDetailsDialog({
           </button>
         </div>
         <div className="flex flex-col gap-5">
-          <Section title={t("chat.usage.details.contextOccupancy")}>
+          {/* Context occupancy and the token ledger are diagnostics: Advanced only. */}
+          {advanced && <Section title={t("chat.usage.details.contextOccupancy")}>
             <ContextOccupancy usage={usage} />
-          </Section>
-          <Section title={t("chat.usage.details.ledger")}>
+          </Section>}
+          {advanced && <Section title={t("chat.usage.details.ledger")}>
             <Ledger usage={usage} instances={instances} bot={bot} />
-          </Section>
+          </Section>}
           <Section title={t("chat.usage.details.allowance")}>
             <AccountAllowance instanceId={instanceId} instanceName={instanceName} open={open} />
           </Section>
@@ -167,6 +170,7 @@ export function ChatUsageDetailsDialog({
 
 export function ChatUsageEntry({ bot, instances }: { bot: Bot; instances: AppState["instances"] }) {
   const [open, setOpen] = useState(false);
+  const advanced = useAdvancedMode();
   const usage = taskUsageForThread(bot);
   const share = usage ? contextShare(usage) : null;
   const hasUsage = Boolean(usage && (usage.turns > 0 || usage.input + usage.output > 0));
@@ -178,7 +182,7 @@ export function ChatUsageEntry({ bot, instances }: { bot: Bot; instances: AppSta
         ? t("chat.usage.menu")
         : t("chat.usage.details.title");
   const tone = share?.tone === "danger" ? "text-danger border-danger/30" : share?.tone === "warning" ? "text-warning border-warning/30" : "text-ink-secondary border-hairline/40 hover:text-ink";
-  const labelText = share ? compact : hasUsage ? t("chat.usage.menu") : t("chat.usage.details.title");
+  const labelText = advanced && share ? compact : hasUsage ? t("chat.usage.menu") : t("chat.usage.details.title");
 
   return (
     <>
@@ -186,7 +190,7 @@ export function ChatUsageEntry({ bot, instances }: { bot: Bot; instances: AppSta
         type="button"
         data-testid="chat-usage-entry"
         onClick={() => setOpen(true)}
-        className={cn("flex min-h-11 items-center gap-1.5 rounded-full border bg-raised/60 px-3 text-[12px] hover:bg-raised", tone)}
+        className={cn("flex min-h-11 items-center gap-1.5 rounded-full border bg-raised/60 px-3 text-[12px] hover:bg-raised", advanced ? tone : "text-ink-secondary border-hairline/40 hover:text-ink")}
         title={t("chat.usage.details.title")}
         aria-label={t("chat.usage.details.openAria")}
       >

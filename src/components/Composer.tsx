@@ -1075,6 +1075,7 @@ export function Composer({
                   approvalMode={modeBot.approvalMode}
                   autoApprove={modeBot.autoApprove}
                   providerName={approvalEngine.displayName}
+                  botName={modeBot.name}
                   driverKind={approvalEngine.driverKind}
                   onSelect={setApprovalMode}
                   disabled={Boolean(modeBot.busy)}

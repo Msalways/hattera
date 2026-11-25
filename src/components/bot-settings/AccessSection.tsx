@@ -6,6 +6,7 @@
 // standing grants) are new.
 import { useEffect, useState } from "react";
 import { browserUnavailableReason } from "@/lib/feature-flags";
+import { BrowserInstallHint } from "../BrowserInstallHint";
 import { ChevronDown, ChevronRight, FolderOpen, Plus } from "lucide-react";
 
 import { api, useStore, type Bot } from "@/state/store";
@@ -670,7 +671,7 @@ export function AccessSection({
           <div className="mt-0.5 text-[13px] text-ink-secondary">
             {!desktopBrowser
               ? browserBlockedOnWindows && !browserInstallable
-                ? "Not available on this Windows machine yet: install the browser engine with `hattera browser install`."
+                ? t("settings.experimental.browserWindows")
                 : browserUnavailableReason(state.config)
               : !browserFeature
                 ? "The built-in browser is switched off under App Settings → Computers."
@@ -682,6 +683,7 @@ export function AccessSection({
                       ? "This bot has its own browser with its own logins."
                       : "Keep the built-in browser unavailable to this bot."}
           </div>
+          {!desktopBrowser && browserBlockedOnWindows && !browserInstallable && <BrowserInstallHint />}
           <ProposalStatus bot={bot} kind="owner" />
         </div>
         <Switch

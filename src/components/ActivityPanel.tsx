@@ -157,7 +157,7 @@ export function ActivityPanel({ bot }: { bot: Bot }) {
 }
 
 function ActivityLine({ row, current, onJump }: { row: ActivityRow; current: boolean; onJump: () => void }) {
-  const chip = outcomeChip(row.outcome);
+  const chip = outcomeChip(row.outcome, row.reason);
   return (
     <button
       type="button"

@@ -46,6 +46,8 @@ describe("outcomeChip", () => {
     expect(outcomeChip("running")).toEqual({ text: "Running", tone: "accent" });
     expect(outcomeChip("allowed")).toEqual({ text: "Allowed", tone: "ok" });
     expect(outcomeChip("denied")).toEqual({ text: "Denied", tone: "danger" });
+    expect(outcomeChip("blocked")).toEqual({ text: "Blocked", tone: "warn" });
+    expect(outcomeChip("blocked", "Not granted")).toEqual({ text: "Blocked: Not granted", tone: "warn" });
     expect(outcomeChip("waiting")).toEqual({ text: "Needs you", tone: "warn" });
   });
 });

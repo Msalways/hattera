@@ -142,6 +142,7 @@ export function PermissionsSection({
             approvalMode={bot.approvalMode}
             autoApprove={bot.autoApprove}
             providerName={engine?.displayName ?? bot.name}
+            botName={bot.name}
             driverKind={engine?.driverKind ?? ""}
             onSelect={setApprovalMode}
             menuDirection="down"

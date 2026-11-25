@@ -1,20 +1,7 @@
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
+import { formatFullDateTime, formatResetTime, toTimestamp } from "@/lib/display-format";
 import type { PlanProvider, PlanWindow } from "./planUsageReport";
-
-export function formatResetDistance(resetsAt: string | null, now: number): string | null {
-  if (!resetsAt) return null;
-  const at = Date.parse(resetsAt);
-  if (!Number.isFinite(at) || at <= now) return null;
-  const minutes = Math.floor((at - now) / 60_000);
-  if (minutes < 1) return "less than a minute";
-  const days = Math.floor(minutes / 1440);
-  const hours = Math.floor((minutes % 1440) / 60);
-  const mins = minutes % 60;
-  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
-  if (hours > 0) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  return `${mins}m`;
-}
 
 function usageTone(used: number): string {
   if (used >= 90) return "bg-danger";
@@ -39,7 +26,10 @@ export function WindowRow({
   now: number;
   usedHeadline?: boolean;
 }) {
-  const when = window.available ? formatResetDistance(window.resetsAt, now) : null;
+  // A reset still ahead reads "Resets today at 3:30 PM"; one that is missing or
+  // invalid says so instead of leaving the row silent.
+  const resetMs = toTimestamp(window.resetsAt);
+  const showReset = window.available && (resetMs === null || resetMs > now);
   const used = window.usedPercent ?? 0;
   const headline = usedHeadline
     ? window.usedPercent == null ? null : t("planUsage.used", { used: Math.round(window.usedPercent) })
@@ -51,7 +41,7 @@ export function WindowRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-2 text-[13px] text-ink">
             <span className="tabular-nums">{headline}</span>
-            {when && <span className="text-[12px] text-ink-secondary">{t("planUsage.resetsIn", { when })}</span>}
+            {showReset && <span className="text-[12px] text-ink-secondary" title={formatFullDateTime(window.resetsAt)} tabIndex={0}>{formatResetTime(window.resetsAt, { now })}</span>}
           </div>
           <div
             className="mt-1 h-1.5 overflow-hidden rounded-full bg-inset"

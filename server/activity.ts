@@ -110,7 +110,8 @@ const MATCH_AFTER_MS = 30_000;
 
 const OUTCOME_OF_DECISION: Record<DecisionKind, ActivityOutcome> = {
   "auto-approved": "allowed",
-  "auto-denied": "denied",
+  // A rule, not a person, stopped it: Blocked, never Denied.
+  "auto-denied": "blocked",
   "user-approved": "allowed",
   "review-would-approve": "allowed",
   "user-denied": "denied",
@@ -119,6 +120,14 @@ const OUTCOME_OF_DECISION: Record<DecisionKind, ActivityOutcome> = {
   "review-would-deny": "denied",
   "card-shown": "waiting",
 };
+
+/** The decision log keeps a human reason only on connector-grant blocks, in
+ * `summary` (rule "connectorTools…"). Every other auto-denial records a rule
+ * code or the call's arguments, which are not reasons, so those say only "Blocked". */
+function blockedReason(row: DecisionRow): string | undefined {
+  if (row.decision !== "auto-denied" || !row.rule?.startsWith("connectorTools")) return undefined;
+  return row.summary?.trim() || undefined;
+}
 
 function describeRow(base: Omit<ActivityRow, "app" | "label">): ActivityRow {
   const { app, label } = describeTool(base.tool);
@@ -148,6 +157,7 @@ function foldDecisions(rows: DecisionRow[]): ActivityRow[] {
         tool: latest.tool ?? opened.tool ?? "unknown",
         ...(summary ? { summary } : {}),
         outcome: OUTCOME_OF_DECISION[latest.decision],
+        ...(blockedReason(latest) ? { reason: blockedReason(latest) } : {}),
       }),
     );
   }

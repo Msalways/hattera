@@ -13,6 +13,8 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { UserRound } from "lucide-react";
+import { t } from "@/lib/i18n";
 import { MAUS_COLORS, type MausColor, type MausMotion, type MausState } from "@/lib/mascot";
 import { CursorAvatar, type CursorAvatarHandle } from "./CursorAvatar";
 import { avatarCropRadius, botAvatarProfile, clampAvatarFocus, clampAvatarZoom, type BotAvatarCrop } from "../../shared/bot-avatar";
@@ -308,8 +310,10 @@ export function InitialsAvatar({
     <div
       className="flex shrink-0 items-center justify-center rounded-full bg-raised text-ink-secondary font-medium"
       style={{ width: size, height: size, fontSize: size * 0.38 }}
+      {...(initials ? {} : { role: "img", "aria-label": t("profile.youAvatar") })}
     >
-      {initials}
+      {/* No name, email or avatar to draw from: a neutral person glyph, never "?". */}
+      {initials || <UserRound size={Math.round(size * 0.55)} aria-hidden="true" />}
     </div>
   );
 }

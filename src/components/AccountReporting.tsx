@@ -1,5 +1,6 @@
 import type { AccountMetric, AccountReporting } from "../../shared/account-usage";
 import { t } from "@/lib/i18n";
+import { formatFullDateTime, formatRelativeDate, formatResetTime } from "@/lib/display-format";
 
 function valueText(value: number | null, unit: AccountMetric["unit"], currency?: string): string {
   if (value === null) return t("accountUsage.unknown");
@@ -27,11 +28,11 @@ export function AccountReportingView({ reporting, now }: { reporting: AccountRep
         {percent !== null && !expired && <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.max(0, percent))} className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-inset">
           <div className={`h-full rounded-full ${percent >= 90 ? "bg-danger" : percent >= 70 ? "bg-warning" : "bg-success"}`} style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} />
         </div>}
-        {entry.resetsAt && <p className="mt-1 text-[11px] text-ink-secondary">{expired ? t("accountUsage.awaitingReset") : t("accountUsage.resetAt", { when: new Date(entry.resetsAt).toLocaleString() })}</p>}
+        {entry.resetsAt && <p className="mt-1 text-[11px] text-ink-secondary">{expired ? t("accountUsage.awaitingReset") : <span title={formatFullDateTime(entry.resetsAt)} tabIndex={0}>{formatResetTime(entry.resetsAt, { now })}</span>}</p>}
       </div>;
     })}
     <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink-secondary">
-      <span>{reporting.source}{reporting.collectedAt && ` · ${new Date(reporting.collectedAt).toLocaleString()}`}{reporting.status === "stale" && ` · ${t("accountUsage.stale")}`}</span>
+      <span>{reporting.source}{reporting.collectedAt && <> · <span title={formatFullDateTime(reporting.collectedAt)} tabIndex={0}>{formatRelativeDate(reporting.collectedAt, { now })}</span></>}{reporting.status === "stale" && ` · ${t("accountUsage.stale")}`}</span>
       {reporting.dashboardUrl && <a href={reporting.dashboardUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">{t("accountUsage.dashboard")} ↗</a>}
     </div>
   </div>;

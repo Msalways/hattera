@@ -1,5 +1,6 @@
 import { Component, createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
 import { useAdvancedMode } from "@/lib/interface-mode";
+import { formatModelName } from "@/lib/display-format";
 import { brand } from "@/lib/brand";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { useCopyFeedback } from "@/lib/copy-text";
@@ -1507,15 +1508,9 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
       </div>
 
       <BotActivityPicker bot={bot} />
-      {!remoteClient && <div data-chat-route className="mx-3 mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-xs text-ink-secondary sm:mx-5">
-        <span className="min-w-0 break-words" title={bot.modelSelection.instanceId}>{t("execution.nextLocal", {
-          account: state.instances.find(instance => instance.instanceId === bot.modelSelection.instanceId)?.displayName ?? bot.modelSelection.instanceId,
-          model: bot.modelSelection.model,
-        })}</span>
-        {state.groups.some(group => group.sharedGroupId) ? state.groups.filter(group => group.sharedGroupId).map(group =>
-          <button key={group.id} type="button" onClick={() => dispatch({ type: "select", id: group.id })} className="min-w-0 break-words text-accent hover:underline">{t("execution.openTeam", { name: group.name })}</button>
-        ) : <span>{t("execution.noGroups")}</span>}
-      </div>}
+      {/* Diagnostic strip: Advanced only. Simple mode never shows the routing
+          internals (server, account profile, raw model id). */}
+      {advanced && !remoteClient && <NextRequestStrip bot={bot} />}
       {routineExecution && <div className="mx-5 mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-[11.5px] text-ink-secondary">
         <span className="min-w-0 flex-1 truncate">{t("routines.executionDetails", { name: routineExecution.routineName })}</span>
         {canOpenResults && resultsThreadId && <button type="button" onClick={() => openNotificationTarget(dispatch, { botId: bot.id, threadId: resultsThreadId }, state, showThreads)} className="rounded px-2 py-1 text-accent hover:bg-raised">{t("routines.results.back")}</button>}
@@ -1706,6 +1701,29 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   );
 }
 
+/** "Next request: {server} · Account profile: {profile} · {model} · {group status}".
+ * Real values only; the model reads as the provider's display name, with the
+ * real ID kept in the tooltip. */
+function NextRequestStrip({ bot }: { bot: Bot }) {
+  const { state, dispatch } = useStore();
+  const instance = state.instances.find((candidate) => candidate.instanceId === bot.modelSelection.instanceId);
+  const model = formatModelName(bot.modelSelection.model, instance?.models.options.find((option) => option.id === bot.modelSelection.model)?.label);
+  const sharedGroups = state.groups.filter((group) => group.sharedGroupId);
+  return (
+    <div data-chat-route className="mx-3 mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-xs text-ink-secondary sm:mx-5">
+      <span className="min-w-0 break-words" title={`${bot.modelSelection.instanceId} · ${model.id}`}>{t("execution.nextLocal", {
+        server: t("execution.thisServer"),
+        account: instance?.displayName ?? bot.modelSelection.instanceId,
+        model: model.label,
+      })}</span>
+      <span aria-hidden>·</span>
+      {sharedGroups.length ? sharedGroups.map(group =>
+        <button key={group.id} type="button" onClick={() => dispatch({ type: "select", id: group.id })} className="min-w-0 break-words text-accent hover:underline">{t("execution.openTeam", { name: group.name })}</button>
+      ) : <span>{t("execution.noGroups")}</span>}
+    </div>
+  );
+}
+
 /** In place of the composer, for a guest on an OMB Cloud home in a
  * conversation it did not open: it can only start its own. One click, no
  * dialog. */
@@ -1723,21 +1741,25 @@ export function NewConversationInstead({ onNew }: { onNew: () => void }) {
 /** The thread's usage, folded to one figure for the header menu — cost when
  * the engine reports one, else new tokens — with the full breakdown as the
  * tooltip. Null while the thread has no usage yet. */
-function usageSummary(bot: Bot, instances: AppState["instances"]): { short: string; detail: string; tone?: "danger" | "warning" } | null {
+function usageSummary(bot: Bot, instances: AppState["instances"], advanced: boolean): { short: string; detail: string; tone?: "danger" | "warning" } | null {
   const usage = bot.tasks?.find((t) => t.threadId === bot.threadId)?.usage;
   if (!usage || !usageChip(usage)) return null;
   const billing = instances.find((i) => i.instanceId === bot.modelSelection.instanceId)?.snapshot.billing;
   const share = contextShare(usage);
+  // Simple mode: the plain figure and, when the provider reports a charge, what
+  // kind of charge it is. Token/cache breakdown and context are Advanced.
+  const cost = hasFiniteCost(usage.costUsd) ? `${formatUsd(usage.costUsd)} ${costCaption(billing)}` : null;
+  if (!advanced) return { short: usageChip(usage), detail: cost ?? "", tone: undefined };
   const detail = [
     usage.turns === 1 ? t("chat.usage.turnsOne") : t("chat.usage.turnsMany", { count: usage.turns }),
     usageDetail(usage),
     lastTurnDetail(usage),
-    contextDetail(usage),
+    share?.percent !== undefined ? `${t("chat.usage.contextUsed", { percent: String(share.percent) })} ${t("chat.usage.contextUsedNote")}` : contextDetail(usage),
     // the whole thread rides along on every turn, so most of "in" is the
     // model re-reading what it already saw — say so, or the figure reads as
     // a bug (issue #527); past 80% of the window the fix is a new thread
     share?.tone === "danger" ? t("chat.usage.contextNudge") : null,
-    hasFiniteCost(usage.costUsd) ? `${formatUsd(usage.costUsd)} ${costCaption(billing)}` : null,
+    cost,
   ]
     .filter(Boolean)
     .join("\n");
@@ -1757,10 +1779,10 @@ function ChatHeaderMenu({ bot, messages, findOpen, onFind }: {
 }) {
   const { state, dispatch } = useStore();
   const remoteClient = window.ogb?.remoteClient?.active === true;
-  const usage = usageSummary(bot, state.instances);
-  // Simple mode keeps these in sight but locked, so people know where they
-  // live without being handed builder tools by default.
+  // Simple mode keeps the inspector in sight but locked, so people know where it
+  // lives without being handed builder tools by default. Plain Usage stays open.
   const advanced = useAdvancedMode();
+  const usage = usageSummary(bot, state.instances, advanced);
   const advancedOnly = advanced ? undefined : t("chat.advancedOnly");
   const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
   const hasMessages = messages.length > 0;
@@ -1797,9 +1819,7 @@ function ChatHeaderMenu({ bot, messages, findOpen, onFind }: {
       label: t("chat.usage.menu"),
       icon: <Gauge size={16} />,
       separatorBefore: true,
-      heading: advancedOnly,
-      disabled: !advanced,
-      trailing: <span title={usage.detail} data-testid="usage-chip" className={cn("tabular-nums text-[12px]", usage.tone === "danger" ? "text-danger" : usage.tone === "warning" ? "text-warning" : "text-ink-secondary")}>{usage.short}</span>,
+      trailing: <span title={usage.detail || undefined} data-testid="usage-chip" className={cn("tabular-nums text-[12px]", usage.tone === "danger" ? "text-danger" : usage.tone === "warning" ? "text-warning" : "text-ink-secondary")}>{usage.short}</span>,
       onSelect: () => dispatch({ type: "toggleSettings", open: true, section: "usage" }),
     } satisfies SidebarMenuItem] : []),
     ...(remoteClient ? [] : [{
@@ -1815,7 +1835,7 @@ function ChatHeaderMenu({ bot, messages, findOpen, onFind }: {
       icon: <Bug size={16} />,
       active: advanced && state.inspectorOpen,
       separatorBefore: true,
-      heading: usage ? undefined : advancedOnly,
+      heading: advancedOnly,
       disabled: !advanced,
       onSelect: () => dispatch({ type: "toggleInspector" }),
     } satisfies SidebarMenuItem]),

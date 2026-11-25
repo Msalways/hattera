@@ -86,6 +86,7 @@ export function ApprovalModeSelector({
   approvalMode,
   autoApprove,
   providerName,
+  botName,
   driverKind,
   onSelect,
   align = "left",
@@ -99,6 +100,8 @@ export function ApprovalModeSelector({
   approvalMode?: ApprovalMode;
   autoApprove?: boolean;
   providerName: string;
+  /** The bot whose actions are being approved; the question names it, not the engine. */
+  botName?: string;
   driverKind: string;
   onSelect: (mode: ApprovalMode) => void;
   align?: "left" | "right";
@@ -206,7 +209,7 @@ export function ApprovalModeSelector({
         >
           <div className="border-b border-hairline/20 px-4 py-3">
             <div className="text-[14px] font-medium text-ink">
-              {t("approvalMode.question", { provider: providerName })}
+              {botName?.trim() ? t("approvalMode.question", { botName: botName.trim() }) : t("approvalMode.questionNoName")}
             </div>
             <button
               type="button"

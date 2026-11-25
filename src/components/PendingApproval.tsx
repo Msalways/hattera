@@ -14,6 +14,8 @@ import { t, tFromServer } from "@/lib/i18n";
 import type { LocaleKey } from "@/locales";
 import { SkillRequestPreview } from "@/components/SkillRequestPreview";
 import { toolLabel } from "./ApprovalCard";
+import { CopyButton, CopyableValue } from "./CopyableValue";
+import { truncatePathMiddle } from "@/lib/display-format";
 import { outboundSummary } from "@/lib/approval-summary";
 import { reviewedSkillSha256 } from "../../shared/skill-request";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
@@ -204,6 +206,21 @@ export const PendingApprovalPanel = memo(function PendingApprovalPanel({
       >
         {pending.commandAllowlist?.command ?? pending.detail}
       </pre>
+      {/* The command above is complete and is what runs. These read the same
+          values in a way a long path cannot bury: where it runs, and a copy of
+          the exact text. */}
+      {pending.commandAllowlist && <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-secondary">
+        {pending.commandAllowlist.cwd && (
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span>{t("approval.workingFolder")}</span>
+            <CopyableValue value={pending.commandAllowlist.cwd} display={truncatePathMiddle(pending.commandAllowlist.cwd, 48)} copyLabel={t("path.copyFull")} />
+          </span>
+        )}
+        <span className="flex items-center gap-1">
+          <span>{t("command.fullLabel")}</span>
+          <CopyButton value={pending.commandAllowlist.command} label={t("approval.copyCommand")} />
+        </span>
+      </div>}
       {pending.message.card?.skillRequest && (
         <SkillRequestPreview request={pending.message.card.skillRequest} />
       )}

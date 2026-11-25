@@ -53,7 +53,8 @@ import {
   type PhonePairingAccess,
 } from "@/lib/phone-pairing";
 
-/** "Milind Soni" → "MS", "milind" → "M", "you@x.dev" → "Y", unset → "?" */
+/** "Milind Soni" → "MS", "milind" → "M", "you@x.dev" → "Y", unset → "" (the
+ * avatar then shows a neutral person glyph named "You", never "?") */
 export function profileInitials(profile?: { name?: string; email?: string }): string {
   const name = profile?.name?.trim();
   if (name) {
@@ -64,7 +65,7 @@ export function profileInitials(profile?: { name?: string; email?: string }): st
       .join("");
   }
   const email = profile?.email?.trim();
-  return email ? email[0]!.toUpperCase() : "?";
+  return email ? email[0]!.toUpperCase() : "";
 }
 
 /** The name shown on the row: the profile name, else the email, else "You". */

@@ -9,6 +9,8 @@ import { useDesktopCapabilities } from "./DesktopCapabilities";
 import { collectMessageFiles, fileIdentity, splitMessageAttachments, type GalleryFile } from "./AttachmentGallery";
 import { AttachedFileChip, type MessageAttachmentContext } from "./AttachmentPreview";
 import { shortPath } from "@/lib/short-path";
+import { truncatePathMiddle } from "@/lib/display-format";
+import { CopyButton } from "./CopyableValue";
 import { t } from "@/lib/i18n";
 
 const MAX_FILES = 20;
@@ -98,9 +100,17 @@ export function ComputerFilesPane({ bot }: { bot: Bot }) {
         <div className="text-[13px] font-medium text-ink">{t("computer.files.folder")}</div>
         <div className="mt-2 flex items-center gap-2">
           <FolderOpen size={15} className="shrink-0 text-ink-secondary" aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink" title={cwd ?? undefined}>
-            {cwd ? shortPath(cwd, home) : cwd === null ? t("computer.files.homeFolder") : t("computer.files.privateFolder", { name: bot.name })}
+          {/* The folder's identifying end stays visible: the middle is what is cut,
+              and the complete path is focusable and copyable. */}
+          <span
+            className="min-w-0 flex-1 break-all font-mono text-[12px] text-ink"
+            title={cwd ?? undefined}
+            tabIndex={cwd ? 0 : undefined}
+            aria-label={cwd ? `${t("path.fullLabel")}: ${cwd}` : undefined}
+          >
+            {cwd ? truncatePathMiddle(shortPath(cwd, home), 44) : cwd === null ? t("computer.files.homeFolder") : t("computer.files.privateFolder", { name: bot.name })}
           </span>
+          {cwd && <CopyButton value={cwd} label={t("path.copyFull")} />}
           <button
             type="button"
             onClick={() => {
@@ -142,7 +152,7 @@ export function ComputerFilesPane({ bot }: { bot: Bot }) {
                       <span className="shrink-0 text-[11px] text-ink-tertiary">{t("computer.files.notShared")}</span>
                     </div>
                   )}
-                  {folder && <div className="mt-1 truncate px-2.5 text-[11px] text-ink-tertiary">{shortPath(folder, home)}</div>}
+                  {folder && <div className="mt-1 truncate px-2.5 text-[11px] text-ink-tertiary">{truncatePathMiddle(shortPath(folder, home), 48)}</div>}
                 </li>
               );
             })}

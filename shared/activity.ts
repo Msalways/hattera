@@ -12,6 +12,8 @@ export type ActivityOutcome =
   | "allowed"
   /** a person or reviewer said no; nothing ran */
   | "denied"
+  /** a rule stopped it before anyone was asked; nothing ran. Not a denial. */
+  | "blocked"
   /** a card is open and nobody has answered it */
   | "waiting";
 
@@ -30,4 +32,6 @@ export interface ActivityRow {
   /** the arguments the decision log recorded, already redacted */
   summary?: string;
   outcome: ActivityOutcome;
+  /** Why a blocked action was stopped, when the log recorded a real reason. Never invented. */
+  reason?: string;
 }

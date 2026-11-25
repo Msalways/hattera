@@ -137,6 +137,18 @@ describe("readBotActivity", () => {
     ]);
   });
 
+  it("reports a rule-stopped request as Blocked, with a reason only when one was recorded", () => {
+    decision({ at: "2026-09-07T09:00:00.000Z", requestId: "r1", tool: "Bash", summary: "curl x", decision: "auto-denied", source: "policy", rule: "bashDeny" } as never);
+    decision({ at: "2026-09-07T09:00:01.000Z", requestId: "r2", tool: "mcp__claude_ai_Gmail__send_email", summary: "Gmail is not granted to this bot", decision: "auto-denied", source: "policy", rule: "connectorToolsNotGranted" } as never);
+    const rows = read();
+    const plain = rows.find((r) => r.requestId === "r1")!;
+    const withReason = rows.find((r) => r.requestId === "r2")!;
+    expect(plain.outcome).toBe("blocked");
+    expect(plain.reason).toBeUndefined();
+    expect(withReason.outcome).toBe("blocked");
+    expect(withReason.reason).toBe("Gmail is not granted to this bot");
+  });
+
   it("shows a card nobody has answered as waiting", () => {
     decision({ at: "2026-09-07T09:00:00.000Z", requestId: "r1", tool: "mcp__claude_ai_Gmail__send_email", summary: "to finance@", decision: "card-shown", source: "question" });
     expect(read()).toEqual([
