@@ -564,6 +564,7 @@ function NewRoomPanel({ onClose }: { onClose: () => void }) {
   const [teamFilter, setTeamFilter] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
+  const membersRef = useRef<HTMLDivElement>(null);
   const bots = state.bots.filter((b) => !b.hidden);
   const loadingTeams = state.sections === undefined;
   const teams = [...new Set([
@@ -584,6 +585,8 @@ function NewRoomPanel({ onClose }: { onClose: () => void }) {
   const create = () => {
     if (!picked.size) {
       setSubmitted(true);
+      // Move focus to the field that is wrong, so the untouched name field is not left looking selected.
+      membersRef.current?.focus();
       return;
     }
     dispatch({
@@ -614,7 +617,7 @@ function NewRoomPanel({ onClose }: { onClose: () => void }) {
       </DialogField>
       <DialogField label={t("sidebar.newChannel.membersLabel")} error={membersError}
         help={picked.size ? t(picked.size === 1 ? "sidebar.newChannel.membersOne" : "sidebar.newChannel.membersMany", { count: picked.size }) : undefined}>
-        {(field) => <div id={field.id} role="group" aria-label={t("sidebar.newChannel.membersLabel")} aria-describedby={field["aria-describedby"]}>
+        {(field) => <div ref={membersRef} tabIndex={-1} className="outline-none" id={field.id} role="group" aria-label={t("sidebar.newChannel.membersLabel")} aria-describedby={field["aria-describedby"]}>
           <BotPickerList bots={bots} picked={picked} onToggle={toggle} emptyHint={t("sidebar.newChannel.emptyHint")} />
         </div>}
       </DialogField>
