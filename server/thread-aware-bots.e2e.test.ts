@@ -597,7 +597,7 @@ describe("list_threads", () => {
       expect(mine.status).toBe(200);
       const titles = mine.body.threads.map((row: { title: string; botName: string; own: boolean }) => `${row.own ? "own" : row.botName}:${row.title}`);
       // Direct work gets a thread of its own, named for its sender.
-      expect(titles).toContain("Quinn:@Parker · work");
+      expect(titles).toContain("Quinn:@Parker · QA: PR #77");
       expect(titles.some((title: string) => title.startsWith("own:"))).toBe(true);
       expect(titles).not.toContain("Quinn:Quinn's own audit");
       // and Quinn, asking for itself, sees its own rows only — never Parker's
@@ -634,7 +634,7 @@ describe("close_thread", () => {
       token = await heldTurn(pm, "Close the completed QA task.");
       const closed = await close(opened.body.threadId);
       expect(closed.status).toBe(200);
-      expect(closed.body).toMatchObject({ closed: true, alreadyClosed: true, title: "@Parker · work", botName: "Quinn" });
+      expect(closed.body).toMatchObject({ closed: true, alreadyClosed: true, title: "@Parker · QA: PR #78", botName: "Quinn" });
       // Successful peer work is already folded from the sidebar.
       expect((await taskOf(qa.id, opened.body.threadId)).closedBy).toMatchObject({ botId: pm.id, name: "Parker" });
       const listed = (await api("GET", "/api/internal/threads", undefined, token)).body.threads as any[];

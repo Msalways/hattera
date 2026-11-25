@@ -522,7 +522,7 @@ it("lets a card hold only its own job: other jobs run beside it, or say once who
   const jobK = await f.newJob("Changelog");
   await f.say(jobK, "PHASE-K-JOB: have Mira update the changelog.");
   await expect.poll(() => f.child(jobK, f.mira.id, "CHANGELOG")?.status, { timeout: 20_000 }).toBe("queued");
-  const behind = 'Queued for @Mira behind your approval in “@Clive · work”';
+  const behind = 'Queued for @Mira behind your approval in “@Clive · SHIP-CHECK: run the test suite and say whether the export c…”';
   await expect.poll(async () => (await f.rows(jobK)).filter((name: string) => name === behind).length, { timeout: 20_000 }).toBe(1);
   const notice = (await f.messages(jobK)).find((message: any) => message.tool?.name === behind);
   expect(notice.tool.ok).toBe(true);

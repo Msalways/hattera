@@ -9,6 +9,10 @@ describe("delegatedTaskSummary", () => {
     expect(delegatedTaskSummary("\n\n## **Draft** the `release` notes\nmore")).toBe("Draft the release notes");
     expect(delegatedTaskSummary("- 1. Fix the login redirect")).toBe("Fix the login redirect");
   });
+  it("keeps underscores inside identifiers and drops emphasis underscores", () => {
+    expect(delegatedTaskSummary("MAILBOX_REVIEW: check the notes")).toBe("MAILBOX_REVIEW: check the notes");
+    expect(delegatedTaskSummary("Fix _urgent_ file_name bug")).toBe("Fix urgent file_name bug");
+  });
   it("collapses whitespace", () => {
     expect(delegatedTaskSummary("Check   the\t build   output")).toBe("Check the build output");
   });

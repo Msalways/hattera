@@ -15,7 +15,9 @@ export function delegatedTaskSummary(message: string | null | undefined): string
   for (const raw of message.split(/\r?\n/)) {
     const line = raw
       .replace(/^\s*(?:(?:[#>*\-+•]+|\d+[.)])\s*)+/, "")
-      .replace(/[*_`~]+/g, "")
+      // Emphasis markers go; an underscore inside a word (MAILBOX_REVIEW, file_name) stays.
+      .replace(/[*`~]+/g, "")
+      .replace(/(^|\s)_+|_+(?=\s|$)/g, "$1")
       .replace(/\s+/g, " ")
       .trim();
     if (!/[\p{L}\p{N}]/u.test(line)) continue;
