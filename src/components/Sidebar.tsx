@@ -63,6 +63,7 @@ import { SidebarNewChatPanel } from "./SidebarNewChatPanel";
 import { openCommandPalette } from "./CommandPalette";
 import { ShareTeamDialog } from "./ShareTeamDialog";
 import { TeamDialog } from "./TeamDialog";
+import { DialogField, SharedDialog, dialogControlClass } from "./SharedDialog";
 import { RenameTitle } from "./RenameTitle";
 import { BotPickerList } from "./BotPickerList";
 import { BotProjectDialog, FolderActions, FolderIcon, navigateThreadMenu } from "./BotProjects";
@@ -553,13 +554,25 @@ function RoomContextMenu({
   );
 }
 
-/** Pick members and an optional Work/Personal/project context, then create. */
+/** Pick members and an optional team, then create. The team is chosen from the
+ * existing ones (a team is identified by its name in this app's data); typed
+ * text never creates one. */
 function NewRoomPanel({ onClose }: { onClose: () => void }) {
   const { state, dispatch } = useStore();
   const [name, setName] = useState("");
   const [section, setSection] = useState("");
+  const [teamFilter, setTeamFilter] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [submitted, setSubmitted] = useState(false);
   const bots = state.bots.filter((b) => !b.hidden);
+  const loadingTeams = state.sections === undefined;
+  const teams = [...new Set([
+    ...(state.sections ?? []),
+    ...state.bots.filter((b) => !b.hidden && b.section).map((b) => b.section!),
+    ...state.groups.filter((g) => g.section).map((g) => g.section!),
+  ])].sort((left, right) => left.localeCompare(right));
+  const longList = teams.length > 8;
+  const shownTeams = teams.filter((team) => !teamFilter.trim() || team.toLowerCase().includes(teamFilter.trim().toLowerCase()) || team === section);
   const toggle = (id: string) =>
     setPicked((prev) => {
       const next = new Set(prev);
@@ -567,67 +580,45 @@ function NewRoomPanel({ onClose }: { onClose: () => void }) {
       else next.add(id);
       return next;
     });
+  const membersError = submitted && !picked.size ? t("sidebar.newChannel.membersRequired") : null;
   const create = () => {
-    if (!picked.size) return;
+    if (!picked.size) {
+      setSubmitted(true);
+      return;
+    }
     dispatch({
       type: "createGroup",
       memberIds: [...picked],
       name: name.trim() || undefined,
-      section: section.trim() || undefined,
+      section: section || undefined,
     });
-    track("room_created", { members: picked.size, context: Boolean(section.trim()) });
+    track("room_created", { members: picked.size, context: Boolean(section) });
     onClose();
   };
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="w-[340px] rounded-2xl border border-hairline/50 bg-card p-4 shadow-2xl">
-        <div className="mb-3 text-[15px] font-semibold text-ink">{t("sidebar.newChannel.title")}</div>
-        <input
-          autoFocus
-          maxLength={100}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") create();
-            if (e.key === "Escape") onClose();
-          }}
-          placeholder={t("sidebar.newChannel.name")}
-          className="mb-3 w-full rounded-lg bg-raised/70 px-3 py-2 text-[14px] text-ink placeholder:text-ink-secondary focus:outline-none"
-        />
-        <input
-          value={section}
-          maxLength={60}
-          onChange={(e) => setSection(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") create();
-            if (e.key === "Escape") onClose();
-          }}
-          placeholder={t("sidebar.newChannel.context")}
-          aria-label={t("sidebar.newChannel.contextAria")}
-          className="mb-3 w-full rounded-lg bg-raised/70 px-3 py-2 text-[14px] text-ink placeholder:text-ink-secondary focus:outline-none"
-        />
-        <BotPickerList
-          bots={bots}
-          picked={picked}
-          onToggle={toggle}
-          emptyHint={t("sidebar.newChannel.emptyHint")}
-        />
-        <button
-          onClick={create}
-          disabled={!picked.size}
-          className="mt-3 w-full rounded-lg bg-accent py-2 text-[14px] font-medium text-white hover:brightness-110 disabled:opacity-40"
-        >
-          {picked.size === 0
-            ? t("sidebar.newChannel.create")
-            : picked.size === 1
-              ? t("sidebar.newChannel.createOne")
-              : t("sidebar.newChannel.createMany", { count: picked.size })}
-        </button>
-      </div>
-    </div>
+    <SharedDialog title={t("sidebar.newChannel.title")} onClose={onClose} onSubmit={create} testId="new-room-dialog"
+      primary={{ label: t("sidebar.newChannel.create") }}>
+      <DialogField label={t("sidebar.newChannel.nameLabel")} help={t("sidebar.newChannel.nameHelp")}>
+        {(field) => <input {...field} maxLength={100} value={name} autoComplete="off" onChange={(e) => setName(e.target.value)} className={dialogControlClass(false)} />}
+      </DialogField>
+      <DialogField label={t("sidebar.newChannel.teamLabel")}
+        help={loadingTeams ? t("sidebar.newChannel.teamsLoading") : teams.length ? undefined : t("sidebar.newChannel.teamsEmpty")}>
+        {(field) => <>
+          {longList && <input type="search" value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)} aria-label={t("sidebar.newChannel.teamSearch")}
+            placeholder={t("sidebar.newChannel.teamSearch")} className={cn(dialogControlClass(false), "mb-2")} />}
+          <select {...field} value={section} disabled={loadingTeams} onChange={(e) => setSection(e.target.value)} className={dialogControlClass(false)}>
+            <option value="">{t("sidebar.newChannel.noTeam")}</option>
+            {shownTeams.map((team) => <option key={team} value={team}>{team}</option>)}
+          </select>
+        </>}
+      </DialogField>
+      <DialogField label={t("sidebar.newChannel.membersLabel")} error={membersError}
+        help={picked.size ? t(picked.size === 1 ? "sidebar.newChannel.membersOne" : "sidebar.newChannel.membersMany", { count: picked.size }) : undefined}>
+        {(field) => <div id={field.id} role="group" aria-label={t("sidebar.newChannel.membersLabel")} aria-describedby={field["aria-describedby"]}>
+          <BotPickerList bots={bots} picked={picked} onToggle={toggle} emptyHint={t("sidebar.newChannel.emptyHint")} />
+        </div>}
+      </DialogField>
+    </SharedDialog>
   );
 }
 

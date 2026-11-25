@@ -1121,6 +1121,16 @@ body {
   height: min(760px, 100%);
   min-height: 0;
 }
+/* An opaque skin surface for a dialog that must stay readable over a busy
+   screen (Settings): the same border and shadow as the glass, with no see-through. */
+.glass-surface.glass-opaque {
+  background: var(--color-menu);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: color-mix(in srgb, var(--color-ink) 22%, transparent);
+}
+.glass-surface.glass-opaque .bg-card { background-color: var(--color-card); }
+.glass-surface.glass-opaque .glass-rail { background: var(--color-app); }
 /* Cards and rails sitting on the glass: a second, thinner pane. */
 .glass-card {
   background: color-mix(in srgb, var(--color-card) 60%, transparent);
