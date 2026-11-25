@@ -5,11 +5,21 @@
 // second profile must not replay the tour, and a phone paired later should
 // see the same hints as already dismissed.
 
+import { withTourFinished } from "@/lib/guided-tour";
+import { SPOTLIGHTS } from "@/lib/first-conversation";
+
+/** How the welcome flow ended. A skip ends every tour; a finish offers the
+ * guided tour and the first-conversation spotlights as before. */
+export type OnboardingOutcome = "finished" | "skipped";
+
 export interface OnboardingStatus {
   /** ISO timestamp; "" until the welcome flow has been finished or skipped. */
   completedAt: string;
   /** Which welcome flow was completed; a newer flow may re-show itself. */
   version: number;
+  /** Absent on records saved before the outcome was kept: those read as
+   * finished (see onboardingOutcome), which is what they always did. */
+  outcome?: OnboardingOutcome;
   reelSeen: boolean;
   hintsSeen: string[];
   /** OMB Cloud home only: when a bot's turn first finished there. The
@@ -95,11 +105,43 @@ export function welcomeDue(
   return true;
 }
 
+/** How the welcome flow ended, or null while it has not. Records from before
+ * `outcome` existed carry only `completedAt`: skipping was saved the same as
+ * finishing, so they migrate to "finished" and keep today's behaviour. */
+export function onboardingOutcome(record: Pick<OnboardingStatus, "completedAt" | "outcome"> | undefined): OnboardingOutcome | null {
+  if (!record?.completedAt) return null;
+  return record.outcome === "skipped" ? "skipped" : "finished";
+}
+
+/** True once the person skipped the welcome flow: no tour or spotlight starts. */
+export function toursEnded(record: Pick<OnboardingStatus, "completedAt" | "outcome"> | undefined): boolean {
+  return onboardingOutcome(record) === "skipped";
+}
+
 /** The config patch that marks the welcome flow done. Sent through the same
  * `PUT /api/config` path as the profile; sections merge server-side, so
  * hints already seen survive a replay. */
-export function completionPatch(now: Date = new Date()): { onboarding: { completedAt: string; version: number } } {
-  return { onboarding: { completedAt: now.toISOString(), version: WELCOME_VERSION } };
+export function completionPatch(now: Date = new Date()): { onboarding: { completedAt: string; version: number; outcome: "finished" } } {
+  return { onboarding: { completedAt: now.toISOString(), version: WELCOME_VERSION, outcome: "finished" } };
+}
+
+/** The patch for skipping the welcome flow: done, outcome "skipped", and every
+ * guided-tour step and first-conversation spotlight marked seen, so clients
+ * that predate `outcome` also stay quiet. */
+export function skipPatch(
+  record: OnboardingStatus | undefined,
+  now: Date = new Date(),
+): { onboarding: { completedAt: string; version: number; outcome: "skipped"; hintsSeen: string[] } } {
+  const hintsSeen = [...new Set([...withTourFinished(record), ...SPOTLIGHTS])];
+  return { onboarding: { completedAt: now.toISOString(), version: WELCOME_VERSION, outcome: "skipped", hintsSeen } };
+}
+
+/** An unanswered approval or question is waiting for the person in these
+ * messages. No tour tip may sit over it: it would cover the command. */
+export function personWaiting(
+  messages: ReadonlyArray<{ kind?: string; card?: { requestId?: string; answered?: string; dismissed?: boolean; expired?: boolean } }> | undefined,
+): boolean {
+  return (messages ?? []).some((m) => m.kind === "options" && Boolean(m.card?.requestId) && !m.card?.answered && !m.card?.dismissed && !m.card?.expired);
 }
 
 export function hintSeen(record: OnboardingStatus | undefined, id: string): boolean {

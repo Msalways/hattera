@@ -97,12 +97,12 @@ export function WelcomeGate({ viewer }: { viewer: WelcomeViewer | null }) {
         setResumeAt("engines");
         dispatch({ type: "toggleAppSettings", open: true, section: "organization" });
       }}
-      onDone={() => {
+      onDone={(reason) => {
         setDismissed(true);
         setResumeAt(undefined);
         dispatch({ type: "toggleWelcome", open: false });
-        // the first real finish hands over to the guided tour; a replay does not
-        if (!replay) dispatch({ type: "toggleTour", open: true });
+        // the first real finish hands over to the guided tour; a replay and a skip do not
+        if (!replay && reason === "completed") dispatch({ type: "toggleTour", open: true });
       }}
     />
   );

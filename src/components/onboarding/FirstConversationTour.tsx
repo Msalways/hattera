@@ -6,7 +6,7 @@
 // paired remote client or to a hosted workspace's member, who cannot save
 // the hint list.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { hintSeenPatch, welcomeDue } from "@/lib/onboarding";
+import { hintSeenPatch, personWaiting, toursEnded, welcomeDue } from "@/lib/onboarding";
 import { emailGateDone } from "@/lib/analytics";
 import { currentStep } from "@/lib/guided-tour";
 import { anchorFor, cardAnswered, nextSpotlight, placementFor, tourComplete, type ChatObservation, type SpotlightId } from "@/lib/first-conversation";
@@ -48,6 +48,9 @@ export function FirstConversationTour({ quiet = false }: { quiet?: boolean }) {
     !remoteClient &&
     !state.welcomeOpen &&
     Boolean(record?.completedAt) &&
+    !toursEnded(record) &&
+    // no tip over an approval or question waiting for the person
+    !personWaiting(bot?.messages) &&
     currentStep(record) === null &&
     !welcomeDue(state.config, { remoteClient, legacyDone: emailGateDone() }) &&
     !tourComplete(seen);

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { SPOTLIGHTS } from "./first-conversation";
+import { currentStep, TOUR_STEPS } from "./guided-tour";
 import {
   beatWidth,
   beatsFor,
@@ -14,7 +16,11 @@ import {
   hintSeenPatch,
   LOCAL_VIEWER,
   nextBeat,
+  onboardingOutcome,
   organisationSignIn,
+  personWaiting,
+  skipPatch,
+  toursEnded,
   previousBeat,
   welcomeDue,
   welcomeViewer,
@@ -190,8 +196,42 @@ describe("engineSummary", () => {
 describe("persistence patches", () => {
   it("stamps completion with the current version", () => {
     expect(completionPatch(new Date("2026-09-09T12:34:56.000Z"))).toEqual({
-      onboarding: { completedAt: "2026-09-09T12:34:56.000Z", version: WELCOME_VERSION },
+      onboarding: { completedAt: "2026-09-09T12:34:56.000Z", version: WELCOME_VERSION, outcome: "finished" },
     });
+  });
+
+  it("records a skip as skipped and marks every tour seen", () => {
+    const patch = skipPatch({ ...EMPTY_ONBOARDING, hintsSeen: ["spot.approval", "updates.2026"] }, new Date("2026-09-09T12:34:56.000Z"));
+    expect(patch.onboarding).toMatchObject({ completedAt: "2026-09-09T12:34:56.000Z", version: WELCOME_VERSION, outcome: "skipped" });
+    for (const id of [...TOUR_STEPS.map((s) => s.id), ...SPOTLIGHTS, "updates.2026"]) expect(patch.onboarding.hintsSeen).toContain(id);
+    expect(new Set(patch.onboarding.hintsSeen).size).toBe(patch.onboarding.hintsSeen.length);
+  });
+
+  it("migrates a record saved without an outcome to finished", () => {
+    const old = { ...EMPTY_ONBOARDING, completedAt: "2026-09-09T12:34:56.000Z", version: 1 };
+    expect(onboardingOutcome(old)).toBe("finished");
+    expect(toursEnded(old)).toBe(false);
+    expect(currentStep(old)?.id).toBe("tour.composer");
+    expect(onboardingOutcome({ ...old, outcome: "skipped" })).toBe("skipped");
+    expect(onboardingOutcome(EMPTY_ONBOARDING)).toBeNull();
+    expect(toursEnded({ ...EMPTY_ONBOARDING, outcome: "skipped" })).toBe(false);
+  });
+
+  it("a skip ends every tour while a finish still offers the next one", () => {
+    const done = { ...EMPTY_ONBOARDING, completedAt: "2026-09-09T12:34:56.000Z", version: WELCOME_VERSION };
+    expect(currentStep({ ...done, outcome: "skipped" })).toBeNull();
+    expect(currentStep({ ...done, outcome: "finished" })?.id).toBe("tour.composer");
+  });
+
+  it("reports a waiting approval or question, and nothing once answered", () => {
+    const card = { requestId: "r", tool: "Bash" } as { requestId: string; tool?: string; answered?: string; dismissed?: boolean; expired?: boolean };
+    expect(personWaiting(undefined)).toBe(false);
+    expect(personWaiting([{ kind: "text" }, { kind: "options", card: { options: ["a"] } as never }])).toBe(false);
+    expect(personWaiting([{ kind: "options", card }])).toBe(true);
+    expect(personWaiting([{ kind: "options", card: { requestId: "q" } }])).toBe(true);
+    for (const done of [{ answered: "allow" }, { dismissed: true }, { expired: true }]) {
+      expect(personWaiting([{ kind: "options", card: { ...card, ...done } }])).toBe(false);
+    }
   });
 
   it("adds a hint once and never writes a no-op", () => {
