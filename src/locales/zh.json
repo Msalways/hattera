@@ -2541,5 +2541,17 @@
   "pro.name": "Hattera Cloud",
   "computer.files.homeFolder": "主目录",
   "computer.files.changeDefaultFolder": "更改默认目录",
-  "computer.files.pinnedFolderHint": "此对话会继续使用当前文件夹。可更改新对话使用的默认文件夹。"
+  "computer.files.pinnedFolderHint": "此对话会继续使用当前文件夹。可更改新对话使用的默认文件夹。",
+  "team.nameRequired": "请输入团队名称。",
+  "sidebar.newChannel.nameLabel": "群组名称",
+  "sidebar.newChannel.nameHelp": "可选。例如：网站发布。",
+  "sidebar.newChannel.teamLabel": "团队（可选）",
+  "sidebar.newChannel.noTeam": "无团队",
+  "sidebar.newChannel.teamSearch": "搜索团队",
+  "sidebar.newChannel.teamsLoading": "正在加载团队…",
+  "sidebar.newChannel.teamsEmpty": "还没有团队。请先在侧边栏创建一个，然后在此选择。",
+  "sidebar.newChannel.membersLabel": "此群聊中的机器人",
+  "sidebar.newChannel.membersRequired": "请至少选择一个机器人。",
+  "sidebar.newChannel.membersOne": "已选择 1 个机器人",
+  "sidebar.newChannel.membersMany": "已选择 {count} 个机器人"
 }

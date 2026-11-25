@@ -1596,5 +1596,17 @@
   "settings.sendKey.subtitle": "Choisissez Shift+Enter ou {key} pour qu'Enter passe plutôt à la ligne, pratique si votre méthode de saisie valide le texte avec Enter, comme pour le japonais. {key} envoie quel que soit votre choix. Sur cet appareil uniquement.",
   "computer.files.homeFolder": "Dossier personnel",
   "computer.files.changeDefaultFolder": "Modifier le dossier par défaut",
-  "computer.files.pinnedFolderHint": "Cette conversation conserve son dossier actuel. Modifiez le dossier par défaut pour les nouvelles conversations."
+  "computer.files.pinnedFolderHint": "Cette conversation conserve son dossier actuel. Modifiez le dossier par défaut pour les nouvelles conversations.",
+  "team.nameRequired": "Saisissez un nom d’équipe.",
+  "sidebar.newChannel.nameLabel": "Nom du groupe",
+  "sidebar.newChannel.nameHelp": "Facultatif. Par exemple, Lancement du site.",
+  "sidebar.newChannel.teamLabel": "Équipe (facultatif)",
+  "sidebar.newChannel.noTeam": "Aucune équipe",
+  "sidebar.newChannel.teamSearch": "Rechercher des équipes",
+  "sidebar.newChannel.teamsLoading": "Chargement des équipes…",
+  "sidebar.newChannel.teamsEmpty": "Aucune équipe pour l’instant. Créez-en une depuis la barre latérale, puis choisissez-la ici.",
+  "sidebar.newChannel.membersLabel": "Bots de ce groupe de discussion",
+  "sidebar.newChannel.membersRequired": "Choisissez au moins un bot.",
+  "sidebar.newChannel.membersOne": "1 bot sélectionné",
+  "sidebar.newChannel.membersMany": "{count} bots sélectionnés"
 }

@@ -1614,5 +1614,17 @@
   "settings.sendKey.subtitle": "Wähle Shift+Enter oder {key}, damit Enter stattdessen eine neue Zeile beginnt – praktisch, wenn deine Eingabemethode Text mit Enter bestätigt, wie bei japanischer Eingabe. {key} sendet bei jeder Wahl. Nur auf diesem Gerät.",
   "computer.files.homeFolder": "Home-Ordner",
   "computer.files.changeDefaultFolder": "Standard ändern",
-  "computer.files.pinnedFolderHint": "Diese Unterhaltung behält ihren aktuellen Ordner. Ändere den Standardordner für neue Unterhaltungen."
+  "computer.files.pinnedFolderHint": "Diese Unterhaltung behält ihren aktuellen Ordner. Ändere den Standardordner für neue Unterhaltungen.",
+  "team.nameRequired": "Gib einen Teamnamen ein.",
+  "sidebar.newChannel.nameLabel": "Gruppenname",
+  "sidebar.newChannel.nameHelp": "Optional. Zum Beispiel Website-Launch.",
+  "sidebar.newChannel.teamLabel": "Team (optional)",
+  "sidebar.newChannel.noTeam": "Kein Team",
+  "sidebar.newChannel.teamSearch": "Teams durchsuchen",
+  "sidebar.newChannel.teamsLoading": "Teams werden geladen…",
+  "sidebar.newChannel.teamsEmpty": "Noch keine Teams. Erstelle eines in der Seitenleiste und wähle es dann hier aus.",
+  "sidebar.newChannel.membersLabel": "Bots in diesem Gruppenchat",
+  "sidebar.newChannel.membersRequired": "Wähle mindestens einen Bot aus.",
+  "sidebar.newChannel.membersOne": "1 Bot ausgewählt",
+  "sidebar.newChannel.membersMany": "{count} Bots ausgewählt"
 }

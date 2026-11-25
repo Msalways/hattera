@@ -3795,5 +3795,17 @@
   "place.view.ccSignIn.lineMyCloud": "請先在 My Cloud 上登入 {engine}。{bot} 在雲端電腦上也會使用它。",
   "computer.files.homeFolder": "家目錄",
   "computer.files.changeDefaultFolder": "變更預設資料夾",
-  "computer.files.pinnedFolderHint": "這段對話會繼續使用目前的資料夾。您可以變更新對話使用的預設資料夾。"
+  "computer.files.pinnedFolderHint": "這段對話會繼續使用目前的資料夾。您可以變更新對話使用的預設資料夾。",
+  "team.nameRequired": "請輸入團隊名稱。",
+  "sidebar.newChannel.nameLabel": "群組名稱",
+  "sidebar.newChannel.nameHelp": "選填。例如：網站發佈。",
+  "sidebar.newChannel.teamLabel": "團隊（選填）",
+  "sidebar.newChannel.noTeam": "無團隊",
+  "sidebar.newChannel.teamSearch": "搜尋團隊",
+  "sidebar.newChannel.teamsLoading": "正在載入團隊…",
+  "sidebar.newChannel.teamsEmpty": "尚無團隊。請先在側邊欄建立一個，再於此選擇。",
+  "sidebar.newChannel.membersLabel": "此群組聊天中的機器人",
+  "sidebar.newChannel.membersRequired": "請至少選擇一個機器人。",
+  "sidebar.newChannel.membersOne": "已選擇 1 個機器人",
+  "sidebar.newChannel.membersMany": "已選擇 {count} 個機器人"
 }

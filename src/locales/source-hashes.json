@@ -1617,7 +1617,19 @@
       "settings.sendKey.subtitle": "30a7d3ac5102dad9e2d202785e2cef0185c85241b279d5177fba55e5beda91cd",
       "computer.files.homeFolder": "6772da558a23e28185deb8d4bb7cdb20ae916f13a03eca9a9e5c0d4deffd4944",
       "computer.files.changeDefaultFolder": "d849aca289a009020a597abaf279d8db449aca92344e9d91485cf1cf0aadc144",
-      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885"
+      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885",
+      "team.nameRequired": "698b17e7f6b91edd42bcc3b4a5965fd5a73475e2926425e161d76e5ba832cc5f",
+      "sidebar.newChannel.nameLabel": "762ebb70ef0ea2e80a41035e91a5f95ec35b0b03d2f2acc5c5b4f4c09213c8c5",
+      "sidebar.newChannel.nameHelp": "eb78784481119c6cf6dcce70322e25d80d10dcea356955127efba68bc8921368",
+      "sidebar.newChannel.teamLabel": "70a51c173242a967905e6d0ba00b99c5b107e6c9598b5e5de4198d612419c293",
+      "sidebar.newChannel.noTeam": "e3924f2807b785f1696e48a823514203bcab4947656bcc37bff4bd85ec7b1a4e",
+      "sidebar.newChannel.teamSearch": "3ad7e221faf1041994c4506c7adc4ccc4ef681f135048a8a6067d07c55349f1e",
+      "sidebar.newChannel.teamsLoading": "e05fe2fbf9983836f58e5ec55f49af7f3a3a56db159a92d9277737505c2f8b62",
+      "sidebar.newChannel.teamsEmpty": "d3a07fc7c9e26f8576e6f86993f3e00fa3a287f8d0628e45786d6f51844c6569",
+      "sidebar.newChannel.membersLabel": "586d96d8e0f5687f1fe6d628ba764f016c9e51e93abfd07c70b32795985ff37c",
+      "sidebar.newChannel.membersRequired": "a52cedb57b9cc70c2d63cf555a966e476a59ab2dcd99e2151f78080e4fe8bce3",
+      "sidebar.newChannel.membersOne": "f95243d2d77f0b40baed1f8b340b0f35b3d9a0feda3419fd3cb8db1177a4a61a",
+      "sidebar.newChannel.membersMany": "3bcfc97168c58828803fcfdacbc4aa618f2ffc3101714645562937c5d03784ac"
     },
     "es": {
       "pro.fromPrice": "5f6a69a9907ead66b99671e80d627cb02391f80aa883a5f2fb4d43fc68358697",
@@ -3217,7 +3229,19 @@
       "settings.sendKey.subtitle": "30a7d3ac5102dad9e2d202785e2cef0185c85241b279d5177fba55e5beda91cd",
       "computer.files.homeFolder": "6772da558a23e28185deb8d4bb7cdb20ae916f13a03eca9a9e5c0d4deffd4944",
       "computer.files.changeDefaultFolder": "d849aca289a009020a597abaf279d8db449aca92344e9d91485cf1cf0aadc144",
-      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885"
+      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885",
+      "team.nameRequired": "698b17e7f6b91edd42bcc3b4a5965fd5a73475e2926425e161d76e5ba832cc5f",
+      "sidebar.newChannel.nameLabel": "762ebb70ef0ea2e80a41035e91a5f95ec35b0b03d2f2acc5c5b4f4c09213c8c5",
+      "sidebar.newChannel.nameHelp": "eb78784481119c6cf6dcce70322e25d80d10dcea356955127efba68bc8921368",
+      "sidebar.newChannel.teamLabel": "70a51c173242a967905e6d0ba00b99c5b107e6c9598b5e5de4198d612419c293",
+      "sidebar.newChannel.noTeam": "e3924f2807b785f1696e48a823514203bcab4947656bcc37bff4bd85ec7b1a4e",
+      "sidebar.newChannel.teamSearch": "3ad7e221faf1041994c4506c7adc4ccc4ef681f135048a8a6067d07c55349f1e",
+      "sidebar.newChannel.teamsLoading": "e05fe2fbf9983836f58e5ec55f49af7f3a3a56db159a92d9277737505c2f8b62",
+      "sidebar.newChannel.teamsEmpty": "d3a07fc7c9e26f8576e6f86993f3e00fa3a287f8d0628e45786d6f51844c6569",
+      "sidebar.newChannel.membersLabel": "586d96d8e0f5687f1fe6d628ba764f016c9e51e93abfd07c70b32795985ff37c",
+      "sidebar.newChannel.membersRequired": "a52cedb57b9cc70c2d63cf555a966e476a59ab2dcd99e2151f78080e4fe8bce3",
+      "sidebar.newChannel.membersOne": "f95243d2d77f0b40baed1f8b340b0f35b3d9a0feda3419fd3cb8db1177a4a61a",
+      "sidebar.newChannel.membersMany": "3bcfc97168c58828803fcfdacbc4aa618f2ffc3101714645562937c5d03784ac"
     },
     "fr": {
       "pro.fromPrice": "5f6a69a9907ead66b99671e80d627cb02391f80aa883a5f2fb4d43fc68358697",
@@ -4817,7 +4841,19 @@
       "settings.sendKey.subtitle": "30a7d3ac5102dad9e2d202785e2cef0185c85241b279d5177fba55e5beda91cd",
       "computer.files.homeFolder": "6772da558a23e28185deb8d4bb7cdb20ae916f13a03eca9a9e5c0d4deffd4944",
       "computer.files.changeDefaultFolder": "d849aca289a009020a597abaf279d8db449aca92344e9d91485cf1cf0aadc144",
-      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885"
+      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885",
+      "team.nameRequired": "698b17e7f6b91edd42bcc3b4a5965fd5a73475e2926425e161d76e5ba832cc5f",
+      "sidebar.newChannel.nameLabel": "762ebb70ef0ea2e80a41035e91a5f95ec35b0b03d2f2acc5c5b4f4c09213c8c5",
+      "sidebar.newChannel.nameHelp": "eb78784481119c6cf6dcce70322e25d80d10dcea356955127efba68bc8921368",
+      "sidebar.newChannel.teamLabel": "70a51c173242a967905e6d0ba00b99c5b107e6c9598b5e5de4198d612419c293",
+      "sidebar.newChannel.noTeam": "e3924f2807b785f1696e48a823514203bcab4947656bcc37bff4bd85ec7b1a4e",
+      "sidebar.newChannel.teamSearch": "3ad7e221faf1041994c4506c7adc4ccc4ef681f135048a8a6067d07c55349f1e",
+      "sidebar.newChannel.teamsLoading": "e05fe2fbf9983836f58e5ec55f49af7f3a3a56db159a92d9277737505c2f8b62",
+      "sidebar.newChannel.teamsEmpty": "d3a07fc7c9e26f8576e6f86993f3e00fa3a287f8d0628e45786d6f51844c6569",
+      "sidebar.newChannel.membersLabel": "586d96d8e0f5687f1fe6d628ba764f016c9e51e93abfd07c70b32795985ff37c",
+      "sidebar.newChannel.membersRequired": "a52cedb57b9cc70c2d63cf555a966e476a59ab2dcd99e2151f78080e4fe8bce3",
+      "sidebar.newChannel.membersOne": "f95243d2d77f0b40baed1f8b340b0f35b3d9a0feda3419fd3cb8db1177a4a61a",
+      "sidebar.newChannel.membersMany": "3bcfc97168c58828803fcfdacbc4aa618f2ffc3101714645562937c5d03784ac"
     },
     "hi": {
       "pro.fromPrice": "5f6a69a9907ead66b99671e80d627cb02391f80aa883a5f2fb4d43fc68358697",
@@ -6417,7 +6453,19 @@
       "settings.sendKey.subtitle": "30a7d3ac5102dad9e2d202785e2cef0185c85241b279d5177fba55e5beda91cd",
       "computer.files.homeFolder": "6772da558a23e28185deb8d4bb7cdb20ae916f13a03eca9a9e5c0d4deffd4944",
       "computer.files.changeDefaultFolder": "d849aca289a009020a597abaf279d8db449aca92344e9d91485cf1cf0aadc144",
-      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885"
+      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885",
+      "team.nameRequired": "698b17e7f6b91edd42bcc3b4a5965fd5a73475e2926425e161d76e5ba832cc5f",
+      "sidebar.newChannel.nameLabel": "762ebb70ef0ea2e80a41035e91a5f95ec35b0b03d2f2acc5c5b4f4c09213c8c5",
+      "sidebar.newChannel.nameHelp": "eb78784481119c6cf6dcce70322e25d80d10dcea356955127efba68bc8921368",
+      "sidebar.newChannel.teamLabel": "70a51c173242a967905e6d0ba00b99c5b107e6c9598b5e5de4198d612419c293",
+      "sidebar.newChannel.noTeam": "e3924f2807b785f1696e48a823514203bcab4947656bcc37bff4bd85ec7b1a4e",
+      "sidebar.newChannel.teamSearch": "3ad7e221faf1041994c4506c7adc4ccc4ef681f135048a8a6067d07c55349f1e",
+      "sidebar.newChannel.teamsLoading": "e05fe2fbf9983836f58e5ec55f49af7f3a3a56db159a92d9277737505c2f8b62",
+      "sidebar.newChannel.teamsEmpty": "d3a07fc7c9e26f8576e6f86993f3e00fa3a287f8d0628e45786d6f51844c6569",
+      "sidebar.newChannel.membersLabel": "586d96d8e0f5687f1fe6d628ba764f016c9e51e93abfd07c70b32795985ff37c",
+      "sidebar.newChannel.membersRequired": "a52cedb57b9cc70c2d63cf555a966e476a59ab2dcd99e2151f78080e4fe8bce3",
+      "sidebar.newChannel.membersOne": "f95243d2d77f0b40baed1f8b340b0f35b3d9a0feda3419fd3cb8db1177a4a61a",
+      "sidebar.newChannel.membersMany": "3bcfc97168c58828803fcfdacbc4aa618f2ffc3101714645562937c5d03784ac"
     },
     "ja": {
       "whop.description": "1a07cf04ef17029448d3781415cbac16d54e66b821907a40d94e0e6349710e70",
@@ -10434,7 +10482,19 @@
       "error.plain.notFound": "bcbdb6c01d36cba08d7f123685ccd0e1243967d5b498cd8615cb01897bea05c3",
       "error.plain.tooLarge": "6698badb14fdf95c744bb7cfde5cbb4c999833ac9043597f1ec009348a7cbc80",
       "error.plain.server": "4bb75b0940538f075b027ef80f4e2b8b176d9499f54137b5148ce54b0fe16d75",
-      "error.plain.generic": "4def98c892406e31099ba18e5d6a60db12420dd723a27a5ab77235d20adb0beb"
+      "error.plain.generic": "4def98c892406e31099ba18e5d6a60db12420dd723a27a5ab77235d20adb0beb",
+      "team.nameRequired": "698b17e7f6b91edd42bcc3b4a5965fd5a73475e2926425e161d76e5ba832cc5f",
+      "sidebar.newChannel.nameLabel": "762ebb70ef0ea2e80a41035e91a5f95ec35b0b03d2f2acc5c5b4f4c09213c8c5",
+      "sidebar.newChannel.nameHelp": "eb78784481119c6cf6dcce70322e25d80d10dcea356955127efba68bc8921368",
+      "sidebar.newChannel.teamLabel": "70a51c173242a967905e6d0ba00b99c5b107e6c9598b5e5de4198d612419c293",
+      "sidebar.newChannel.noTeam": "e3924f2807b785f1696e48a823514203bcab4947656bcc37bff4bd85ec7b1a4e",
+      "sidebar.newChannel.teamSearch": "3ad7e221faf1041994c4506c7adc4ccc4ef681f135048a8a6067d07c55349f1e",
+      "sidebar.newChannel.teamsLoading": "e05fe2fbf9983836f58e5ec55f49af7f3a3a56db159a92d9277737505c2f8b62",
+      "sidebar.newChannel.teamsEmpty": "d3a07fc7c9e26f8576e6f86993f3e00fa3a287f8d0628e45786d6f51844c6569",
+      "sidebar.newChannel.membersLabel": "586d96d8e0f5687f1fe6d628ba764f016c9e51e93abfd07c70b32795985ff37c",
+      "sidebar.newChannel.membersRequired": "a52cedb57b9cc70c2d63cf555a966e476a59ab2dcd99e2151f78080e4fe8bce3",
+      "sidebar.newChannel.membersOne": "f95243d2d77f0b40baed1f8b340b0f35b3d9a0feda3419fd3cb8db1177a4a61a",
+      "sidebar.newChannel.membersMany": "3bcfc97168c58828803fcfdacbc4aa618f2ffc3101714645562937c5d03784ac"
     },
     "pt-br": {
       "pro.fromPrice": "5f6a69a9907ead66b99671e80d627cb02391f80aa883a5f2fb4d43fc68358697",
@@ -12050,7 +12110,19 @@
       "settings.sendKey.subtitle": "30a7d3ac5102dad9e2d202785e2cef0185c85241b279d5177fba55e5beda91cd",
       "computer.files.homeFolder": "6772da558a23e28185deb8d4bb7cdb20ae916f13a03eca9a9e5c0d4deffd4944",
       "computer.files.changeDefaultFolder": "d849aca289a009020a597abaf279d8db449aca92344e9d91485cf1cf0aadc144",
-      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885"
+      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885",
+      "team.nameRequired": "698b17e7f6b91edd42bcc3b4a5965fd5a73475e2926425e161d76e5ba832cc5f",
+      "sidebar.newChannel.nameLabel": "762ebb70ef0ea2e80a41035e91a5f95ec35b0b03d2f2acc5c5b4f4c09213c8c5",
+      "sidebar.newChannel.nameHelp": "eb78784481119c6cf6dcce70322e25d80d10dcea356955127efba68bc8921368",
+      "sidebar.newChannel.teamLabel": "70a51c173242a967905e6d0ba00b99c5b107e6c9598b5e5de4198d612419c293",
+      "sidebar.newChannel.noTeam": "e3924f2807b785f1696e48a823514203bcab4947656bcc37bff4bd85ec7b1a4e",
+      "sidebar.newChannel.teamSearch": "3ad7e221faf1041994c4506c7adc4ccc4ef681f135048a8a6067d07c55349f1e",
+      "sidebar.newChannel.teamsLoading": "e05fe2fbf9983836f58e5ec55f49af7f3a3a56db159a92d9277737505c2f8b62",
+      "sidebar.newChannel.teamsEmpty": "d3a07fc7c9e26f8576e6f86993f3e00fa3a287f8d0628e45786d6f51844c6569",
+      "sidebar.newChannel.membersLabel": "586d96d8e0f5687f1fe6d628ba764f016c9e51e93abfd07c70b32795985ff37c",
+      "sidebar.newChannel.membersRequired": "a52cedb57b9cc70c2d63cf555a966e476a59ab2dcd99e2151f78080e4fe8bce3",
+      "sidebar.newChannel.membersOne": "f95243d2d77f0b40baed1f8b340b0f35b3d9a0feda3419fd3cb8db1177a4a61a",
+      "sidebar.newChannel.membersMany": "3bcfc97168c58828803fcfdacbc4aa618f2ffc3101714645562937c5d03784ac"
     },
     "zh": {
       "pro.fromPrice": "5f6a69a9907ead66b99671e80d627cb02391f80aa883a5f2fb4d43fc68358697",
@@ -14595,7 +14667,19 @@
       "pro.name": "678fd2f7d313cdaf471d2eac4130247cc680243bf69b01fad68b5d0a3727b953",
       "computer.files.homeFolder": "6772da558a23e28185deb8d4bb7cdb20ae916f13a03eca9a9e5c0d4deffd4944",
       "computer.files.changeDefaultFolder": "d849aca289a009020a597abaf279d8db449aca92344e9d91485cf1cf0aadc144",
-      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885"
+      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885",
+      "team.nameRequired": "698b17e7f6b91edd42bcc3b4a5965fd5a73475e2926425e161d76e5ba832cc5f",
+      "sidebar.newChannel.nameLabel": "762ebb70ef0ea2e80a41035e91a5f95ec35b0b03d2f2acc5c5b4f4c09213c8c5",
+      "sidebar.newChannel.nameHelp": "eb78784481119c6cf6dcce70322e25d80d10dcea356955127efba68bc8921368",
+      "sidebar.newChannel.teamLabel": "70a51c173242a967905e6d0ba00b99c5b107e6c9598b5e5de4198d612419c293",
+      "sidebar.newChannel.noTeam": "e3924f2807b785f1696e48a823514203bcab4947656bcc37bff4bd85ec7b1a4e",
+      "sidebar.newChannel.teamSearch": "3ad7e221faf1041994c4506c7adc4ccc4ef681f135048a8a6067d07c55349f1e",
+      "sidebar.newChannel.teamsLoading": "e05fe2fbf9983836f58e5ec55f49af7f3a3a56db159a92d9277737505c2f8b62",
+      "sidebar.newChannel.teamsEmpty": "d3a07fc7c9e26f8576e6f86993f3e00fa3a287f8d0628e45786d6f51844c6569",
+      "sidebar.newChannel.membersLabel": "586d96d8e0f5687f1fe6d628ba764f016c9e51e93abfd07c70b32795985ff37c",
+      "sidebar.newChannel.membersRequired": "a52cedb57b9cc70c2d63cf555a966e476a59ab2dcd99e2151f78080e4fe8bce3",
+      "sidebar.newChannel.membersOne": "f95243d2d77f0b40baed1f8b340b0f35b3d9a0feda3419fd3cb8db1177a4a61a",
+      "sidebar.newChannel.membersMany": "3bcfc97168c58828803fcfdacbc4aa618f2ffc3101714645562937c5d03784ac"
     },
     "zh-tw": {
       "whop.description": "1a07cf04ef17029448d3781415cbac16d54e66b821907a40d94e0e6349710e70",
@@ -18394,7 +18478,19 @@
       "place.view.ccSignIn.lineMyCloud": "6355755039d6f4bc1a8ff134a46e7b29ff8c0f9a45da01340d4c39001303afa2",
       "computer.files.homeFolder": "6772da558a23e28185deb8d4bb7cdb20ae916f13a03eca9a9e5c0d4deffd4944",
       "computer.files.changeDefaultFolder": "d849aca289a009020a597abaf279d8db449aca92344e9d91485cf1cf0aadc144",
-      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885"
+      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885",
+      "team.nameRequired": "698b17e7f6b91edd42bcc3b4a5965fd5a73475e2926425e161d76e5ba832cc5f",
+      "sidebar.newChannel.nameLabel": "762ebb70ef0ea2e80a41035e91a5f95ec35b0b03d2f2acc5c5b4f4c09213c8c5",
+      "sidebar.newChannel.nameHelp": "eb78784481119c6cf6dcce70322e25d80d10dcea356955127efba68bc8921368",
+      "sidebar.newChannel.teamLabel": "70a51c173242a967905e6d0ba00b99c5b107e6c9598b5e5de4198d612419c293",
+      "sidebar.newChannel.noTeam": "e3924f2807b785f1696e48a823514203bcab4947656bcc37bff4bd85ec7b1a4e",
+      "sidebar.newChannel.teamSearch": "3ad7e221faf1041994c4506c7adc4ccc4ef681f135048a8a6067d07c55349f1e",
+      "sidebar.newChannel.teamsLoading": "e05fe2fbf9983836f58e5ec55f49af7f3a3a56db159a92d9277737505c2f8b62",
+      "sidebar.newChannel.teamsEmpty": "d3a07fc7c9e26f8576e6f86993f3e00fa3a287f8d0628e45786d6f51844c6569",
+      "sidebar.newChannel.membersLabel": "586d96d8e0f5687f1fe6d628ba764f016c9e51e93abfd07c70b32795985ff37c",
+      "sidebar.newChannel.membersRequired": "a52cedb57b9cc70c2d63cf555a966e476a59ab2dcd99e2151f78080e4fe8bce3",
+      "sidebar.newChannel.membersOne": "f95243d2d77f0b40baed1f8b340b0f35b3d9a0feda3419fd3cb8db1177a4a61a",
+      "sidebar.newChannel.membersMany": "3bcfc97168c58828803fcfdacbc4aa618f2ffc3101714645562937c5d03784ac"
     },
     "uk": {
       "pro.fromPrice": "5f6a69a9907ead66b99671e80d627cb02391f80aa883a5f2fb4d43fc68358697",
@@ -20540,7 +20636,19 @@
       "settings.sendKey.subtitle": "30a7d3ac5102dad9e2d202785e2cef0185c85241b279d5177fba55e5beda91cd",
       "computer.files.homeFolder": "6772da558a23e28185deb8d4bb7cdb20ae916f13a03eca9a9e5c0d4deffd4944",
       "computer.files.changeDefaultFolder": "d849aca289a009020a597abaf279d8db449aca92344e9d91485cf1cf0aadc144",
-      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885"
+      "computer.files.pinnedFolderHint": "b69c3a6863aa1de63d33f31fcd2ec1b43df5dab08c1a8dd931aec171adff9885",
+      "team.nameRequired": "698b17e7f6b91edd42bcc3b4a5965fd5a73475e2926425e161d76e5ba832cc5f",
+      "sidebar.newChannel.nameLabel": "762ebb70ef0ea2e80a41035e91a5f95ec35b0b03d2f2acc5c5b4f4c09213c8c5",
+      "sidebar.newChannel.nameHelp": "eb78784481119c6cf6dcce70322e25d80d10dcea356955127efba68bc8921368",
+      "sidebar.newChannel.teamLabel": "70a51c173242a967905e6d0ba00b99c5b107e6c9598b5e5de4198d612419c293",
+      "sidebar.newChannel.noTeam": "e3924f2807b785f1696e48a823514203bcab4947656bcc37bff4bd85ec7b1a4e",
+      "sidebar.newChannel.teamSearch": "3ad7e221faf1041994c4506c7adc4ccc4ef681f135048a8a6067d07c55349f1e",
+      "sidebar.newChannel.teamsLoading": "e05fe2fbf9983836f58e5ec55f49af7f3a3a56db159a92d9277737505c2f8b62",
+      "sidebar.newChannel.teamsEmpty": "d3a07fc7c9e26f8576e6f86993f3e00fa3a287f8d0628e45786d6f51844c6569",
+      "sidebar.newChannel.membersLabel": "586d96d8e0f5687f1fe6d628ba764f016c9e51e93abfd07c70b32795985ff37c",
+      "sidebar.newChannel.membersRequired": "a52cedb57b9cc70c2d63cf555a966e476a59ab2dcd99e2151f78080e4fe8bce3",
+      "sidebar.newChannel.membersOne": "f95243d2d77f0b40baed1f8b340b0f35b3d9a0feda3419fd3cb8db1177a4a61a",
+      "sidebar.newChannel.membersMany": "3bcfc97168c58828803fcfdacbc4aa618f2ffc3101714645562937c5d03784ac"
     }
   }
 }

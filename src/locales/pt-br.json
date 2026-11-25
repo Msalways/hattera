@@ -1612,5 +1612,17 @@
   "settings.sendKey.subtitle": "Escolha Shift+Enter ou {key} para que Enter comece uma nova linha, útil quando seu método de entrada confirma o texto com Enter, como na digitação em japonês. {key} envia em qualquer opção. Só neste dispositivo.",
   "computer.files.homeFolder": "Pasta pessoal",
   "computer.files.changeDefaultFolder": "Alterar padrão",
-  "computer.files.pinnedFolderHint": "Esta conversa mantém a pasta atual. Altere a pasta padrão para novas conversas."
+  "computer.files.pinnedFolderHint": "Esta conversa mantém a pasta atual. Altere a pasta padrão para novas conversas.",
+  "team.nameRequired": "Digite um nome de equipe.",
+  "sidebar.newChannel.nameLabel": "Nome do grupo",
+  "sidebar.newChannel.nameHelp": "Opcional. Por exemplo, Lançamento do site.",
+  "sidebar.newChannel.teamLabel": "Equipe (opcional)",
+  "sidebar.newChannel.noTeam": "Sem equipe",
+  "sidebar.newChannel.teamSearch": "Pesquisar equipes",
+  "sidebar.newChannel.teamsLoading": "Carregando equipes…",
+  "sidebar.newChannel.teamsEmpty": "Ainda não há equipes. Crie uma na barra lateral e escolha-a aqui.",
+  "sidebar.newChannel.membersLabel": "Bots deste chat em grupo",
+  "sidebar.newChannel.membersRequired": "Escolha pelo menos um bot.",
+  "sidebar.newChannel.membersOne": "1 bot selecionado",
+  "sidebar.newChannel.membersMany": "{count} bots selecionados"
 }

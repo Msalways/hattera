@@ -1596,5 +1596,17 @@
   "settings.sendKey.subtitle": "Elige Shift+Enter o {key} para que Enter empiece una línea nueva, útil si tu método de entrada confirma el texto con Enter, como al escribir en japonés. {key} envía con cualquier opción. Solo en este dispositivo.",
   "computer.files.homeFolder": "Carpeta personal",
   "computer.files.changeDefaultFolder": "Cambiar carpeta predeterminada",
-  "computer.files.pinnedFolderHint": "Esta conversación conserva su carpeta actual. Cambia la carpeta predeterminada para las nuevas conversaciones."
+  "computer.files.pinnedFolderHint": "Esta conversación conserva su carpeta actual. Cambia la carpeta predeterminada para las nuevas conversaciones.",
+  "team.nameRequired": "Introduce un nombre de equipo.",
+  "sidebar.newChannel.nameLabel": "Nombre del grupo",
+  "sidebar.newChannel.nameHelp": "Opcional. Por ejemplo, Lanzamiento web.",
+  "sidebar.newChannel.teamLabel": "Equipo (opcional)",
+  "sidebar.newChannel.noTeam": "Sin equipo",
+  "sidebar.newChannel.teamSearch": "Buscar equipos",
+  "sidebar.newChannel.teamsLoading": "Cargando equipos…",
+  "sidebar.newChannel.teamsEmpty": "Aún no hay equipos. Crea uno desde la barra lateral y elígelo aquí.",
+  "sidebar.newChannel.membersLabel": "Bots de este chat de grupo",
+  "sidebar.newChannel.membersRequired": "Elige al menos un bot.",
+  "sidebar.newChannel.membersOne": "1 bot seleccionado",
+  "sidebar.newChannel.membersMany": "{count} bots seleccionados"
 }

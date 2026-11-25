@@ -2142,5 +2142,17 @@
   "settings.sendKey.subtitle": "Оберіть Shift+Enter або {key}, щоб Enter починав новий рядок, — зручно, коли метод введення підтверджує текст клавішею Enter, як-от під час введення японською. {key} надсилає за будь-якого вибору. Лише на цьому пристрої.",
   "computer.files.homeFolder": "Домашня папка",
   "computer.files.changeDefaultFolder": "Змінити типову папку",
-  "computer.files.pinnedFolderHint": "Ця розмова зберігає свою поточну папку. Змініть типову папку для нових розмов."
+  "computer.files.pinnedFolderHint": "Ця розмова зберігає свою поточну папку. Змініть типову папку для нових розмов.",
+  "team.nameRequired": "Введіть назву команди.",
+  "sidebar.newChannel.nameLabel": "Назва групи",
+  "sidebar.newChannel.nameHelp": "Необов’язково. Наприклад, Запуск сайту.",
+  "sidebar.newChannel.teamLabel": "Команда (необов’язково)",
+  "sidebar.newChannel.noTeam": "Без команди",
+  "sidebar.newChannel.teamSearch": "Шукати команди",
+  "sidebar.newChannel.teamsLoading": "Завантаження команд…",
+  "sidebar.newChannel.teamsEmpty": "Команд ще немає. Створіть її на бічній панелі, а потім виберіть тут.",
+  "sidebar.newChannel.membersLabel": "Боти в цьому груповому чаті",
+  "sidebar.newChannel.membersRequired": "Виберіть принаймні одного бота.",
+  "sidebar.newChannel.membersOne": "Вибрано 1 бота",
+  "sidebar.newChannel.membersMany": "Вибрано ботів: {count}"
 }
